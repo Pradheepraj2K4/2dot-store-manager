@@ -80,8 +80,30 @@ class TransactionController {
 
   getNextReceiptNumber(req, res, next) {
     try {
-      const receiptNumber = transactionService.getNextReceiptNumber();
+      const type = req.query.type || 'credit';
+      const receiptNumber = transactionService.getNextReceiptNumber(type);
       res.json({ success: true, data: { receipt_number: receiptNumber } });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  updateTransaction(req, res, next) {
+    try {
+      const transaction = transactionService.updateTransaction(
+        parseInt(req.params.id),
+        req.body
+      );
+      res.json({ success: true, data: transaction });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  deleteTransaction(req, res, next) {
+    try {
+      transactionService.deleteTransaction(parseInt(req.params.id));
+      res.json({ success: true });
     } catch (err) {
       next(err);
     }

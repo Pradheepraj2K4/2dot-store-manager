@@ -19,8 +19,10 @@ export const transactionApi = {
   getByParty: (partyId) => api.get(`/transactions/party/${partyId}`),
   getPartyBalance: (partyId) => api.get(`/transactions/party/${partyId}/balance`),
   getOutstanding: () => api.get('/transactions/outstanding'),
-  getNextReceiptNumber: () => api.get('/transactions/next-receipt'),
+  getNextReceiptNumber: (type = 'credit') => api.get(`/transactions/next-receipt?type=${type}`),
   recordPayment: (data) => api.post('/transactions', data),
+  updatePayment: (id, data) => api.put(`/transactions/${id}`, data),
+  deletePayment: (id) => api.delete(`/transactions/${id}`),
   getStatement: (partyId, params = {}) => {
     const qs = new URLSearchParams(params).toString();
     return api.get(`/transactions/party/${partyId}/statement${qs ? `?${qs}` : ''}`);

@@ -66,6 +66,26 @@ class TransactionRepository {
     return db.prepare('SELECT * FROM transactions WHERE receipt_number = ?').get(receiptNumber);
   }
 
+  update(id, { date, type, amount, reference, notes }) {
+    const db = getDb();
+    db.prepare(`
+      UPDATE transactions
+      SET date = ?, type = ?, amount = ?, reference = ?, notes = ?
+      WHERE id = ?
+    `).run(date, type, amount, reference ?? '', notes ?? '', id);
+    return this.findById(id);
+  }
+
+  updateBalanceAfter(id, balance_after) {
+    const db = getDb();
+    db.prepare('UPDATE transactions SET balance_after = ? WHERE id = ?').run(balance_after, id);
+  }
+
+  delete(id) {
+    const db = getDb();
+    return db.prepare('DELETE FROM transactions WHERE id = ?').run(id);
+  }
+
   create({ party_id, date, type, amount, reference, notes, receipt_number, balance_after }) {
     const db = getDb();
     const stmt = db.prepare(`
@@ -132,13 +152,16 @@ class TransactionRepository {
     `).all();
   }
 
-  getLastReceiptNumber() {
+  getLastReceiptNumber(type) {
     const db = getDb();
+    // credit transactions use the REC- prefix; debit transactions use PAY-
+    const prefix = type === 'debit' ? 'PAY-%' : 'REC-%';
     const row = db.prepare(`
       SELECT receipt_number FROM transactions
       WHERE receipt_number IS NOT NULL
+        AND receipt_number LIKE ?
       ORDER BY id DESC LIMIT 1
-    `).get();
+    `).get(prefix);
     return row ? row.receipt_number : null;
   }
 

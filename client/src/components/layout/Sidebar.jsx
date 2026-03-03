@@ -17,7 +17,7 @@ const navigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
   { name: 'Customers', href: '/customers', icon: UserGroupIcon },
   { name: 'Suppliers', href: '/suppliers', icon: TruckIcon },
-  { name: 'Payments', href: '/payments', icon: CreditCardIcon },
+  { name: 'Payments/Receipts', href: '/payments', icon: CreditCardIcon },
   { name: 'Reports', href: '/reports', icon: DocumentChartBarIcon },
   { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
 ];

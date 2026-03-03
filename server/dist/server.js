@@ -23851,6 +23851,23 @@ var require_transactionRepository = __commonJS({
         const db = getDb();
         return db.prepare("SELECT * FROM transactions WHERE receipt_number = ?").get(receiptNumber);
       }
+      update(id, { date, type, amount, reference, notes }) {
+        const db = getDb();
+        db.prepare(`
+      UPDATE transactions
+      SET date = ?, type = ?, amount = ?, reference = ?, notes = ?
+      WHERE id = ?
+    `).run(date, type, amount, reference ?? "", notes ?? "", id);
+        return this.findById(id);
+      }
+      updateBalanceAfter(id, balance_after) {
+        const db = getDb();
+        db.prepare("UPDATE transactions SET balance_after = ? WHERE id = ?").run(balance_after, id);
+      }
+      delete(id) {
+        const db = getDb();
+        return db.prepare("DELETE FROM transactions WHERE id = ?").run(id);
+      }
       create({ party_id, date, type, amount, reference, notes, receipt_number, balance_after }) {
         const db = getDb();
         const stmt = db.prepare(`
@@ -23907,13 +23924,15 @@ var require_transactionRepository = __commonJS({
       ORDER BY p.name ASC
     `).all();
       }
-      getLastReceiptNumber() {
+      getLastReceiptNumber(type) {
         const db = getDb();
+        const prefix = type === "debit" ? "PAY-%" : "REC-%";
         const row = db.prepare(`
       SELECT receipt_number FROM transactions
       WHERE receipt_number IS NOT NULL
+        AND receipt_number LIKE ?
       ORDER BY id DESC LIMIT 1
-    `).get();
+    `).get(prefix);
         return row ? row.receipt_number : null;
       }
       getRecentTransactions(limit = 10) {
@@ -23994,7 +24013,7 @@ var require_transactionService = __commonJS({
             balanceAfter -= parsedAmount;
           }
         }
-        const receiptNumber = this._generateReceiptNumber();
+        const receiptNumber = this._generateReceiptNumber(type);
         const txnDate = date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
         const transaction = transactionRepository.create({
           party_id,
@@ -24010,6 +24029,48 @@ var require_transactionService = __commonJS({
       }
       getOutstandingBalances() {
         return transactionRepository.getAllBalances();
+      }
+      updateTransaction(id, { date, type, amount, reference, notes }) {
+        const txn = transactionRepository.findById(id);
+        if (!txn) throw new AppError("Transaction not found", 404);
+        if (!type || !["credit", "debit"].includes(type)) {
+          throw new AppError('Invalid transaction type. Must be "credit" or "debit".', 400);
+        }
+        const parsedAmount = parseFloat(amount);
+        if (isNaN(parsedAmount) || parsedAmount <= 0) {
+          throw new AppError("Amount must be a positive number.", 400);
+        }
+        transactionRepository.update(id, {
+          date: date || txn.date,
+          type,
+          amount: parsedAmount,
+          reference: reference ?? txn.reference,
+          notes: notes ?? txn.notes
+        });
+        this._recalculatePartyBalances(txn.party_id);
+        return transactionRepository.findById(id);
+      }
+      deleteTransaction(id) {
+        const txn = transactionRepository.findById(id);
+        if (!txn) throw new AppError("Transaction not found", 404);
+        const partyId = txn.party_id;
+        transactionRepository.delete(id);
+        this._recalculatePartyBalances(partyId);
+      }
+      // Recalculate balance_after for every transaction of a party in chronological order
+      _recalculatePartyBalances(partyId) {
+        const party = partyRepository.findById(partyId);
+        if (!party) return;
+        const txns = transactionRepository.findByPartyId(partyId);
+        let runningBalance = party.opening_balance;
+        for (const t of txns) {
+          if (party.type === "customer") {
+            runningBalance = t.type === "credit" ? runningBalance - t.amount : runningBalance + t.amount;
+          } else {
+            runningBalance = t.type === "credit" ? runningBalance + t.amount : runningBalance - t.amount;
+          }
+          transactionRepository.updateBalanceAfter(t.id, runningBalance);
+        }
       }
       getPartyBalance(partyId) {
         const party = partyRepository.findById(partyId);
@@ -24042,19 +24103,22 @@ var require_transactionService = __commonJS({
           period: { startDate, endDate }
         };
       }
-      getNextReceiptNumber() {
-        return this._generateReceiptNumber();
+      getNextReceiptNumber(type = "credit") {
+        return this._generateReceiptNumber(type);
       }
-      _generateReceiptNumber() {
-        const lastReceipt = transactionRepository.getLastReceiptNumber();
+      _generateReceiptNumber(type = "credit") {
+        const isDebit = type === "debit";
+        const prefix = isDebit ? "PAY" : "REC";
+        const regex = isDebit ? /PAY-(\d+)/ : /REC-(\d+)/;
+        const lastReceipt = transactionRepository.getLastReceiptNumber(type);
         let nextNum = 1;
         if (lastReceipt) {
-          const match = lastReceipt.match(/REC-(\d+)/);
+          const match = lastReceipt.match(regex);
           if (match) {
             nextNum = parseInt(match[1], 10) + 1;
           }
         }
-        return `REC-${String(nextNum).padStart(6, "0")}`;
+        return `${prefix}-${String(nextNum).padStart(6, "0")}`;
       }
     };
     module2.exports = new TransactionService();
@@ -24138,8 +24202,28 @@ var require_transactionController = __commonJS({
       }
       getNextReceiptNumber(req, res, next) {
         try {
-          const receiptNumber = transactionService.getNextReceiptNumber();
+          const type = req.query.type || "credit";
+          const receiptNumber = transactionService.getNextReceiptNumber(type);
           res.json({ success: true, data: { receipt_number: receiptNumber } });
+        } catch (err) {
+          next(err);
+        }
+      }
+      updateTransaction(req, res, next) {
+        try {
+          const transaction = transactionService.updateTransaction(
+            parseInt(req.params.id),
+            req.body
+          );
+          res.json({ success: true, data: transaction });
+        } catch (err) {
+          next(err);
+        }
+      }
+      deleteTransaction(req, res, next) {
+        try {
+          transactionService.deleteTransaction(parseInt(req.params.id));
+          res.json({ success: true });
         } catch (err) {
           next(err);
         }
@@ -24163,6 +24247,8 @@ var require_transactionRoutes = __commonJS({
     router.get("/party/:partyId/statement", (req, res, next) => txnController.getStatement(req, res, next));
     router.get("/:id", (req, res, next) => txnController.getById(req, res, next));
     router.post("/", (req, res, next) => txnController.recordPayment(req, res, next));
+    router.put("/:id", (req, res, next) => txnController.updateTransaction(req, res, next));
+    router.delete("/:id", (req, res, next) => txnController.deleteTransaction(req, res, next));
     module2.exports = router;
   }
 });

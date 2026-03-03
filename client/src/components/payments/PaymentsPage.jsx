@@ -14,6 +14,8 @@ import {
   DocumentTextIcon,
   CalendarDaysIcon,
   MagnifyingGlassIcon,
+  PencilIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 
 // ── Date range helpers ────────────────────────────────────────────────────────
@@ -77,6 +79,9 @@ export default function PaymentsPage() {
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [receiptModal, setReceiptModal] = useState({ open: false, transaction: null });
   const [nextReceiptNumber, setNextReceiptNumber] = useState(null);
+  const [editingTransaction, setEditingTransaction] = useState(null);
+  const [deleteConfirm, setDeleteConfirm] = useState({ open: false, txn: null });
+  const [deleting, setDeleting] = useState(false);
 
   // ── URL params (for deep-link from Dashboard) ─────────────────────────
   const [searchParams] = useSearchParams();
@@ -107,6 +112,19 @@ export default function PaymentsPage() {
   });
   const [submitting, setSubmitting]             = useState(false);
   const [selectedPartyBalance, setSelectedPartyBalance] = useState(null);
+  const [paymentErrors, setPaymentErrors] = useState({});
+  const [paymentTouched, setPaymentTouched] = useState({});
+
+  function validatePaymentForm(f) {
+    const errs = {};
+    if (!f.party_id) errs.party_id = 'Please select a party.';
+    if (!f.date) errs.date = 'Date is required.';
+    const amt = parseFloat(f.amount);
+    if (!f.amount) errs.amount = 'Amount is required.';
+    else if (isNaN(amt) || amt <= 0) errs.amount = 'Amount must be a positive number.';
+    if (f.reference && f.reference.length > 100) errs.reference = 'Reference must be 100 characters or less.';
+    return errs;
+  }
 
   // ── Refs for Enter-key navigation in modal form ────────────────────────
   const partyRef     = useRef(null);
@@ -181,9 +199,49 @@ export default function PaymentsPage() {
 
   // ── Helpers ────────────────────────────────────────────────────────────
   const openPaymentModal = async () => {
+    setEditingTransaction(null);
+    setForm({ party_id: '', date: todayISO(), type: 'credit', amount: '', reference: '', notes: '' });
     setPaymentModalOpen(true);
     try {
-      const res = await transactionApi.getNextReceiptNumber();
+      const res = await transactionApi.getNextReceiptNumber('credit');
+      setNextReceiptNumber(res.data.receipt_number);
+    } catch {
+      setNextReceiptNumber(null);
+    }
+  };
+
+  const openEditModal = (txn) => {
+    setEditingTransaction(txn);
+    setForm({
+      party_id: txn.party_id,
+      date: txn.date,
+      type: txn.type,
+      amount: String(txn.amount),
+      reference: txn.reference || '',
+      notes: txn.notes || '',
+    });
+    setNextReceiptNumber(txn.receipt_number);
+    setSelectedPartyBalance(null);
+    setPaymentErrors({});
+    setPaymentTouched({});
+    setPaymentModalOpen(true);
+  };
+
+  const closePaymentModal = () => {
+    setPaymentModalOpen(false);
+    setEditingTransaction(null);
+    setSelectedPartyBalance(null);
+    setNextReceiptNumber(null);
+    setPaymentErrors({});
+    setPaymentTouched({});
+  };
+
+  const handleTypeChange = async (newType) => {
+    setForm((prev) => ({ ...prev, type: newType }));
+    // Don't re-fetch receipt number in edit mode — it's locked to the original
+    if (editingTransaction) return;
+    try {
+      const res = await transactionApi.getNextReceiptNumber(newType);
       setNextReceiptNumber(res.data.receipt_number);
     } catch {
       setNextReceiptNumber(null);
@@ -191,7 +249,9 @@ export default function PaymentsPage() {
   };
 
   const handlePartyChange = async (partyId) => {
-    setForm((prev) => ({ ...prev, party_id: partyId }));
+    const newForm = { ...form, party_id: partyId };
+    setForm(newForm);
+    if (paymentTouched.party_id) setPaymentErrors(validatePaymentForm(newForm));
     if (partyId) {
       try {
         const res = await transactionApi.getPartyBalance(partyId);
@@ -213,27 +273,34 @@ export default function PaymentsPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.party_id || !form.amount) {
-      toast.error('Please select a party and enter an amount');
-      return;
-    }
+    // Mark all fields touched and validate
+    const allTouched = { party_id: true, date: true, amount: true, reference: true };
+    setPaymentTouched(allTouched);
+    const errs = validatePaymentForm(form);
+    setPaymentErrors(errs);
+    if (Object.keys(errs).length > 0) return;
     try {
       setSubmitting(true);
-      const res = await transactionApi.recordPayment({
+      const payload = {
         party_id: parseInt(form.party_id),
         date: form.date,
         type: form.type,
         amount: parseFloat(form.amount),
         reference: form.reference,
         notes: form.notes,
-      });
-      toast.success('Payment recorded successfully');
-      setPaymentModalOpen(false);
-      setForm({ party_id: '', date: todayISO(), type: 'credit', amount: '', reference: '', notes: '' });
-      setSelectedPartyBalance(null);
-      setNextReceiptNumber(null);
-      setReceiptModal({ open: true, transaction: res.data });
-      // Refresh only transactions
+      };
+
+      if (editingTransaction) {
+        await transactionApi.updatePayment(editingTransaction.id, payload);
+        toast.success('Payment updated successfully');
+        closePaymentModal();
+      } else {
+        const res = await transactionApi.recordPayment(payload);
+        toast.success('Payment recorded successfully');
+        closePaymentModal();
+        setReceiptModal({ open: true, transaction: res.data });
+      }
+
       const range = activeDateRange();
       const txnRes = await transactionApi.getAll({ startDate: range.from, endDate: range.to });
       setTransactions(txnRes.data);
@@ -241,6 +308,23 @@ export default function PaymentsPage() {
       toast.error(err.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteConfirm.txn) return;
+    try {
+      setDeleting(true);
+      await transactionApi.deletePayment(deleteConfirm.txn.id);
+      toast.success('Payment deleted');
+      setDeleteConfirm({ open: false, txn: null });
+      const range = activeDateRange();
+      const txnRes = await transactionApi.getAll({ startDate: range.from, endDate: range.to });
+      setTransactions(txnRes.data);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -452,7 +536,7 @@ export default function PaymentsPage() {
                   <th className="px-4 py-2.5 text-center font-semibold text-slate-600">Type</th>
                   <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Amount</th>
                   <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Balance After</th>
-                  <th className="px-4 py-2.5 text-center font-semibold text-slate-600">Receipt</th>
+                  <th className="px-4 py-2.5 text-center font-semibold text-slate-600">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -478,13 +562,29 @@ export default function PaymentsPage() {
                       {formatCurrency(txn.balance_after)}
                     </td>
                     <td className="px-4 py-2.5 text-center">
-                      <button
-                        onClick={() => setReceiptModal({ open: true, transaction: txn })}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-trust-blue transition-colors"
-                        title="View Receipt"
-                      >
-                        <DocumentTextIcon className="h-4 w-4" />
-                      </button>
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => openEditModal(txn)}
+                          className="rounded-lg p-1.5 text-slate-400 hover:bg-blue-50 hover:text-trust-blue transition-colors"
+                          title="Edit Payment"
+                        >
+                          <PencilIcon className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirm({ open: true, txn })}
+                          className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                          title="Delete Payment"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => setReceiptModal({ open: true, transaction: txn })}
+                          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-trust-blue transition-colors"
+                          title="View Receipt"
+                        >
+                          <DocumentTextIcon className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -518,35 +618,89 @@ export default function PaymentsPage() {
         </div>
       )}
 
-      {/* Payment Entry Modal */}
+      {/* Delete Confirmation Modal */}
+      <Modal
+        open={deleteConfirm.open}
+        onClose={() => setDeleteConfirm({ open: false, txn: null })}
+        title="Delete Payment"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-slate-600">
+            Are you sure you want to delete payment{' '}
+            <span className="font-mono font-semibold text-slate-800">
+              {deleteConfirm.txn?.receipt_number}
+            </span>
+            {' '}for{' '}
+            <span className="font-semibold text-slate-800">{deleteConfirm.txn?.party_name}</span>?
+            <br />
+            <span className="text-xs text-red-500 mt-1 block">This action cannot be undone. Balances will be recalculated.</span>
+          </p>
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={() => setDeleteConfirm({ open: false, txn: null })}
+              className="btn-secondary"
+              disabled={deleting}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="px-4 py-2 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 transition-colors"
+            >
+              {deleting ? 'Deleting...' : 'Delete'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Payment Entry / Edit Modal */}
       <Modal
         open={paymentModalOpen}
-        onClose={() => {
-          setPaymentModalOpen(false);
-          setSelectedPartyBalance(null);
-          setNextReceiptNumber(null);
-        }}
-        title="Record Payment"
+        onClose={closePaymentModal}
+        title={editingTransaction ? 'Edit Payment' : 'Record Payment'}
         size="md"
       >
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Receipt number preview */}
           <div className="flex items-center justify-between rounded-lg bg-slate-50 border border-slate-200 px-3 py-2">
             <span className="text-xs text-slate-500">Receipt No.</span>
-            <span className="font-mono font-semibold text-sm text-slate-700 tracking-wide">
-              {nextReceiptNumber ?? '—'}
-            </span>
+            <div className="flex items-center gap-2">
+              {editingTransaction && (
+                <span className="text-[10px] text-slate-400 uppercase tracking-wide">locked</span>
+              )}
+              <span className="font-mono font-semibold text-sm text-slate-700 tracking-wide">
+                {nextReceiptNumber ?? '—'}
+              </span>
+            </div>
           </div>
           <div>
             <label className="label">Party *</label>
-            <PartyAutocomplete
-              ref={partyRef}
-              parties={parties}
-              value={form.party_id}
-              onChange={handlePartyChange}
-              onEnterWhenSelected={() => dateRef.current?.focus()}
-              placeholder="Search for customer or supplier..."
-            />
+            {editingTransaction ? (
+              <div className="flex items-center gap-2 input-field bg-slate-50 cursor-not-allowed">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-slate-700 truncate">{editingTransaction.party_name}</p>
+                  <p className="text-xs text-slate-400 capitalize">{editingTransaction.party_type}</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <PartyAutocomplete
+                  ref={partyRef}
+                  parties={parties}
+                  value={form.party_id}
+                  onChange={handlePartyChange}
+                  onEnterWhenSelected={() => dateRef.current?.focus()}
+                  placeholder="Search for customer or supplier..."
+                />
+                {paymentErrors.party_id && paymentTouched.party_id && (
+                  <p className="text-xs text-red-500 mt-1">{paymentErrors.party_id}</p>
+                )}
+              </>
+            )}
           </div>
 
           {selectedPartyBalance && (
@@ -565,17 +719,28 @@ export default function PaymentsPage() {
                 ref={dateRef}
                 type="date"
                 value={form.date}
-                onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))}
+                onChange={(e) => {
+                  const newForm = { ...form, date: e.target.value };
+                  setForm(newForm);
+                  if (paymentTouched.date) setPaymentErrors(validatePaymentForm(newForm));
+                }}
+                onBlur={() => {
+                  setPaymentTouched((p) => ({ ...p, date: true }));
+                  setPaymentErrors(validatePaymentForm(form));
+                }}
                 onKeyDown={(e) => handleKeyDown(e, typeRef)}
-                className="input-field"
+                className={`input-field ${paymentErrors.date && paymentTouched.date ? 'border-red-400' : ''}`}
               />
+              {paymentErrors.date && paymentTouched.date && (
+                <p className="text-xs text-red-500 mt-1">{paymentErrors.date}</p>
+              )}
             </div>
             <div>
               <label className="label">Type *</label>
               <select
                 ref={typeRef}
                 value={form.type}
-                onChange={(e) => setForm((prev) => ({ ...prev, type: e.target.value }))}
+                onChange={(e) => handleTypeChange(e.target.value)}
                 onKeyDown={(e) => handleKeyDown(e, amountRef)}
                 className="input-field"
               >
@@ -625,14 +790,24 @@ export default function PaymentsPage() {
               ref={amountRef}
               type="number"
               value={form.amount}
-              onChange={(e) => setForm((prev) => ({ ...prev, amount: e.target.value }))}
+              onChange={(e) => {
+                const newForm = { ...form, amount: e.target.value };
+                setForm(newForm);
+                if (paymentTouched.amount) setPaymentErrors(validatePaymentForm(newForm));
+              }}
+              onBlur={() => {
+                setPaymentTouched((p) => ({ ...p, amount: true }));
+                setPaymentErrors(validatePaymentForm(form));
+              }}
               onKeyDown={(e) => handleKeyDown(e, referenceRef)}
               step="0.01"
               min="0.01"
-              required
-              className="input-field"
+              className={`input-field ${paymentErrors.amount && paymentTouched.amount ? 'border-red-400' : ''}`}
               placeholder="0.00"
             />
+            {paymentErrors.amount && paymentTouched.amount && (
+              <p className="text-xs text-red-500 mt-1">{paymentErrors.amount}</p>
+            )}
           </div>
 
           <div>
@@ -641,11 +816,23 @@ export default function PaymentsPage() {
               ref={referenceRef}
               type="text"
               value={form.reference}
-              onChange={(e) => setForm((prev) => ({ ...prev, reference: e.target.value }))}
+              onChange={(e) => {
+                const newForm = { ...form, reference: e.target.value };
+                setForm(newForm);
+                if (paymentTouched.reference) setPaymentErrors(validatePaymentForm(newForm));
+              }}
+              onBlur={() => {
+                setPaymentTouched((p) => ({ ...p, reference: true }));
+                setPaymentErrors(validatePaymentForm(form));
+              }}
               onKeyDown={(e) => handleKeyDown(e, notesRef)}
-              className="input-field"
+              maxLength={100}
+              className={`input-field ${paymentErrors.reference && paymentTouched.reference ? 'border-red-400' : ''}`}
               placeholder="Check number, invoice ref, etc."
             />
+            {paymentErrors.reference && paymentTouched.reference && (
+              <p className="text-xs text-red-500 mt-1">{paymentErrors.reference}</p>
+            )}
           </div>
 
           <div>
@@ -664,16 +851,15 @@ export default function PaymentsPage() {
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
-              onClick={() => {
-                setPaymentModalOpen(false);
-                setSelectedPartyBalance(null);
-              }}
+              onClick={closePaymentModal}
               className="btn-secondary"
             >
               Cancel
             </button>
             <button ref={submitRef} type="submit" disabled={submitting} className="btn-primary">
-              {submitting ? 'Recording...' : 'Record Payment'}
+              {submitting
+                ? (editingTransaction ? 'Saving...' : 'Recording...')
+                : (editingTransaction ? 'Save Changes' : 'Record Payment')}
             </button>
           </div>
         </form>

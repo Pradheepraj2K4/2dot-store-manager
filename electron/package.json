@@ -1,0 +1,67 @@
+{
+  "name": "2dot-store-manager",
+  "version": "1.0.0",
+  "description": "2Dot Store Manager — Desktop wrapper",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "postinstall": "electron-rebuild -f -w better-sqlite3",
+    "rebuild": "electron-rebuild -f -w better-sqlite3",
+    "dist": "electron-builder --win",
+    "dist:dir": "electron-builder --win --dir"
+  },
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^24.13.3",
+    "@electron/rebuild": "^3.6.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0"
+  },
+  "build": {
+    "appId": "com.2dotsolutions.storemanager",
+    "productName": "2Dot Store Manager",
+    "copyright": "Copyright © 2026 2Dot Solutions",
+
+    "asar": false,
+
+    "directories": {
+      "output": "dist"
+    },
+
+    "files": [
+      "main.js",
+      "node_modules/**"
+    ],
+
+    "extraResources": [
+      {
+        "from": "../server/dist/server.js",
+        "to": "server.js"
+      },
+      {
+        "from": "../client/dist",
+        "to": "client/dist"
+      }
+    ],
+
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+        "icon": "../client/public/icon.ico"
+    },
+
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "2Dot Store Manager"
+    }
+  }
+}

@@ -1,0 +1,88 @@
+Role: You are an expert Full Stack Engineer specializing in Electron, Node.js (Express), and React.
+Project Name: 2DotInventory
+Objective: Build a robust, offline-first Accounts Module for an inventory system.
+
+1. Technical Architecture
+Frontend: React (Vite/CRA), Tailwind CSS, Headless UI (for components).
+
+Backend: Node.js Express API.
+
+Database: SQLite via better-sqlite3.
+
+Distribution: The backend is bundled using nexe into app.exe, which serves the React build.
+
+Communication: React communicates with the local Express server via standard REST calls.
+
+2. Database Schema Requirements
+Design a schema that tracks "ledger" style entries rather than just flat balances:
+
+Entities: Parties (Type: Customer or Supplier, Name, Address, Phone, Place, Opening Balance).
+
+Transactions: Transactions (PartyID, Date, Type: Credit/Debit, Amount, Reference/Notes, CurrentBalanceAfterTransaction).
+
+Settings: Settings - store as two columns [Key - Value] (Keys can be => Store Name, Address, GST/Tax ID, Logo Path, Receipt Template Config).
+
+3. Feature Requirements: Accounts Module
+Onboarding: Create/Edit Customers and Suppliers with an initial opening balance.
+
+Outstanding Management: A dashboard showing a list of all parties and their current net outstanding (Balance = Opening + Credits - Debits).
+
+Payment Entry: A dedicated form to record a payment.
+
+Support partial payments (e.g., if $10k is owed, record $2k today).
+
+Automatically update the party's outstanding balance.
+
+Receipt System: * Generate a unique receipt for every payment entry.
+
+Receipt Preview: A modal showing a professional bill layout.
+
+Configurability: The layout (Header, Footer, Font Size) should be driven by a JSON config stored in the Settings table.
+
+Reports:
+
+Generate "Statement of Account" for individual parties.
+
+Export functionality for all reports to Excel (using exceljs) and PDF (using jsPDF/html-pdf).
+
+4. UI/UX Specifications
+Layout: A sidebar-based navigation (Dashboard, Customers, Suppliers, Payments, Reports, Settings).
+
+Style: Clean, professional "Enterprise" look using Tailwind CSS. Use a neutral color palette (Slates/Blues).
+
+Settings Page: Fields to update shop profile and toggle receipt layout preferences (e.g., thermal vs. A4).
+
+Section: UI/UX & Visual Identity
+Color Palette: Use a "Trust & Ledger" theme.
+
+Primary/Sidebar: Deep Slate (#0F172A) or Navy.
+
+Main Background: Light Slate/Gray (#F8FAFC) to reduce eye strain.
+
+Action Elements: Professional Trust Blue (#1D4ED8) for primary buttons and active states.
+
+Accounting Status Colors (Strict Consistency):
+
+Credit/Inward/Receivable: Use Emerald Green (#059669) to signify positive cash flow or amounts owed to the shop.
+
+Debit/Outward/Payable: Use Rose Red (#E11D48) to signify pending payments to suppliers.
+
+Pending/Partial: Use Amber/Gold (#F59E0B) for incomplete transactions.
+
+Data Density: * Use Zebra-striping (alternating row colors) for all ledger and transaction tables to ensure high readability of financial data.
+
+Implement a "Condensed" mode or tight padding in tables to allow more records to be visible on one screen without scrolling.
+
+Component Style: * Use Headless UI or Radix UI for accessible dropdowns and modals.
+
+Receipt previews must be rendered in a distinct white "paper" container (bg-white) with a high-contrast shadow to separate it from the app interface.
+
+5. Implementation Standards
+Code Quality: Use a Controller-Service-Repository pattern for the Express backend to keep logic separate from routes.
+
+DB Handling: Ensure better-sqlite3 uses prepared statements to prevent SQL injection.
+
+Error Handling: Implement a global error handler in Express and toast notifications in React.
+
+Offline First: Ensure all operations work locally without internet.
+

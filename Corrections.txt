@@ -1,0 +1,20 @@
+New supplier & Customers:
+	- GST No. - Optional
+	- State Code (34 - PY,22- TN) - Optional
+	- IGST Status - Yes/No - Mandatory
+
+Reports - Statment of Account
+	- Search Party instead of select
+	- Date filter should have a default date
+
+Oustanding Balance
+	- Search by party
+
+Payments Entry
+	- Should have a ID
+
+Navigate dashboard outstanding to suppliers/Customers
+
+---------------------------------------------------
+
+Expenses Entry

@@ -1,0 +1,22 @@
+{
+  "name": "2dot-inventory-server",
+  "version": "1.0.0",
+  "description": "2DotInventory Backend - Accounts Module",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "build": "esbuild src/index.js --bundle --platform=node --outfile=dist/server.js --external:better-sqlite3 --external:bindings"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.7.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.0",
+    "morgan": "^1.10.0",
+    "uuid": "^10.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "nodemon": "^3.1.0"
+  }
+}

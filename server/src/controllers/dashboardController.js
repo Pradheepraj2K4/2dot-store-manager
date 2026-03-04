@@ -9,18 +9,18 @@ class DashboardController {
       const recentTransactions = transactionService.getRecentTransactions(10);
       const outstanding = transactionService.getOutstandingBalances();
 
-      // Compute aggregates
+      // Compute aggregates — use outstanding (principal + pending interest) if available
       const totalReceivable = outstanding
-        .filter((p) => p.type === 'customer' && p.current_balance > 0)
-        .reduce((sum, p) => sum + p.current_balance, 0);
+        .filter((p) => p.type === 'customer' && (p.outstanding || p.current_balance) > 0)
+        .reduce((sum, p) => sum + (p.outstanding || p.current_balance), 0);
 
       const totalPayable = outstanding
-        .filter((p) => p.type === 'supplier' && p.current_balance > 0)
-        .reduce((sum, p) => sum + p.current_balance, 0);
+        .filter((p) => p.type === 'supplier' && (p.outstanding || p.current_balance) > 0)
+        .reduce((sum, p) => sum + (p.outstanding || p.current_balance), 0);
 
       const topOutstanding = outstanding
-        .filter((p) => Math.abs(p.current_balance) > 0)
-        .sort((a, b) => Math.abs(b.current_balance) - Math.abs(a.current_balance))
+        .filter((p) => Math.abs(p.outstanding || p.current_balance) > 0)
+        .sort((a, b) => Math.abs(b.outstanding || b.current_balance) - Math.abs(a.outstanding || a.current_balance))
         .slice(0, 5);
 
       res.json({

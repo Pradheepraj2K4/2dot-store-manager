@@ -86,13 +86,13 @@ class TransactionRepository {
     return db.prepare('DELETE FROM transactions WHERE id = ?').run(id);
   }
 
-  create({ party_id, date, type, amount, reference, notes, receipt_number, balance_after }) {
+  create({ party_id, date, type, amount, reference, notes, receipt_number, balance_after, payment_target }) {
     const db = getDb();
     const stmt = db.prepare(`
-      INSERT INTO transactions (party_id, date, type, amount, reference, notes, receipt_number, balance_after)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO transactions (party_id, date, type, amount, reference, notes, receipt_number, balance_after, payment_target)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const result = stmt.run(party_id, date, type, amount, reference || '', notes || '', receipt_number, balance_after);
+    const result = stmt.run(party_id, date, type, amount, reference || '', notes || '', receipt_number, balance_after, payment_target || 'principal');
     return this.findById(result.lastInsertRowid);
   }
 
@@ -101,12 +101,22 @@ class TransactionRepository {
     const party = db.prepare('SELECT opening_balance, type FROM parties WHERE id = ?').get(partyId);
     if (!party) return null;
 
+    // Only count principal-targeted transactions for the balance
     const totals = db.prepare(`
       SELECT
         COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE 0 END), 0) as total_credit,
         COALESCE(SUM(CASE WHEN type = 'debit' THEN amount ELSE 0 END), 0) as total_debit
       FROM transactions
-      WHERE party_id = ?
+      WHERE party_id = ? AND payment_target = 'principal'
+    `).get(partyId);
+
+    // Interest-targeted payments (tracked separately)
+    const interestTotals = db.prepare(`
+      SELECT
+        COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE 0 END), 0) as interest_credit,
+        COALESCE(SUM(CASE WHEN type = 'debit' THEN amount ELSE 0 END), 0) as interest_debit
+      FROM transactions
+      WHERE party_id = ? AND payment_target = 'interest'
     `).get(partyId);
 
     // For CUSTOMER: opening - credit + debit (they owe us)
@@ -115,11 +125,25 @@ class TransactionRepository {
       ? party.opening_balance - totals.total_credit + totals.total_debit
       : party.opening_balance + totals.total_credit - totals.total_debit;
 
+    // Pending interest from the interest_entries table
+    const interestRow = db.prepare(`
+      SELECT COALESCE(SUM(interest_amount - adjustment), 0) as pending_interest
+      FROM interest_entries
+      WHERE party_id = ? AND status = 'pending'
+    `).get(partyId);
+
+    const pending_interest = interestRow ? interestRow.pending_interest : 0;
+    const outstanding = current_balance + pending_interest;
+
     return {
       opening_balance: party.opening_balance,
       total_credit: totals.total_credit,
       total_debit: totals.total_debit,
       current_balance,
+      interest_credit: interestTotals.interest_credit,
+      interest_debit: interestTotals.interest_debit,
+      pending_interest,
+      outstanding,
     };
   }
 
@@ -133,18 +157,36 @@ class TransactionRepository {
         p.phone,
         p.place,
         p.opening_balance,
-        COALESCE(SUM(CASE WHEN t.type = 'credit' THEN t.amount ELSE 0 END), 0) as total_credit,
-        COALESCE(SUM(CASE WHEN t.type = 'debit' THEN t.amount ELSE 0 END), 0) as total_debit,
+        p.interest_rate,
+        p.interest_scheme,
+        COALESCE(SUM(CASE WHEN t.type = 'credit' AND t.payment_target = 'principal' THEN t.amount ELSE 0 END), 0) as total_credit,
+        COALESCE(SUM(CASE WHEN t.type = 'debit'  AND t.payment_target = 'principal' THEN t.amount ELSE 0 END), 0) as total_debit,
         CASE
           WHEN p.type = 'customer' THEN
             (p.opening_balance -
-              COALESCE(SUM(CASE WHEN t.type = 'credit' THEN t.amount ELSE 0 END), 0) +
-              COALESCE(SUM(CASE WHEN t.type = 'debit' THEN t.amount ELSE 0 END), 0))
+              COALESCE(SUM(CASE WHEN t.type = 'credit' AND t.payment_target = 'principal' THEN t.amount ELSE 0 END), 0) +
+              COALESCE(SUM(CASE WHEN t.type = 'debit'  AND t.payment_target = 'principal' THEN t.amount ELSE 0 END), 0))
           ELSE
             (p.opening_balance +
-              COALESCE(SUM(CASE WHEN t.type = 'credit' THEN t.amount ELSE 0 END), 0) -
-              COALESCE(SUM(CASE WHEN t.type = 'debit' THEN t.amount ELSE 0 END), 0))
-        END as current_balance
+              COALESCE(SUM(CASE WHEN t.type = 'credit' AND t.payment_target = 'principal' THEN t.amount ELSE 0 END), 0) -
+              COALESCE(SUM(CASE WHEN t.type = 'debit'  AND t.payment_target = 'principal' THEN t.amount ELSE 0 END), 0))
+        END as current_balance,
+        COALESCE((SELECT SUM(ie.interest_amount - ie.adjustment)
+                  FROM interest_entries ie
+                  WHERE ie.party_id = p.id AND ie.status = 'pending'), 0) as pending_interest,
+        CASE
+          WHEN p.type = 'customer' THEN
+            (p.opening_balance -
+              COALESCE(SUM(CASE WHEN t.type = 'credit' AND t.payment_target = 'principal' THEN t.amount ELSE 0 END), 0) +
+              COALESCE(SUM(CASE WHEN t.type = 'debit'  AND t.payment_target = 'principal' THEN t.amount ELSE 0 END), 0))
+          ELSE
+            (p.opening_balance +
+              COALESCE(SUM(CASE WHEN t.type = 'credit' AND t.payment_target = 'principal' THEN t.amount ELSE 0 END), 0) -
+              COALESCE(SUM(CASE WHEN t.type = 'debit'  AND t.payment_target = 'principal' THEN t.amount ELSE 0 END), 0))
+        END +
+        COALESCE((SELECT SUM(ie.interest_amount - ie.adjustment)
+                  FROM interest_entries ie
+                  WHERE ie.party_id = p.id AND ie.status = 'pending'), 0) as outstanding
       FROM parties p
       LEFT JOIN transactions t ON p.id = t.party_id
       GROUP BY p.id

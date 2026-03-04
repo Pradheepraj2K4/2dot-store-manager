@@ -14,30 +14,33 @@ class PartyRepository {
     return db.prepare('SELECT * FROM parties WHERE id = ?').get(id);
   }
 
-  create({ type, name, address, phone, place, opening_balance, gst_no, state_code, igst_status }) {
+  create({ type, name, address, phone, place, opening_balance, gst_no, state_code, igst_status, interest_rate, interest_scheme }) {
     const db = getDb();
     const stmt = db.prepare(`
-      INSERT INTO parties (type, name, address, phone, place, opening_balance, gst_no, state_code, igst_status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO parties (type, name, address, phone, place, opening_balance, gst_no, state_code, igst_status, interest_rate, interest_scheme)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const result = stmt.run(
       type, name, address || '', phone || '', place || '', opening_balance || 0,
-      gst_no || '', state_code || '', igst_status || 'NO'
+      gst_no || '', state_code || '', igst_status || 'NO',
+      parseFloat(interest_rate) || 0, interest_scheme || 'NONE'
     );
     return this.findById(result.lastInsertRowid);
   }
 
-  update(id, { name, address, phone, place, type, gst_no, state_code, igst_status }) {
+  update(id, { name, address, phone, place, type, gst_no, state_code, igst_status, interest_rate, interest_scheme }) {
     const db = getDb();
     const stmt = db.prepare(`
       UPDATE parties
       SET name = ?, address = ?, phone = ?, place = ?, type = ?,
           gst_no = ?, state_code = ?, igst_status = ?,
+          interest_rate = ?, interest_scheme = ?,
           updated_at = datetime('now', 'localtime')
       WHERE id = ?
     `);
     stmt.run(name, address || '', phone || '', place || '', type,
-      gst_no || '', state_code || '', igst_status || 'NO', id);
+      gst_no || '', state_code || '', igst_status || 'NO',
+      parseFloat(interest_rate) || 0, interest_scheme || 'NONE', id);
     return this.findById(id);
   }
 

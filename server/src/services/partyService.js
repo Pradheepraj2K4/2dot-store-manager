@@ -25,10 +25,15 @@ class PartyService {
     if (!igst_status || !['YES', 'NO'].includes(igst_status)) {
       throw new AppError('IGST Status is required. Must be "YES" or "NO".', 400);
     }
+    if (data.interest_scheme && !['NONE', 'DAILY', 'MONTHLY'].includes(data.interest_scheme)) {
+      throw new AppError('Interest scheme must be "NONE", "DAILY", or "MONTHLY".', 400);
+    }
     return partyRepository.create({
       ...data,
       name: name.trim(),
       opening_balance: parseFloat(data.opening_balance) || 0,
+      interest_rate: parseFloat(data.interest_rate) || 0,
+      interest_scheme: data.interest_scheme || 'NONE',
     });
   }
 
@@ -43,9 +48,14 @@ class PartyService {
     if (!data.igst_status || !['YES', 'NO'].includes(data.igst_status)) {
       throw new AppError('IGST Status is required. Must be "YES" or "NO".', 400);
     }
+    if (data.interest_scheme && !['NONE', 'DAILY', 'MONTHLY'].includes(data.interest_scheme)) {
+      throw new AppError('Interest scheme must be "NONE", "DAILY", or "MONTHLY".', 400);
+    }
     return partyRepository.update(id, {
       ...data,
       name: data.name.trim(),
+      interest_rate: parseFloat(data.interest_rate) || 0,
+      interest_scheme: data.interest_scheme || 'NONE',
     });
   }
 

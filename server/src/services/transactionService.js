@@ -1,5 +1,6 @@
 const transactionRepository = require('../repositories/transactionRepository');
 const partyRepository = require('../repositories/partyRepository');
+const interestRepository = require('../repositories/interestRepository');
 const { AppError } = require('../middleware/errorHandler');
 
 class TransactionService {
@@ -25,7 +26,7 @@ class TransactionService {
     return { party, transactions, balance };
   }
 
-  recordPayment({ party_id, date, type, amount, reference, notes }) {
+  recordPayment({ party_id, date, type, amount, reference, notes, payment_target }) {
     // Validate party exists
     const party = partyRepository.findById(party_id);
     if (!party) {
@@ -37,34 +38,42 @@ class TransactionService {
       throw new AppError('Invalid transaction type. Must be "credit" or "debit".', 400);
     }
 
+    // Validate payment_target
+    const target = payment_target || 'principal';
+    if (!['principal', 'interest'].includes(target)) {
+      throw new AppError('Invalid payment target. Must be "principal" or "interest".', 400);
+    }
+
     // Validate amount
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       throw new AppError('Amount must be a positive number.', 400);
     }
 
-    // Calculate current balance
+    // Calculate current balance (only from principal transactions)
     const currentBalanceData = transactionRepository.getPartyBalance(party_id);
     let balanceAfter = currentBalanceData.current_balance;
-    
-    // Balance calculation depends on party type:
-    // CUSTOMER (they owe us): credit reduces (-), debit increases (+)
-    // SUPPLIER (we owe them): credit increases (+), debit reduces (-)
-    if (party.type === 'customer') {
-      if (type === 'credit') {
-        balanceAfter -= parsedAmount;
+
+    if (target === 'principal') {
+      // Principal payment: affects the running balance
+      if (party.type === 'customer') {
+        if (type === 'credit') {
+          balanceAfter -= parsedAmount;
+        } else {
+          balanceAfter += parsedAmount;
+        }
       } else {
-        balanceAfter += parsedAmount;
-      }
-    } else {
-      if (type === 'credit') {
-        balanceAfter += parsedAmount;
-      } else {
-        balanceAfter -= parsedAmount;
+        if (type === 'credit') {
+          balanceAfter += parsedAmount;
+        } else {
+          balanceAfter -= parsedAmount;
+        }
       }
     }
+    // Interest payments do NOT change the principal balance
+    // balanceAfter stays the same as current_balance
 
-    // Generate receipt number — separate sequences: REC-XXXXXX (credit) / PAY-XXXXXX (debit)
+    // Generate receipt number
     const receiptNumber = this._generateReceiptNumber(type);
 
     // Use provided date or today
@@ -79,7 +88,13 @@ class TransactionService {
       notes: notes || '',
       receipt_number: receiptNumber,
       balance_after: balanceAfter,
+      payment_target: target,
     });
+
+    // For interest payments, auto-settle pending interest entries
+    if (target === 'interest') {
+      interestRepository.settleWithAmount(party_id, parsedAmount);
+    }
 
     return transaction;
   }
@@ -129,6 +144,12 @@ class TransactionService {
     let runningBalance = party.opening_balance;
 
     for (const t of txns) {
+      // Interest-targeted payments don't affect the principal balance
+      if (t.payment_target === 'interest') {
+        transactionRepository.updateBalanceAfter(t.id, runningBalance);
+        continue;
+      }
+
       if (party.type === 'customer') {
         // Customer owes us; credit (payment received) reduces balance, debit (sale) increases
         runningBalance = t.type === 'credit'

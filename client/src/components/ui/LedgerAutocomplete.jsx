@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { ChevronDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
 
-const PartyAutocomplete = forwardRef(function PartyAutocomplete({ parties, value, onChange, placeholder = 'Search party...', onEnterWhenSelected }, ref) {
+const LedgerAutocomplete = forwardRef(function LedgerAutocomplete(
+  { ledgers, value, onChange, placeholder = 'Search ledger...', onEnterWhenSelected },
+  ref
+) {
   const [search, setSearch] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -11,7 +14,7 @@ const PartyAutocomplete = forwardRef(function PartyAutocomplete({ parties, value
 
   useImperativeHandle(ref, () => ({
     focus: () => {
-      if (selectedParty && wrapperRef.current) {
+      if (selectedLedger && wrapperRef.current) {
         wrapperRef.current.focus();
       } else if (inputRef.current) {
         inputRef.current.focus();
@@ -19,19 +22,17 @@ const PartyAutocomplete = forwardRef(function PartyAutocomplete({ parties, value
     },
   }));
 
-  const selectedParty = parties.find((p) => p.id === value);
+  const selectedLedger = ledgers.find((l) => l.id === value);
 
-  const filtered = parties.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase())
+  const filtered = ledgers.filter((l) =>
+    l.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const customers = filtered.filter((p) => p.type === 'customer');
-  const suppliers = filtered.filter((p) => p.type === 'supplier');
+  const customers = filtered.filter((l) => l.type === 'customer');
+  const suppliers = filtered.filter((l) => l.type === 'supplier');
 
   useEffect(() => {
-    if (isOpen) {
-      setHighlightedIndex(0);
-    }
+    if (isOpen) setHighlightedIndex(0);
   }, [search, isOpen]);
 
   useEffect(() => {
@@ -48,8 +49,8 @@ const PartyAutocomplete = forwardRef(function PartyAutocomplete({ parties, value
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSelect = (party) => {
-    onChange(party.id);
+  const handleSelect = (ledger) => {
+    onChange(ledger.id);
     setSearch('');
     setIsOpen(false);
   };
@@ -83,15 +84,20 @@ const PartyAutocomplete = forwardRef(function PartyAutocomplete({ parties, value
         break;
       case 'Enter':
         e.preventDefault();
-        if (filtered[highlightedIndex]) {
-          handleSelect(filtered[highlightedIndex]);
-        }
+        if (filtered[highlightedIndex]) handleSelect(filtered[highlightedIndex]);
         break;
       case 'Escape':
         setIsOpen(false);
         break;
       default:
         break;
+    }
+  };
+
+  const handleSelectedKeyDown = (e) => {
+    if (e.key === 'Enter' && onEnterWhenSelected) {
+      e.preventDefault();
+      onEnterWhenSelected();
     }
   };
 
@@ -102,25 +108,20 @@ const PartyAutocomplete = forwardRef(function PartyAutocomplete({ parties, value
     }
   }, [highlightedIndex, isOpen]);
 
-  const handleSelectedKeyDown = (e) => {
-    if (e.key === 'Enter' && onEnterWhenSelected) {
-      e.preventDefault();
-      onEnterWhenSelected();
-    }
-  };
-
   return (
     <div className="relative">
-      {selectedParty ? (
-        <div 
+      {selectedLedger ? (
+        <div
           ref={wrapperRef}
           tabIndex={0}
           onKeyDown={handleSelectedKeyDown}
           className="flex items-center gap-2 input-field pr-2"
         >
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-slate-800 truncate">{selectedParty.name}</p>
-            <p className="text-xs text-slate-400 capitalize">{selectedParty.type} · {selectedParty.place || 'No location'}</p>
+            <p className="font-medium text-slate-800 truncate">{selectedLedger.name}</p>
+            <p className="text-xs text-slate-400 capitalize">
+              {selectedLedger.type} · {selectedLedger.place || 'No location'}
+            </p>
           </div>
           <button
             type="button"
@@ -137,10 +138,7 @@ const PartyAutocomplete = forwardRef(function PartyAutocomplete({ parties, value
               ref={inputRef}
               type="text"
               value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setIsOpen(true);
-              }}
+              onChange={(e) => { setSearch(e.target.value); setIsOpen(true); }}
               onFocus={() => setIsOpen(true)}
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
@@ -148,9 +146,7 @@ const PartyAutocomplete = forwardRef(function PartyAutocomplete({ parties, value
               autoComplete="off"
             />
             <ChevronDownIcon
-              className={`absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none transition-transform ${
-                isOpen ? 'rotate-180' : ''
-              }`}
+              className={`absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none transition-transform ${isOpen ? 'rotate-180' : ''}`}
             />
           </div>
 
@@ -161,7 +157,7 @@ const PartyAutocomplete = forwardRef(function PartyAutocomplete({ parties, value
             >
               {filtered.length === 0 ? (
                 <div className="px-3 py-6 text-center text-sm text-slate-400">
-                  {search ? 'No parties found' : 'Start typing to search'}
+                  {search ? 'No ledgers found' : 'Start typing to search'}
                 </div>
               ) : (
                 <>
@@ -170,48 +166,43 @@ const PartyAutocomplete = forwardRef(function PartyAutocomplete({ parties, value
                       <div className="px-3 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50 border-b border-slate-200">
                         Customers
                       </div>
-                      {customers.map((party, idx) => {
-                        const globalIdx = filtered.findIndex((p) => p.id === party.id);
+                      {customers.map((ledger) => {
+                        const globalIdx = filtered.findIndex((l) => l.id === ledger.id);
                         return (
                           <button
-                            key={party.id}
+                            key={ledger.id}
                             type="button"
                             data-index={globalIdx}
-                            onClick={() => handleSelect(party)}
-                            className={`w-full px-3 py-2 text-left hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 ${
-                              globalIdx === highlightedIndex ? 'bg-trust-blue/10' : ''
-                            }`}
+                            onClick={() => handleSelect(ledger)}
+                            className={`w-full px-3 py-2 text-left hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 ${globalIdx === highlightedIndex ? 'bg-trust-blue/10' : ''}`}
                           >
-                            <p className="text-sm font-medium text-slate-800">{party.name}</p>
+                            <p className="text-sm font-medium text-slate-800">{ledger.name}</p>
                             <p className="text-xs text-slate-400">
-                              {party.phone || 'No phone'} · {party.place || 'No location'}
+                              {ledger.phone || 'No phone'} · {ledger.place || 'No location'}
                             </p>
                           </button>
                         );
                       })}
                     </div>
                   )}
-
                   {suppliers.length > 0 && (
                     <div>
                       <div className="px-3 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50 border-b border-slate-200">
                         Suppliers
                       </div>
-                      {suppliers.map((party, idx) => {
-                        const globalIdx = filtered.findIndex((p) => p.id === party.id);
+                      {suppliers.map((ledger) => {
+                        const globalIdx = filtered.findIndex((l) => l.id === ledger.id);
                         return (
                           <button
-                            key={party.id}
+                            key={ledger.id}
                             type="button"
                             data-index={globalIdx}
-                            onClick={() => handleSelect(party)}
-                            className={`w-full px-3 py-2 text-left hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 ${
-                              globalIdx === highlightedIndex ? 'bg-trust-blue/10' : ''
-                            }`}
+                            onClick={() => handleSelect(ledger)}
+                            className={`w-full px-3 py-2 text-left hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 ${globalIdx === highlightedIndex ? 'bg-trust-blue/10' : ''}`}
                           >
-                            <p className="text-sm font-medium text-slate-800">{party.name}</p>
+                            <p className="text-sm font-medium text-slate-800">{ledger.name}</p>
                             <p className="text-xs text-slate-400">
-                              {party.phone || 'No phone'} · {party.place || 'No location'}
+                              {ledger.phone || 'No phone'} · {ledger.place || 'No location'}
                             </p>
                           </button>
                         );
@@ -228,4 +219,4 @@ const PartyAutocomplete = forwardRef(function PartyAutocomplete({ parties, value
   );
 });
 
-export default PartyAutocomplete;
+export default LedgerAutocomplete;

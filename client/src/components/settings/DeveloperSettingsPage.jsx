@@ -50,6 +50,9 @@ export default function DeveloperSettingsPage() {
   // Active section tab
   const [activeTab, setActiveTab] = useState('profile');
 
+  // Interest module state
+  const [interestModuleEnabled, setInterestModuleEnabled] = useState(false);
+
   useEffect(() => {
     if (authenticated) {
       fetchSettings();
@@ -75,6 +78,8 @@ export default function DeveloperSettingsPage() {
       if (data.logo_path) {
         setLogoPreview(`/api/settings/logo-file?t=${Date.now()}`);
       }
+      // Load interest module setting
+      setInterestModuleEnabled(data.interest_module_enabled === true || data.interest_module_enabled === 'true');
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -269,6 +274,7 @@ export default function DeveloperSettingsPage() {
 
   const tabs = [
     { id: 'profile', label: 'Store Profile' },
+    { id: 'modules', label: 'Modules' },
     { id: 'layout', label: 'Receipt Layout' },
     { id: 'style', label: 'Receipt Style' },
   ];
@@ -410,6 +416,47 @@ export default function DeveloperSettingsPage() {
                 <button onClick={handleSaveProfile} disabled={saving} className="btn-primary">
                   {saving ? 'Saving...' : 'Save Profile'}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modules Tab */}
+      {activeTab === 'modules' && (
+        <div className="space-y-4">
+          <div className="card">
+            <h2 className="text-base font-semibold text-slate-900 mb-4">Feature Modules</h2>
+            <p className="text-xs text-slate-500 mb-6">Enable or disable optional feature modules. Changes take effect immediately.</p>
+
+            <div className="space-y-4">
+              {/* Interest Module Toggle */}
+              <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-white">
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-slate-800">Interest Module</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Enable interest-based payments for parties. Adds interest rate and scheme fields to
+                    customer/supplier creation and tracks daily/monthly interest on outstanding balances.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer ml-4">
+                  <input
+                    type="checkbox"
+                    checked={interestModuleEnabled}
+                    onChange={async (e) => {
+                      const newVal = e.target.checked;
+                      try {
+                        await settingsApi.update('interest_module_enabled', String(newVal));
+                        setInterestModuleEnabled(newVal);
+                        toast.success(`Interest module ${newVal ? 'enabled' : 'disabled'}`);
+                      } catch (err) {
+                        toast.error(err.message);
+                      }
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
+                </label>
               </div>
             </div>
           </div>

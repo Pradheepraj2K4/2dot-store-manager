@@ -1,29 +1,47 @@
 import { NavLink, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import {
   HomeIcon,
-  UserGroupIcon,
-  TruckIcon,
-  CreditCardIcon,
+  BookOpenIcon,
   DocumentChartBarIcon,
   Cog6ToothIcon,
   ArrowLeftOnRectangleIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  BanknotesIcon,
+  PlusCircleIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
 import { logout } from '../../utils/auth';
+import { interestApi } from '../../api';
 import toast from 'react-hot-toast';
 
-const navigation = [
+const baseNavigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
-  { name: 'Customers', href: '/customers', icon: UserGroupIcon },
-  { name: 'Suppliers', href: '/suppliers', icon: TruckIcon },
-  { name: 'Payments/Receipts', href: '/payments', icon: CreditCardIcon },
+  { name: 'Ledger Creation', href: '/ledger-creation', icon: PlusCircleIcon },
+  { name: 'Ledgers', href: '/ledgers', icon: BookOpenIcon },
+  { name: 'Account Creation', href: '/account-creation', icon: BanknotesIcon },
   { name: 'Reports', href: '/reports', icon: DocumentChartBarIcon },
   { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
 ];
 
 export default function Sidebar() {
   const navigate = useNavigate();
+  const [interestEnabled, setInterestEnabled] = useState(false);
+
+  useEffect(() => {
+    interestApi.isEnabled().then((res) => {
+      setInterestEnabled(res.data.enabled);
+    }).catch(() => {});
+  }, []);
+
+  const navigation = interestEnabled
+    ? [
+        ...baseNavigation.slice(0, 5),
+        { name: 'Pending Interest', href: '/pending-interest', icon: ClockIcon },
+        ...baseNavigation.slice(5),
+      ]
+    : baseNavigation;
 
   const handleLogout = () => {
     logout();

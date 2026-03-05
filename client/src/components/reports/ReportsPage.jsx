@@ -1,16 +1,16 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { partyApi, transactionApi } from '../../api';
+import { paymentApi } from '../../api';
 import { formatCurrency, formatDate, todayISO } from '../../utils/helpers';
 import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 import LoadingSpinner from '../ui/LoadingSpinner';
-import PartyAutocomplete from '../ui/PartyAutocomplete';
 import toast from 'react-hot-toast';
 import {
   ArrowDownTrayIcon,
   FunnelIcon,
   CalendarDaysIcon,
   MagnifyingGlassIcon,
+  BanknotesIcon,
 } from '@heroicons/react/24/outline';
 
 // ── Date range helpers ────────────────────────────────────────────────────────
@@ -54,164 +54,95 @@ const PRESETS = [
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function ReportsPage() {
-  // ── URL params ──────────────────────────────────────────────────────────
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
 
-  // ── Shared ─────────────────────────────────────────────────────────────
-  const [parties, setParties]         = useState([]);
-  const [outstanding, setOutstanding] = useState([]);
-  const [initLoading, setInitLoading] = useState(true);
-  const [tab, setTab]                 = useState(() => searchParams.get('tab') || 'outstanding');
+  // ── State ──────────────────────────────────────────────────────────────
+  const [payments, setPayments]   = useState([]);
+  const [loading, setLoading]     = useState(false);
+  const [initDone, setInitDone]   = useState(false);
 
-  // ── Outstanding filters ─────────────────────────────────────────────────
-  const [outTab, setOutTab]       = useState(() => searchParams.get('type') || 'all');   // 'all' | 'customer' | 'supplier'
-  const [outSearch, setOutSearch] = useState('');
-
-  // ── Statement state ─────────────────────────────────────────────────────
-  const [selectedParty, setSelectedParty] = useState('');
-  const [activePreset, setActivePreset]   = useState('this_month');
+  // ── Filters ────────────────────────────────────────────────────────────
+  const [typeFilter, setTypeFilter] = useState(searchParams.get('type') || 'all'); // 'all' | 'principal' | 'interest'
+  const [ledgerTypeFilter, setLedgerTypeFilter] = useState('all'); // 'all' | 'customer' | 'supplier'
+  const [search, setSearch]         = useState('');
+  const [activePreset, setActivePreset] = useState('this_month');
   const today = new Date();
   const [customFrom, setCustomFrom] = useState(getISODate(new Date(today.getFullYear(), today.getMonth(), 1)));
   const [customTo, setCustomTo]     = useState(todayISO());
-  const [statement, setStatement]   = useState(null);
-  const [stmtLoading, setStmtLoading] = useState(false);
-  const hasFetchedRef = useRef(false);
 
   function activeDateRange() {
     if (activePreset === 'custom') return { from: customFrom, to: customTo };
     return getDateRange(activePreset);
   }
 
-  // ── Initial load ────────────────────────────────────────────────────────
-  useEffect(() => {
-    (async () => {
-      try {
-        const [partiesRes, outstandingRes] = await Promise.all([
-          partyApi.getAll(),
-          transactionApi.getOutstanding(),
-        ]);
-        setParties(partiesRes.data);
-        setOutstanding(outstandingRes.data);
-      } catch (err) {
-        toast.error(err.message);
-      } finally {
-        setInitLoading(false);
-      }
-    })();
-  }, []);
-
-  // ── Re-fetch statement when date changes (only after first fetch) ───────
-  useEffect(() => {
-    if (!hasFetchedRef.current || !selectedParty) return;
-    fetchStatement();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activePreset, customFrom, customTo]);
-
-  const fetchStatement = async () => {
-    if (!selectedParty) { toast.error('Please select a party'); return; }
-    const range = activeDateRange();
+  // ── Fetch ──────────────────────────────────────────────────────────────
+  const fetchPayments = useCallback(async () => {
     try {
-      setStmtLoading(true);
-      const res = await transactionApi.getStatement(selectedParty, {
-        startDate: range.from,
-        endDate:   range.to,
-      });
-      setStatement(res.data);
-      hasFetchedRef.current = true;
+      setLoading(true);
+      const range = activeDateRange();
+      const params = {};
+      if (typeFilter !== 'all') params.type = typeFilter;
+      if (ledgerTypeFilter !== 'all') params.ledgerType = ledgerTypeFilter;
+      if (range) {
+        params.fromDate = range.from;
+        params.toDate = range.to;
+      }
+      const res = await paymentApi.getAll(params);
+      setPayments(res.data);
+      setInitDone(true);
     } catch (err) {
       toast.error(err.message);
     } finally {
-      setStmtLoading(false);
+      setLoading(false);
     }
-  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [typeFilter, ledgerTypeFilter, activePreset, customFrom, customTo]);
 
-  // ── Outstanding filtered list ───────────────────────────────────────────
-  const visibleOutstanding = useMemo(() => {
-    let list = outstanding;
-    if (outTab !== 'all') list = list.filter((p) => p.type === outTab);
-    if (outSearch.trim()) {
-      const q = outSearch.trim().toLowerCase();
-      list = list.filter((p) => p.name.toLowerCase().includes(q));
-    }
-    return list;
-  }, [outstanding, outTab, outSearch]);
+  useEffect(() => { fetchPayments(); }, [fetchPayments]);
 
-  const OUT_TABS = [
-    { key: 'all',      label: 'All',       count: outstanding.length },
-    { key: 'customer', label: 'Customers', count: outstanding.filter((p) => p.type === 'customer').length },
-    { key: 'supplier', label: 'Suppliers', count: outstanding.filter((p) => p.type === 'supplier').length },
-  ];
+  // ── Filtered list (client-side name search) ─────────────────────────────
+  const visible = useMemo(() => {
+    if (!search.trim()) return payments;
+    const q = search.trim().toLowerCase();
+    return payments.filter((p) =>
+      (p.ledger_name || '').toLowerCase().includes(q) ||
+      (p.receipt_number || '').toLowerCase().includes(q)
+    );
+  }, [payments, search]);
 
-  // ── Outstanding totals ──────────────────────────────────────────────────
-  const outstandingTotals = useMemo(() => ({
-    opening:  visibleOutstanding.reduce((s, p) => s + (p.opening_balance  || 0), 0),
-    credits:  visibleOutstanding.reduce((s, p) => s + (p.total_credit     || 0), 0),
-    debits:   visibleOutstanding.reduce((s, p) => s + (p.total_debit      || 0), 0),
-    balance:  visibleOutstanding.reduce((s, p) => s + (p.current_balance  || 0), 0),
-  }), [visibleOutstanding]);
+  // ── Totals ─────────────────────────────────────────────────────────────
+  const totals = useMemo(() => {
+    const principalTotal = visible.filter(p => p.type === 'principal').reduce((s, p) => s + p.amount, 0);
+    const interestTotal  = visible.filter(p => p.type === 'interest').reduce((s, p) => s + p.amount, 0);
+    return { principal: principalTotal, interest: interestTotal, total: principalTotal + interestTotal };
+  }, [visible]);
 
   // ── Export helpers ──────────────────────────────────────────────────────
-  const exportOutstandingExcel = () => {
+  const handleExportExcel = () => {
     const columns = [
-      { header: 'Name',            key: 'name',            width: 25 },
-      { header: 'Type',            key: 'type',            width: 12 },
-      { header: 'Phone',           key: 'phone',           width: 15 },
-      { header: 'Place',           key: 'place',           width: 15 },
-      { header: 'Opening Bal.',    key: 'opening_balance', width: 15 },
-      { header: 'Total Credit',    key: 'total_credit',    width: 15 },
-      { header: 'Total Debit',     key: 'total_debit',     width: 15 },
-      { header: 'Current Balance', key: 'current_balance', width: 18 },
+      { header: 'Date',       key: 'date',           width: 15 },
+      { header: 'Receipt #',  key: 'receipt_number',  width: 18 },
+      { header: 'Ledger',     key: 'ledger_name',     width: 25 },
+      { header: 'Type',       key: 'type',            width: 12 },
+      { header: 'Amount',     key: 'amount',          width: 15 },
+      { header: 'Reference',  key: 'reference',       width: 20 },
+      { header: 'Notes',      key: 'notes',           width: 25 },
     ];
-    exportToExcel(visibleOutstanding, columns, 'Outstanding_Report');
+    exportToExcel(visible, columns, 'Payment_Report');
   };
 
-  const exportOutstandingPDF = () => {
-    const headers = ['Name', 'Type', 'Opening', 'Credits', 'Debits', 'Balance'];
-    const rows = visibleOutstanding.map((p) => [
-      p.name,
-      p.type,
-      formatCurrency(p.opening_balance).replace('₹', 'Rs. '),
-      formatCurrency(p.total_credit).replace('₹', 'Rs. '),
-      formatCurrency(p.total_debit).replace('₹', 'Rs. '),
-      formatCurrency(p.current_balance).replace('₹', 'Rs. '),
+  const handleExportPDF = () => {
+    const headers = ['Date', 'Receipt #', 'Ledger', 'Type', 'Amount', 'Reference'];
+    const rows = visible.map((p) => [
+      formatDate(p.date),
+      p.receipt_number || '',
+      p.ledger_name || '',
+      p.type.charAt(0).toUpperCase() + p.type.slice(1),
+      formatCurrency(p.amount).replace('₹', 'Rs. '),
+      p.reference || '',
     ]);
-    exportToPDF('Outstanding Balances Report', headers, rows, 'Outstanding_Report');
+    exportToPDF('Payment History Report', headers, rows, 'Payment_Report');
   };
-
-  const exportStatementExcel = () => {
-    if (!statement) return;
-    const columns = [
-      { header: 'Date',          key: 'date',           width: 15 },
-      { header: 'Receipt #',     key: 'receipt_number', width: 18 },
-      { header: 'Type',          key: 'type',           width: 10 },
-      { header: 'Amount',        key: 'amount',         width: 15 },
-      { header: 'Balance After', key: 'balance_after',  width: 15 },
-      { header: 'Reference',     key: 'reference',      width: 20 },
-      { header: 'Notes',         key: 'notes',          width: 25 },
-    ];
-    exportToExcel(statement.transactions, columns, `Statement_${statement.party.name}`);
-  };
-
-  const exportStatementPDF = () => {
-    if (!statement) return;
-    const headers = ['Date', 'Receipt #', 'Type', 'Amount', 'Balance', 'Reference'];
-    const rows = statement.transactions.map((t) => [
-      formatDate(t.date),
-      t.receipt_number || '',
-      t.type.toUpperCase(),
-      formatCurrency(t.amount).replace('₹', 'Rs. '),
-      formatCurrency(t.balance_after).replace('₹', 'Rs. '),
-      t.reference || '',
-    ]);
-    exportToPDF(
-      `Statement of Account — ${statement.party.name}`,
-      headers, rows,
-      `Statement_${statement.party.name}`
-    );
-  };
-
-  // ── Full-page spinner on first load only ────────────────────────────────
-  if (initLoading) return <LoadingSpinner className="py-20" size="lg" />;
 
   const range = activeDateRange();
 
@@ -221,354 +152,232 @@ export default function ReportsPage() {
       {/* ── Page header ─────────────────────────────────────────────────── */}
       <div className="shrink-0">
         <h1 className="page-title">Reports</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Generate and export financial reports</p>
+        <p className="text-sm text-slate-500 mt-0.5">View and export payment history</p>
       </div>
 
-      {/* ── Tab bar ──────────────────────────────────────────────────────── */}
-      <div className="flex gap-1 border-b border-slate-200 shrink-0">
-        {[
-          { key: 'outstanding', label: 'Outstanding Balances'  },
-          { key: 'statement',   label: 'Statement of Account' },
-        ].map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              tab === t.key
-                ? 'border-trust-blue text-trust-blue'
-                : 'border-transparent text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* ════ OUTSTANDING BALANCES ══════════════════════════════════════════ */}
-      {tab === 'outstanding' && (
-        <div className="flex flex-col flex-1 min-h-0 gap-3">
-
-          {/* Filter bar */}
-          <div className="flex items-center gap-3 shrink-0">
-            {/* Type tabs */}
-            <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
-              {OUT_TABS.map((t) => (
-                <button
-                  key={t.key}
-                  onClick={() => setOutTab(t.key)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                    outTab === t.key
-                      ? 'bg-white text-slate-800 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  {t.label}
-                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
-                    outTab === t.key ? 'bg-slate-100 text-slate-600' : 'bg-slate-200 text-slate-500'
-                  }`}>
-                    {t.count}
-                  </span>
-                </button>
-              ))}
-            </div>
-
-            {/* Search */}
-            <div className="relative w-52">
-              <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-              <input
-                type="text"
-                value={outSearch}
-                onChange={(e) => setOutSearch(e.target.value)}
-                placeholder="Search by name…"
-                className="input-field !pl-8 !py-1.5 !text-xs w-full"
-              />
-              {outSearch && (
-                <button
-                  onClick={() => setOutSearch('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs leading-none"
-                >
-                  ✕
-                </button>
-              )}
-            </div>
-
-            {/* Export */}
-            <div className="flex gap-2 ml-auto">
-              <button onClick={exportOutstandingExcel} className="btn-secondary gap-2">
-                <ArrowDownTrayIcon className="h-4 w-4" />Excel
-              </button>
-              <button onClick={exportOutstandingPDF} className="btn-secondary gap-2">
-                <ArrowDownTrayIcon className="h-4 w-4" />PDF
-              </button>
-            </div>
+      {/* ── Summary Cards ────────────────────────────────────────────────── */}
+      {initDone && (
+        <div className="grid grid-cols-3 gap-4 shrink-0">
+          <div className="card text-center py-3">
+            <p className="text-xs text-slate-500">Principal Payments</p>
+            <p className="text-lg font-bold text-trust-blue">{formatCurrency(totals.principal)}</p>
           </div>
-
-          {/* Table card */}
-          <div className="card p-0 flex flex-col flex-1 min-h-0 overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
-              <h2 className="text-sm font-semibold text-slate-700">Outstanding Balances</h2>
-              <span className="text-xs text-slate-400">
-                {visibleOutstanding.length} record{visibleOutstanding.length !== 1 ? 's' : ''}
-              </span>
-            </div>
-            <div className="overflow-y-auto overflow-x-auto flex-1">
-              <table className="w-full text-sm table-zebra">
-                <thead className="sticky top-0 z-10 bg-white">
-                  <tr className="border-b border-slate-200">
-                    <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Name</th>
-                    <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Type</th>
-                    <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Phone</th>
-                    <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Place</th>
-                    <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Opening</th>
-                    <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Credits</th>
-                    <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Debits</th>
-                    <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Balance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visibleOutstanding.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="px-4 py-10 text-center text-slate-400 text-sm">
-                        {outSearch ? `No results matching "${outSearch}"` : 'No data available'}
-                      </td>
-                    </tr>
-                  ) : (
-                    visibleOutstanding.map((p) => (
-                      <tr key={p.id} className="border-b border-slate-100">
-                        <td className="px-4 py-2.5 font-medium text-slate-800">{p.name}</td>
-                        <td className="px-4 py-2.5 text-slate-600 capitalize">{p.type}</td>
-                        <td className="px-4 py-2.5 text-slate-500">{p.phone || '—'}</td>
-                        <td className="px-4 py-2.5 text-slate-500">{p.place || '—'}</td>
-                        <td className="px-4 py-2.5 text-right text-slate-600">{formatCurrency(p.opening_balance)}</td>
-                        <td className="px-4 py-2.5 text-right text-credit-green">{formatCurrency(p.total_credit)}</td>
-                        <td className="px-4 py-2.5 text-right text-debit-red">{formatCurrency(p.total_debit)}</td>
-                        <td className={`px-4 py-2.5 text-right font-bold ${p.current_balance >= 0 ? 'text-credit-green' : 'text-debit-red'}`}>
-                          {formatCurrency(p.current_balance)}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-                {visibleOutstanding.length > 0 && (
-                  <tfoot className="sticky bottom-0 z-10 bg-slate-50 border-t-2 border-slate-200">
-                    <tr>
-                      <td colSpan={4} className="px-4 py-2.5 text-xs font-bold text-slate-600 uppercase tracking-wide">
-                        Total ({visibleOutstanding.length} {outTab === 'all' ? 'parties' : outTab === 'customer' ? 'customers' : 'suppliers'})
-                      </td>
-                      <td className="px-4 py-2.5 text-right text-xs font-bold text-slate-600">{formatCurrency(outstandingTotals.opening)}</td>
-                      <td className="px-4 py-2.5 text-right text-xs font-bold text-credit-green">{formatCurrency(outstandingTotals.credits)}</td>
-                      <td className="px-4 py-2.5 text-right text-xs font-bold text-debit-red">{formatCurrency(outstandingTotals.debits)}</td>
-                      <td className={`px-4 py-2.5 text-right text-sm font-bold ${outstandingTotals.balance >= 0 ? 'text-credit-green' : 'text-debit-red'}`}>
-                        {formatCurrency(outstandingTotals.balance)}
-                      </td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
+          <div className="card text-center py-3 border-amber-200 bg-amber-50/30">
+            <p className="text-xs text-amber-600">Interest Payments</p>
+            <p className="text-lg font-bold text-amber-700">{formatCurrency(totals.interest)}</p>
+          </div>
+          <div className="card text-center py-3">
+            <p className="text-xs text-slate-500">Total</p>
+            <p className="text-lg font-bold text-slate-800">{formatCurrency(totals.total)}</p>
           </div>
         </div>
       )}
 
-      {/* ════ STATEMENT OF ACCOUNT ══════════════════════════════════════════ */}
-      {tab === 'statement' && (
-        <div className="flex flex-col flex-1 min-h-0 gap-3">
-
-          {/* Filter card */}
-          <div className="card p-4 flex flex-col gap-4 shrink-0">
-            {/* Row 1: party autocomplete + generate */}
-            <div className="flex items-end gap-3">
-              <div className="flex-1 max-w-sm">
-                <label className="label">Party</label>
-                <PartyAutocomplete
-                  parties={parties}
-                  value={selectedParty ? parseInt(selectedParty) : ''}
-                  onChange={(id) => {
-                    setSelectedParty(id);
-                    setStatement(null);
-                    hasFetchedRef.current = false;
-                  }}
-                  placeholder="Search for customer or supplier…"
-                />
-              </div>
+      {/* ── Filters ──────────────────────────────────────────────────────── */}
+      <div className="card p-4 flex flex-col gap-3 shrink-0">
+        {/* Row 1: type filter + ledger type + search + export */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Payment type */}
+          <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
+            {[['all', 'All'], ['principal', 'Principal'], ['interest', 'Interest']].map(([val, label]) => (
               <button
-                onClick={fetchStatement}
-                disabled={stmtLoading || !selectedParty}
-                className="btn-primary gap-2 shrink-0"
+                key={val}
+                onClick={() => setTypeFilter(val)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  typeFilter === val
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
               >
-                <FunnelIcon className="h-4 w-4" />
-                {stmtLoading ? 'Loading…' : 'Generate'}
+                {label}
               </button>
-            </div>
-
-            {/* Row 2: date preset pills */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <div className="flex items-center gap-1.5 shrink-0">
-                <CalendarDaysIcon className="h-4 w-4 text-slate-400" />
-                <span className="text-xs font-medium text-slate-500">Period:</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {PRESETS.map((p) => (
-                  <button
-                    key={p.key}
-                    onClick={() => setActivePreset(p.key)}
-                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                      activePreset === p.key
-                        ? 'bg-trust-blue text-white shadow-sm'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-
-              {activePreset === 'custom' ? (
-                <div className="flex items-center gap-2 flex-wrap sm:ml-2">
-                  <input
-                    type="date"
-                    value={customFrom}
-                    max={customTo}
-                    onChange={(e) => setCustomFrom(e.target.value)}
-                    className="input-field !py-1 !text-xs w-36"
-                  />
-                  <span className="text-xs text-slate-400">to</span>
-                  <input
-                    type="date"
-                    value={customTo}
-                    min={customFrom}
-                    max={todayISO()}
-                    onChange={(e) => setCustomTo(e.target.value)}
-                    className="input-field !py-1 !text-xs w-36"
-                  />
-                </div>
-              ) : (
-                <span className="text-xs text-slate-400 sm:ml-auto">
-                  {formatDate(range.from)} — {formatDate(range.to)}
-                </span>
-              )}
-            </div>
+            ))}
           </div>
 
-          {/* Empty state */}
-          {!statement && !stmtLoading && (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="text-center text-slate-400">
-                <FunnelIcon className="h-10 w-10 mx-auto mb-3 opacity-40" />
-                <p className="text-sm">Select a party and click Generate to view the statement</p>
-              </div>
+          {/* Ledger type */}
+          <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
+            {[['all', 'All'], ['customer', 'Customers'], ['supplier', 'Suppliers']].map(([val, label]) => (
+              <button
+                key={val}
+                onClick={() => setLedgerTypeFilter(val)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  ledgerTypeFilter === val
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* Search */}
+          <div className="relative w-52">
+            <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name / receipt…"
+              className="input-field !pl-8 !py-1.5 !text-xs w-full"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs leading-none"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* Export */}
+          <div className="flex gap-2 ml-auto">
+            <button onClick={handleExportExcel} className="btn-secondary gap-2">
+              <ArrowDownTrayIcon className="h-4 w-4" />Excel
+            </button>
+            <button onClick={handleExportPDF} className="btn-secondary gap-2">
+              <ArrowDownTrayIcon className="h-4 w-4" />PDF
+            </button>
+          </div>
+        </div>
+
+        {/* Row 2: date presets */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <div className="flex items-center gap-1.5 shrink-0">
+            <CalendarDaysIcon className="h-4 w-4 text-slate-400" />
+            <span className="text-xs font-medium text-slate-500">Period:</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {PRESETS.map((p) => (
+              <button
+                key={p.key}
+                onClick={() => setActivePreset(p.key)}
+                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                  activePreset === p.key
+                    ? 'bg-trust-blue text-white shadow-sm'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          {activePreset === 'custom' ? (
+            <div className="flex items-center gap-2 flex-wrap sm:ml-2">
+              <input
+                type="date"
+                value={customFrom}
+                max={customTo}
+                onChange={(e) => setCustomFrom(e.target.value)}
+                className="input-field !py-1 !text-xs w-36"
+              />
+              <span className="text-xs text-slate-400">to</span>
+              <input
+                type="date"
+                value={customTo}
+                min={customFrom}
+                max={todayISO()}
+                onChange={(e) => setCustomTo(e.target.value)}
+                className="input-field !py-1 !text-xs w-36"
+              />
             </div>
+          ) : (
+            range && (
+              <span className="text-xs text-slate-400 sm:ml-auto">
+                {formatDate(range.from)} — {formatDate(range.to)}
+              </span>
+            )
           )}
+        </div>
+      </div>
 
-          {/* Loading state */}
-          {stmtLoading && (
-            <div className="flex-1 flex items-center justify-center">
-              <LoadingSpinner size="md" />
-            </div>
-          )}
+      {/* ── Loading ──────────────────────────────────────────────────────── */}
+      {loading && (
+        <div className="flex-1 flex items-center justify-center">
+          <LoadingSpinner size="md" />
+        </div>
+      )}
 
-          {/* Statement results */}
-          {statement && !stmtLoading && (
-            <div className="flex flex-col flex-1 min-h-0 gap-3">
+      {/* ── Empty state ──────────────────────────────────────────────────── */}
+      {!loading && visible.length === 0 && (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center text-slate-400">
+            <BanknotesIcon className="h-10 w-10 mx-auto mb-3 opacity-40" />
+            <p className="text-sm">No payments found for the selected filters</p>
+          </div>
+        </div>
+      )}
 
-              {/* Statement header + export */}
-              <div className="flex items-center justify-between shrink-0">
-                <div>
-                  <h3 className="text-sm font-semibold text-slate-800">
-                    {statement.party.name}
-                    <span className="ml-2 inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-500 capitalize align-middle">
-                      {statement.party.type}
-                    </span>
-                  </h3>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {formatDate(range.from)} — {formatDate(range.to)}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={exportStatementExcel} className="btn-secondary gap-2">
-                    <ArrowDownTrayIcon className="h-4 w-4" />Excel
-                  </button>
-                  <button onClick={exportStatementPDF} className="btn-secondary gap-2">
-                    <ArrowDownTrayIcon className="h-4 w-4" />PDF
-                  </button>
-                </div>
-              </div>
-
-              {/* Summary cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
-                <div className="card text-center py-3">
-                  <p className="text-xs text-slate-500">Opening</p>
-                  <p className="text-base font-bold text-slate-800">{formatCurrency(statement.balance.opening_balance)}</p>
-                </div>
-                <div className="card text-center py-3">
-                  <p className="text-xs text-slate-500">Credits</p>
-                  <p className="text-base font-bold text-credit-green">{formatCurrency(statement.balance.total_credit)}</p>
-                </div>
-                <div className="card text-center py-3">
-                  <p className="text-xs text-slate-500">Debits</p>
-                  <p className="text-base font-bold text-debit-red">{formatCurrency(statement.balance.total_debit)}</p>
-                </div>
-                <div className="card text-center py-3">
-                  <p className="text-xs text-slate-500">Balance</p>
-                  <p className={`text-base font-bold ${statement.balance.current_balance >= 0 ? 'text-credit-green' : 'text-debit-red'}`}>
-                    {formatCurrency(statement.balance.current_balance)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Scrollable transactions table */}
-              <div className="card p-0 flex flex-col flex-1 min-h-0 overflow-hidden">
-                <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
-                  <h2 className="text-sm font-semibold text-slate-700">Transactions</h2>
-                  <span className="text-xs text-slate-400">
-                    {statement.transactions.length} record{statement.transactions.length !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                <div className="overflow-y-auto overflow-x-auto flex-1">
-                  <table className="w-full text-sm table-zebra">
-                    <thead className="sticky top-0 z-10 bg-white">
-                      <tr className="border-b border-slate-200">
-                        <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Date</th>
-                        <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Receipt #</th>
-                        <th className="px-4 py-2.5 text-center font-semibold text-slate-600">Type</th>
-                        <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Amount</th>
-                        <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Balance</th>
-                        <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Reference</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {statement.transactions.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="px-4 py-10 text-center text-slate-400 text-sm">
-                            No transactions in this period
-                          </td>
-                        </tr>
-                      ) : (
-                        statement.transactions.map((txn) => (
-                          <tr key={txn.id} className="border-b border-slate-100">
-                            <td className="px-4 py-2 text-slate-600">{formatDate(txn.date)}</td>
-                            <td className="px-4 py-2 font-mono text-xs text-slate-600">{txn.receipt_number || '—'}</td>
-                            <td className="px-4 py-2 text-center">
-                              <span className={txn.type === 'credit' ? 'badge-credit' : 'badge-debit'}>
-                                {txn.type.toUpperCase()}
-                              </span>
-                            </td>
-                            <td className={`px-4 py-2 text-right font-medium ${txn.type === 'credit' ? 'text-credit-green' : 'text-debit-red'}`}>
-                              {formatCurrency(txn.amount)}
-                            </td>
-                            <td className={`px-4 py-2 text-right font-medium ${txn.balance_after >= 0 ? 'text-credit-green' : 'text-debit-red'}`}>
-                              {formatCurrency(txn.balance_after)}
-                            </td>
-                            <td className="px-4 py-2 text-slate-500">{txn.reference || '—'}</td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          )}
+      {/* ── Table ────────────────────────────────────────────────────────── */}
+      {!loading && visible.length > 0 && (
+        <div className="card p-0 flex flex-col flex-1 min-h-0 overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between shrink-0">
+            <h2 className="text-sm font-semibold text-slate-700">Payment History</h2>
+            <span className="text-xs text-slate-400">
+              {visible.length} record{visible.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="overflow-y-auto overflow-x-auto flex-1">
+            <table className="w-full text-sm table-zebra">
+              <thead className="sticky top-0 z-10 bg-white">
+                <tr className="border-b border-slate-200">
+                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Date</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Receipt #</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Ledger</th>
+                  <th className="px-4 py-2.5 text-center font-semibold text-slate-600">Ledger Type</th>
+                  <th className="px-4 py-2.5 text-center font-semibold text-slate-600">Payment Type</th>
+                  <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Amount</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Reference</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((pmt) => (
+                  <tr key={pmt.id} className={`border-b border-slate-100 ${pmt.type === 'interest' ? 'bg-amber-50/40' : ''}`}>
+                    <td className="px-4 py-2.5 text-slate-600">{formatDate(pmt.date)}</td>
+                    <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{pmt.receipt_number || '—'}</td>
+                    <td className="px-4 py-2.5 font-medium text-slate-800">{pmt.ledger_name}</td>
+                    <td className="px-4 py-2.5 text-center">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                        pmt.ledger_type === 'customer'
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {pmt.ledger_type === 'customer' ? 'Customer' : 'Supplier'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                        pmt.type === 'principal'
+                          ? 'bg-trust-blue/10 text-trust-blue'
+                          : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {pmt.type === 'principal' ? 'Principal' : 'Interest'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-slate-800">
+                      {formatCurrency(pmt.amount)}
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-500 truncate max-w-[200px]">
+                      {pmt.reference || pmt.notes || '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot className="sticky bottom-0 z-10 bg-slate-50 border-t-2 border-slate-200">
+                <tr>
+                  <td colSpan={5} className="px-4 py-2.5 text-xs font-bold text-slate-600 uppercase tracking-wide">
+                    Total ({visible.length} payments)
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-sm font-bold text-slate-800">
+                    {formatCurrency(totals.total)}
+                  </td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
       )}
     </div>

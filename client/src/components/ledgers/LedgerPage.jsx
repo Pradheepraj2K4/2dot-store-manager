@@ -1,33 +1,275 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ledgerApi, accountApi } from '../../api';
-import { formatCurrency, formatDate } from '../../utils/helpers';
+import { ledgerApi, transactionApi, interestApi, settingsApi } from '../../api';
+import { formatCurrency, formatDate, formatDateTime, todayISO } from '../../utils/helpers';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
+import Modal from '../ui/Modal';
 import toast from 'react-hot-toast';
 import {
   ArrowLeftIcon,
-  PlusIcon,
-  EyeIcon,
   BanknotesIcon,
+  ArrowUpCircleIcon,
+  ArrowDownCircleIcon,
+  CalculatorIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline';
 
+/* ─── Transaction Entry Form ──────────────────────────────────────── */
+function TransactionForm({ ledgerId, entryType, onCreated, currentBalance, behaviour }) {
+  const [nextNum, setNextNum] = useState('');
+  const [form, setForm] = useState({ amount: '', date: todayISO(), notes: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const amountRef = useRef(null);
+  const dateRef   = useRef(null);
+  const notesRef  = useRef(null);
+  const submitRef = useRef(null);
+
+  // Compute what balance would be after this entry
+  const amt = parseFloat(form.amount);
+  const wouldGoNegative = !isNaN(amt) && amt > 0 && (() => {
+    let projected = currentBalance ?? 0;
+    const beh = behaviour || 'customer';
+    if (beh === 'customer') {
+      projected = entryType === 'payment' ? projected + amt : projected - amt;
+    } else {
+      projected = entryType === 'payment' ? projected - amt : projected + amt;
+    }
+    return projected < 0;
+  })();
+
+  useEffect(() => {
+    transactionApi.getNextRunningNumber(entryType).then((res) => setNextNum(res.data.runningNumber)).catch(() => {});
+  }, [entryType]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.amount || Number(form.amount) <= 0) { toast.error('Enter a valid amount'); return; }
+    if (wouldGoNegative) { toast.error('This entry would make the balance negative'); return; }
+    try {
+      setSubmitting(true);
+      await transactionApi.create({
+        ledger_id: parseInt(ledgerId),
+        entry_type: entryType,
+        amount: parseFloat(form.amount),
+        date: form.date,
+        notes: form.notes.trim(),
+      });
+      toast.success(`${entryType === 'payment' ? 'Payment' : 'Receipt'} recorded`);
+      setForm({ amount: '', date: todayISO(), notes: '' });
+      // refresh next number
+      transactionApi.getNextRunningNumber(entryType).then((res) => setNextNum(res.data.runningNumber)).catch(() => {});
+      onCreated();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const isPayment = entryType === 'payment';
+  const colorAccent = isPayment ? 'red' : 'green';
+  const Icon = isPayment ? ArrowUpCircleIcon : ArrowDownCircleIcon;
+
+  return (
+    <form onSubmit={handleSubmit} className="card">
+      <div className="flex items-center gap-2 mb-4">
+        <Icon className={`h-5 w-5 text-${colorAccent}-600`} />
+        <h3 className={`text-sm font-semibold text-${colorAccent}-700`}>
+          New {isPayment ? 'Payment' : 'Receipt'}
+        </h3>
+        {nextNum && <span className="ml-auto text-xs font-mono text-slate-400">{nextNum}</span>}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div>
+          <label className="label">Amount *</label>
+          <input
+            ref={amountRef}
+            type="number"
+            min="0.01"
+            step="0.01"
+            value={form.amount}
+            onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); dateRef.current?.focus(); } }}
+            className={`input-field ${wouldGoNegative ? 'border-red-400 focus:ring-red-400' : ''}`}
+            placeholder="0.00"
+            autoFocus
+          />
+          {wouldGoNegative && (
+            <p className="text-xs text-red-600 mt-1">⚠ Balance would go negative</p>
+          )}
+        </div>
+        <div>
+          <label className="label">Date</label>
+          <input
+            ref={dateRef}
+            type="date"
+            value={form.date}
+            onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); notesRef.current?.focus(); } }}
+            className="input-field"
+          />
+        </div>
+        <div>
+          <label className="label">Notes</label>
+          <input
+            ref={notesRef}
+            type="text"
+            value={form.notes}
+            onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitRef.current?.focus(); } }}
+            className="input-field"
+            placeholder="Optional"
+          />
+        </div>
+      </div>
+      <div className="flex justify-end mt-3">
+        <button
+          ref={submitRef}
+          type="submit"
+          disabled={submitting || wouldGoNegative}
+          className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${
+            isPayment
+              ? 'bg-red-600 hover:bg-red-700 disabled:bg-red-300'
+              : 'bg-green-600 hover:bg-green-700 disabled:bg-green-300'
+          }`}
+        >
+          {submitting ? 'Saving…' : `Record ${isPayment ? 'Payment' : 'Receipt'}`}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/* ─── Interest Section ────────────────────────────────────────────── */
+function InterestSection({ ledgerId, ledger, onRefresh }) {
+  const [entries, setEntries] = useState([]);
+  const [totalPending, setTotalPending] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+
+  const fetchInterest = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [entriesRes, totalRes] = await Promise.all([
+        interestApi.getByLedger(ledgerId),
+        interestApi.getTotalPending(ledgerId),
+      ]);
+      setEntries(entriesRes.data);
+      setTotalPending(totalRes.data.total_pending || 0);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [ledgerId]);
+
+  useEffect(() => { fetchInterest(); }, [fetchInterest]);
+
+  const handleGenerate = async () => {
+    try {
+      setGenerating(true);
+      await interestApi.generate({ ledger_id: parseInt(ledgerId) });
+      toast.success('Interest generated');
+      fetchInterest();
+      onRefresh();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  if (loading) return <LoadingSpinner size="sm" />;
+
+  return (
+    <div className="card">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <CalculatorIcon className="h-5 w-5 text-amber-600" />
+          <h3 className="text-sm font-semibold text-slate-700">Interest</h3>
+          <span className="text-xs text-slate-400">
+            {ledger.interest_rate}% {ledger.interest_scheme}
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          {totalPending > 0 && (
+            <span className="text-sm font-semibold text-amber-700">
+              Pending: {formatCurrency(totalPending)}
+            </span>
+          )}
+          <button
+            onClick={handleGenerate}
+            disabled={generating}
+            className="btn-secondary text-xs"
+          >
+            {generating ? 'Generating…' : 'Generate Interest'}
+          </button>
+        </div>
+      </div>
+      {entries.length === 0 ? (
+        <p className="text-sm text-slate-400 text-center py-4">No interest entries yet</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-slate-500">
+                <th className="px-3 py-2 text-left text-xs font-medium">Period</th>
+                <th className="px-3 py-2 text-right text-xs font-medium">Principal</th>
+                <th className="px-3 py-2 text-right text-xs font-medium">Amount</th>
+                <th className="px-3 py-2 text-center text-xs font-medium">Status</th>
+                <th className="px-3 py-2 text-left text-xs font-medium">Generated</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.slice(0, 20).map((e) => (
+                <tr key={e.id} className="border-b border-slate-50">
+                  <td className="px-3 py-2 text-xs text-slate-600">
+                    {formatDate(e.from_date)} — {formatDate(e.to_date)}
+                  </td>
+                  <td className="px-3 py-2 text-right text-xs">{formatCurrency(e.principal_used)}</td>
+                  <td className="px-3 py-2 text-right text-xs font-medium text-amber-700">{formatCurrency(e.amount)}</td>
+                  <td className="px-3 py-2 text-center">
+                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                      e.status === 'paid' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
+                    }`}>
+                      {e.status}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-xs text-slate-400">{formatDate(e.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Main Page ───────────────────────────────────────────────────── */
 export default function LedgerPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [ledger, setLedger] = useState(null);
-  const [accounts, setAccounts] = useState([]);
+  const [transactions, setTransactions] = useState([]);
+  const [interestEnabled, setInterestEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [closeLedgerModal, setCloseLedgerModal] = useState(false);
+  const [reopenLedgerModal, setReopenLedgerModal] = useState(false);
+  const [deleteTxnModal, setDeleteTxnModal] = useState({ open: false, txn: null });
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [ledgerRes, accountsRes] = await Promise.all([
+      const [ledgerRes, txnsRes, intRes] = await Promise.all([
         ledgerApi.getById(id),
-        accountApi.getByLedger(id),
+        transactionApi.getByLedger(id),
+        interestApi.isEnabled(),
       ]);
       setLedger(ledgerRes.data);
-      setAccounts(accountsRes.data);
+      setTransactions(txnsRes.data);
+      setInterestEnabled(intRes.data.enabled);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -37,12 +279,44 @@ export default function LedgerPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
+  const handleCloseLedger = async () => {
+    try {
+      await ledgerApi.update(id, { ...ledger, status: 'closed' });
+      toast.success('Ledger closed');
+      setCloseLedgerModal(false);
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleReopenLedger = async () => {
+    try {
+      await ledgerApi.update(id, { ...ledger, status: 'active' });
+      toast.success('Ledger reopened');
+      setReopenLedgerModal(false);
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleDeleteTransaction = async () => {
+    try {
+      await transactionApi.delete(deleteTxnModal.txn.id);
+      toast.success('Transaction deleted');
+      setDeleteTxnModal({ open: false, txn: null });
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
   if (loading) return <LoadingSpinner className="py-20" size="lg" />;
   if (!ledger) return <p className="text-center text-slate-400 py-20">Ledger not found</p>;
 
-  const totalOutstanding = accounts.reduce((sum, a) => sum + (a.outstanding || a.current_balance), 0);
-  const totalPendingInterest = accounts.reduce((sum, a) => sum + (a.pending_interest || 0), 0);
-  const activeAccounts = accounts.filter(a => a.status === 'active');
+  const isActive = ledger.status === 'active';
+  const hasInterest = interestEnabled && ledger.interest_rate > 0;
 
   return (
     <div className="space-y-6">
@@ -57,134 +331,180 @@ export default function LedgerPage() {
           </button>
           <div>
             <h1 className="page-title">{ledger.name}</h1>
-            <p className="text-sm text-slate-500 capitalize">
-              {ledger.type} · {ledger.place || 'No location'} · {ledger.phone || 'No phone'}
+            <p className="text-sm text-slate-500">
+              {ledger.type_name} ({ledger.behaviour}) · {ledger.place || 'No location'} · {ledger.phone || 'No phone'}
             </p>
           </div>
         </div>
-        <button
-          onClick={() => navigate('/account-creation')}
-          className="btn-primary gap-2"
-        >
-          <PlusIcon className="h-4 w-4" />
-          New Account
-        </button>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="card text-center">
-          <p className="text-xs font-medium text-slate-500">Total Accounts</p>
-          <p className="text-lg font-bold text-slate-800 mt-1">{accounts.length}</p>
-        </div>
-        <div className="card text-center">
-          <p className="text-xs font-medium text-slate-500">Active</p>
-          <p className="text-lg font-bold text-trust-blue mt-1">{activeAccounts.length}</p>
-        </div>
-        <div className="card text-center border-amber-200 bg-amber-50/30">
-          <p className="text-xs font-medium text-amber-600">Pending Interest</p>
-          <p className="text-lg font-bold text-amber-700 mt-1">{formatCurrency(totalPendingInterest)}</p>
-        </div>
-        <div className="card text-center">
-          <p className="text-xs font-medium text-slate-500">Total Outstanding</p>
-          <p className="text-lg font-bold text-debit-red mt-1">{formatCurrency(totalOutstanding)}</p>
-        </div>
-      </div>
-
-      {/* Ledger Info */}
-      <div className="card">
-        <h2 className="text-sm font-semibold text-slate-700 mb-3">Ledger Details</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
-          <div>
-            <p className="text-slate-400 text-xs">Type</p>
-            <p className="font-medium capitalize">{ledger.type}</p>
-          </div>
-          <div>
-            <p className="text-slate-400 text-xs">Phone</p>
-            <p className="font-medium">{ledger.phone || '—'}</p>
-          </div>
-          <div>
-            <p className="text-slate-400 text-xs">Place</p>
-            <p className="font-medium">{ledger.place || '—'}</p>
-          </div>
-          <div>
-            <p className="text-slate-400 text-xs">GST</p>
-            <p className="font-medium">{ledger.gst_no || '—'}</p>
-          </div>
-        </div>
-        {ledger.address && (
-          <p className="text-sm text-slate-500 mt-3 pt-3 border-t border-slate-100">{ledger.address}</p>
+        {isActive ? (
+          <button onClick={() => setCloseLedgerModal(true)} className="btn-secondary text-xs text-red-500">
+            Close Ledger
+          </button>
+        ) : (
+          <button onClick={() => setReopenLedgerModal(true)} className="btn-secondary text-xs text-green-600">
+            Reopen Ledger
+          </button>
         )}
       </div>
 
-      {/* Accounts Table */}
-      {accounts.length === 0 ? (
+      {/* Summary Cards */}
+      <div className={`grid grid-cols-2 ${hasInterest ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-4`}>
+        <div className="card text-center">
+          <p className="text-xs font-medium text-slate-500">Opening Balance</p>
+          <p className="text-lg font-bold text-slate-800 mt-1">{formatCurrency(ledger.opening_balance || 0)}</p>
+        </div>
+        <div className="card text-center">
+          <p className="text-xs font-medium text-slate-500">Current Balance</p>
+          <p className="text-lg font-bold text-debit-red mt-1">{formatCurrency(ledger.current_balance || 0)}</p>
+        </div>
+        <div className="card text-center">
+          <p className="text-xs font-medium text-slate-500">Status</p>
+          <p className={`text-lg font-bold mt-1 ${isActive ? 'text-green-600' : 'text-slate-400'}`}>
+            {isActive ? 'Active' : 'Closed'}
+          </p>
+        </div>
+        {hasInterest && (
+          <div className="card text-center border-amber-200 bg-amber-50/30">
+            <p className="text-xs font-medium text-amber-600">Interest Rate</p>
+            <p className="text-lg font-bold text-amber-700 mt-1">
+              {ledger.interest_rate}% <span className="text-xs font-normal">({ledger.interest_scheme})</span>
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Ledger Details */}
+      <div className="card py-3 px-4">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+          <span className="text-slate-700 text-xs font-medium uppercase tracking-wide">Details</span>
+          <span><span className="text-slate-700 text-xs">Type: </span><span className="font-medium">{ledger.type_name}</span></span>
+          <span><span className="text-slate-700 text-xs">Behaviour: </span><span className="font-medium capitalize">{ledger.behaviour}</span></span>
+          {ledger.phone && <span><span className="text-slate-700 text-xs">Phone: </span><span className="font-medium">{ledger.phone}</span></span>}
+          {ledger.place && <span><span className="text-slate-700 text-xs">Place: </span><span className="font-medium">{ledger.place}</span></span>}
+          {ledger.gst_no && <span><span className="text-slate-700 text-xs">GST: </span><span className="font-medium">{ledger.gst_no}</span></span>}
+          {ledger.state_code && <span><span className="text-slate-400 text-xs">State: </span><span className="font-medium">{ledger.state_code}</span></span>}
+          <span><span className="text-slate-700 text-xs">IGST: </span><span className="font-medium">{ledger.igst_status}</span></span>
+          <span><span className="text-slate-700 text-xs">Created: </span><span className="font-medium">{formatDate(ledger.created_at)}</span></span>
+          {ledger.address && <span><span className="text-slate-700 text-xs">Address: </span><span className="font-medium">{ledger.address}</span></span>}
+          {ledger.notes && <span className="italic text-slate-500">{ledger.notes}</span>}
+        </div>
+      </div>
+
+      {/* Transaction Entry Forms (only when active) */}
+      {isActive && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <TransactionForm ledgerId={id} entryType="payment" onCreated={fetchData} currentBalance={ledger.current_balance} behaviour={ledger.behaviour} />
+          <TransactionForm ledgerId={id} entryType="receipt" onCreated={fetchData} currentBalance={ledger.current_balance} behaviour={ledger.behaviour} />
+        </div>
+      )}
+
+      {/* Interest Section */}
+      {hasInterest && <InterestSection ledgerId={id} ledger={ledger} onRefresh={fetchData} />}
+
+      {/* Transaction History */}
+      {transactions.length === 0 ? (
         <EmptyState
           icon={BanknotesIcon}
-          title="No accounts"
-          description="Create the first account for this ledger"
-          action={
-            <button onClick={() => navigate('/account-creation')} className="btn-primary gap-2">
-              <PlusIcon className="h-4 w-4" />
-              New Account
-            </button>
-          }
+          title="No transactions"
+          description="Record a payment or receipt to get started"
         />
       ) : (
         <div className="card p-0 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-200 bg-slate-50">
-            <h2 className="text-sm font-semibold text-slate-700">Accounts ({accounts.length})</h2>
+          <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-700">
+              Transactions ({transactions.length})
+            </h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm table-zebra">
               <thead>
                 <tr className="border-b border-slate-200">
-                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Account #</th>
-                  <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Principal</th>
-                  <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Current Balance</th>
-                  <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Pending Interest</th>
-                  <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Outstanding</th>
-                  <th className="px-4 py-2.5 text-center font-semibold text-slate-600">Status</th>
-                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Created</th>
-                  <th className="px-4 py-2.5 text-center font-semibold text-slate-600">Action</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Ref #</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Type</th>
+                  <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Amount</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Date</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Notes</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Recorded</th>
+                  {isActive && <th className="px-4 py-2.5"></th>}
                 </tr>
               </thead>
               <tbody>
-                {accounts.map((acct) => (
-                  <tr key={acct.id} className="border-b border-slate-100">
-                    <td className="px-4 py-2.5 font-mono text-sm text-slate-700">#{acct.id}</td>
-                    <td className="px-4 py-2.5 text-right">{formatCurrency(acct.principal)}</td>
-                    <td className="px-4 py-2.5 text-right font-medium text-trust-blue">{formatCurrency(acct.current_balance)}</td>
-                    <td className="px-4 py-2.5 text-right font-medium text-amber-700">
-                      {formatCurrency(acct.pending_interest || 0)}
-                    </td>
-                    <td className="px-4 py-2.5 text-right font-semibold text-debit-red">
-                      {formatCurrency(acct.outstanding || acct.current_balance)}
-                    </td>
-                    <td className="px-4 py-2.5 text-center">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                        acct.status === 'active' ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'
-                      }`}>
-                        {acct.status === 'active' ? 'Active' : 'Closed'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-2.5 text-slate-500">{formatDate(acct.created_at)}</td>
-                    <td className="px-4 py-2.5 text-center">
-                      <button
-                        onClick={() => navigate(`/account/${acct.id}`)}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-trust-blue transition-colors"
-                        title="View Account"
-                      >
-                        <EyeIcon className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {transactions.map((txn) => {
+                  const isPayment = txn.entry_type === 'payment';
+                  return (
+                    <tr key={txn.id} className="border-b border-slate-100">
+                      <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{txn.running_number}</td>
+                      <td className="px-4 py-2.5">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                          isPayment ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
+                        }`}>
+                          {isPayment ? 'Payment' : 'Receipt'}
+                        </span>
+                      </td>
+                      <td className={`px-4 py-2.5 text-right font-semibold ${isPayment ? 'text-red-600' : 'text-green-600'}`}>
+                        {formatCurrency(txn.amount)}
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-600">{formatDate(txn.date)}</td>
+                      <td className="px-4 py-2.5 text-slate-500 text-xs max-w-[200px] truncate">{txn.notes || '—'}</td>
+                      <td className="px-4 py-2.5 text-slate-400 text-xs">{formatDateTime(txn.created_at)}</td>
+                      {isActive && (
+                        <td className="px-4 py-2.5">
+                          <button
+                            onClick={() => setDeleteTxnModal({ open: true, txn })}
+                            className="text-slate-400 hover:text-red-600 transition-colors"
+                            title="Delete transaction"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         </div>
       )}
+
+      {/* Close Ledger Confirmation */}
+      <Modal open={closeLedgerModal} onClose={() => setCloseLedgerModal(false)} title="Close Ledger" size="sm">
+        <p className="text-sm text-slate-600 mb-6">
+          Are you sure you want to close <strong>{ledger.name}</strong>? No further transactions
+          can be recorded after closing.
+        </p>
+        <div className="flex justify-end gap-3">
+          <button onClick={() => setCloseLedgerModal(false)} className="btn-secondary">Cancel</button>
+          <button onClick={handleCloseLedger} className="btn-danger">Close Ledger</button>
+        </div>
+      </Modal>
+
+      {/* Reopen Ledger Confirmation */}
+      <Modal open={reopenLedgerModal} onClose={() => setReopenLedgerModal(false)} title="Reopen Ledger" size="sm">
+        <p className="text-sm text-slate-600 mb-6">
+          Reopen <strong>{ledger.name}</strong>? Transactions can be recorded again.
+        </p>
+        <div className="flex justify-end gap-3">
+          <button onClick={() => setReopenLedgerModal(false)} className="btn-secondary">Cancel</button>
+          <button onClick={handleReopenLedger} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors">Reopen Ledger</button>
+        </div>
+      </Modal>
+
+      {/* Delete Transaction Confirmation */}
+      <Modal open={deleteTxnModal.open} onClose={() => setDeleteTxnModal({ open: false, txn: null })} title="Delete Transaction" size="sm">
+        {deleteTxnModal.txn && (
+          <>
+            <p className="text-sm text-slate-600 mb-6">
+              Delete <strong>{deleteTxnModal.txn.running_number}</strong> ({deleteTxnModal.txn.entry_type === 'payment' ? 'Payment' : 'Receipt'} of{' '}
+              <strong>{formatCurrency(deleteTxnModal.txn.amount)}</strong>)? This will reverse the balance effect.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setDeleteTxnModal({ open: false, txn: null })} className="btn-secondary">Cancel</button>
+              <button onClick={handleDeleteTransaction} className="btn-danger">Delete</button>
+            </div>
+          </>
+        )}
+      </Modal>
     </div>
   );
 }

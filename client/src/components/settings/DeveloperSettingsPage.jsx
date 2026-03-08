@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { settingsApi } from '../../api';
+import { settingsApi, ledgerTypeApi } from '../../api';
 import { isDevAuthenticated, devLogin, devLogout, getDevPassword } from '../../utils/auth';
 import { getReceiptLayout, saveReceiptLayout, DEFAULT_RECEIPT_LAYOUT } from '../../utils/receiptLayout';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -15,6 +15,8 @@ import {
   PhotoIcon,
   TrashIcon,
   ArrowPathIcon,
+  PlusIcon,
+  PencilIcon,
 } from '@heroicons/react/24/outline';
 
 export default function DeveloperSettingsPage() {
@@ -52,10 +54,19 @@ export default function DeveloperSettingsPage() {
 
   // Interest module state
   const [interestModuleEnabled, setInterestModuleEnabled] = useState(false);
+  // Expense module state
+  const [expenseModuleEnabled, setExpenseModuleEnabled] = useState(false);
+
+  // Ledger types state
+  const [ledgerTypes, setLedgerTypes] = useState([]);
+  const [ltForm, setLtForm] = useState({ name: '', behaviour: 'customer' });
+  const [ltSaving, setLtSaving] = useState(false);
+  const [editingType, setEditingType] = useState(null);
 
   useEffect(() => {
     if (authenticated) {
       fetchSettings();
+      fetchLedgerTypes();
     } else {
       setLoading(false);
       setTimeout(() => passwordInputRef.current?.focus(), 100);
@@ -80,10 +91,64 @@ export default function DeveloperSettingsPage() {
       }
       // Load interest module setting
       setInterestModuleEnabled(data.interest_module_enabled === true || data.interest_module_enabled === 'true');
+      // Load expense module setting
+      setExpenseModuleEnabled(data.expense_module_enabled === true || data.expense_module_enabled === 'true');
     } catch (err) {
       toast.error(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchLedgerTypes = async () => {
+    try {
+      const res = await ledgerTypeApi.getAll();
+      setLedgerTypes(res.data || []);
+    } catch (err) {
+      toast.error('Failed to load ledger types');
+    }
+  };
+
+  const handleCreateType = async (e) => {
+    e.preventDefault();
+    if (!ltForm.name.trim()) return toast.error('Name is required');
+    try {
+      setLtSaving(true);
+      await ledgerTypeApi.create({ name: ltForm.name.trim(), behaviour: ltForm.behaviour });
+      toast.success('Ledger type created');
+      setLtForm({ name: '', behaviour: 'customer' });
+      fetchLedgerTypes();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setLtSaving(false);
+    }
+  };
+
+  const handleUpdateType = async (e) => {
+    e.preventDefault();
+    if (!editingType || !editingType.name.trim()) return;
+    try {
+      setLtSaving(true);
+      await ledgerTypeApi.update(editingType.id, { name: editingType.name.trim(), behaviour: editingType.behaviour });
+      toast.success('Ledger type updated');
+      setEditingType(null);
+      fetchLedgerTypes();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setLtSaving(false);
+    }
+  };
+
+  const handleDeleteType = async (id) => {
+    if (!window.confirm('Delete this ledger type? Ledgers using it must be reassigned first.')) return;
+    try {
+      await ledgerTypeApi.delete(id);
+      toast.success('Ledger type deleted');
+      fetchLedgerTypes();
+    } catch (err) {
+      toast.error(err.message);
     }
   };
 
@@ -274,6 +339,7 @@ export default function DeveloperSettingsPage() {
 
   const tabs = [
     { id: 'profile', label: 'Store Profile' },
+    { id: 'ledgerTypes', label: 'Ledger Types' },
     { id: 'modules', label: 'Modules' },
     { id: 'layout', label: 'Receipt Layout' },
     { id: 'style', label: 'Receipt Style' },
@@ -422,6 +488,111 @@ export default function DeveloperSettingsPage() {
         </div>
       )}
 
+      {/* Ledger Types Tab */}
+      {activeTab === 'ledgerTypes' && (
+        <div className="space-y-4">
+          {/* Create New Type */}
+          <div className="card">
+            <h2 className="text-base font-semibold text-slate-900 mb-4">Create Ledger Type</h2>
+            <form onSubmit={handleCreateType} className="flex items-end gap-3">
+              <div className="flex-1">
+                <label className="label">Name</label>
+                <input
+                  type="text"
+                  value={ltForm.name}
+                  onChange={(e) => setLtForm((f) => ({ ...f, name: e.target.value }))}
+                  className="input-field"
+                  placeholder="e.g. Vendor, Distributor"
+                />
+              </div>
+              <div className="w-44">
+                <label className="label">Behaviour</label>
+                <select
+                  value={ltForm.behaviour}
+                  onChange={(e) => setLtForm((f) => ({ ...f, behaviour: e.target.value }))}
+                  className="input-field"
+                >
+                  <option value="customer">Customer</option>
+                  <option value="supplier">Supplier</option>
+                </select>
+              </div>
+              <button type="submit" disabled={ltSaving} className="btn-primary text-sm gap-1 whitespace-nowrap">
+                <PlusIcon className="h-4 w-4" />
+                Add Type
+              </button>
+            </form>
+            <p className="text-xs text-slate-500 mt-3">
+              <strong>Customer behaviour:</strong> Payment increases balance, Receipt decreases.{' '}
+              <strong>Supplier behaviour:</strong> Payment decreases balance, Receipt increases.
+            </p>
+          </div>
+
+          {/* Existing Types */}
+          <div className="card">
+            <h2 className="text-base font-semibold text-slate-900 mb-4">Ledger Types</h2>
+            <div className="space-y-2">
+              {ledgerTypes.map((lt) => (
+                <div key={lt.id} className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 bg-white">
+                  {editingType?.id === lt.id ? (
+                    <form onSubmit={handleUpdateType} className="flex items-center gap-3 flex-1">
+                      <input
+                        type="text"
+                        value={editingType.name}
+                        onChange={(e) => setEditingType((p) => ({ ...p, name: e.target.value }))}
+                        className="input-field flex-1"
+                        autoFocus
+                      />
+                      <select
+                        value={editingType.behaviour}
+                        onChange={(e) => setEditingType((p) => ({ ...p, behaviour: e.target.value }))}
+                        className="input-field w-36"
+                      >
+                        <option value="customer">Customer</option>
+                        <option value="supplier">Supplier</option>
+                      </select>
+                      <button type="submit" disabled={ltSaving} className="btn-primary text-xs">Save</button>
+                      <button type="button" onClick={() => setEditingType(null)} className="btn-secondary text-xs">Cancel</button>
+                    </form>
+                  ) : (
+                    <>
+                      <span className="flex-1 text-sm font-medium text-slate-800">{lt.name}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        lt.behaviour === 'customer'
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'bg-orange-50 text-orange-700'
+                      }`}>
+                        {lt.behaviour}
+                      </span>
+                      {lt.is_system ? (
+                        <span className="text-[10px] bg-slate-100 text-slate-400 px-2 py-0.5 rounded-full">SYSTEM</span>
+                      ) : (
+                        <div className="flex gap-1">
+                          <button
+                            onClick={() => setEditingType({ id: lt.id, name: lt.name, behaviour: lt.behaviour })}
+                            className="p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                          >
+                            <PencilIcon className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteType(lt.id)}
+                            className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              ))}
+              {ledgerTypes.length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-6">No ledger types found</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modules Tab */}
       {activeTab === 'modules' && (
         <div className="space-y-4">
@@ -449,6 +620,35 @@ export default function DeveloperSettingsPage() {
                         await settingsApi.update('interest_module_enabled', String(newVal));
                         setInterestModuleEnabled(newVal);
                         toast.success(`Interest module ${newVal ? 'enabled' : 'disabled'}`);
+                      } catch (err) {
+                        toast.error(err.message);
+                      }
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
+                </label>
+              </div>
+
+              {/* Expense Module Toggle */}
+              <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-white">
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-slate-800">Expense Module</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Track business expenses like salary, stationery and utilities. Adds expense entry,
+                    expense reports and expense summary to the dashboard.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer ml-4">
+                  <input
+                    type="checkbox"
+                    checked={expenseModuleEnabled}
+                    onChange={async (e) => {
+                      const newVal = e.target.checked;
+                      try {
+                        await settingsApi.update('expense_module_enabled', String(newVal));
+                        setExpenseModuleEnabled(newVal);
+                        toast.success(`Expense module ${newVal ? 'enabled' : 'disabled'}`);
                       } catch (err) {
                         toast.error(err.message);
                       }

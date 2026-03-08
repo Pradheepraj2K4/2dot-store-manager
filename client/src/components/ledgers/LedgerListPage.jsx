@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ledgerApi, accountApi } from '../../api';
+import { ledgerApi, ledgerTypeApi } from '../../api';
 import { formatCurrency } from '../../utils/helpers';
 import Modal from '../ui/Modal';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -12,7 +12,6 @@ import {
   PencilSquareIcon,
   TrashIcon,
   BookOpenIcon,
-  EyeIcon,
 } from '@heroicons/react/24/outline';
 
 const GST_REGEX   = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z0-9]{1}Z[A-Z0-9]{1}$/;
@@ -21,7 +20,7 @@ const STATE_REGEX = /^\d{2}$/;
 
 function validateForm(form) {
   const errors = {};
-  if (!form.type) errors.type = 'Please select ledger type.';
+  if (!form.ledger_type_id) errors.ledger_type_id = 'Please select a ledger type.';
   if (!form.name.trim()) errors.name = 'Name is required.';
   else if (form.name.trim().length < 2) errors.name = 'Name must be at least 2 characters.';
   if (form.phone && !PHONE_REGEX.test(form.phone.replace(/\s/g, ''))) errors.phone = 'Enter a valid 10-digit number.';
@@ -38,10 +37,10 @@ function FieldError({ msg }) {
 
 export default function LedgerListPage() {
   const [ledgers, setLedgers] = useState([]);
-  const [accountInfo, setAccountInfo] = useState({});
+  const [ledgerTypes, setLedgerTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all'); // 'all' | 'customer' | 'supplier'
+  const [typeFilter, setTypeFilter] = useState('all');
   const [editModal, setEditModal] = useState({ open: false, ledger: null });
   const [editForm, setEditForm] = useState({});
   const [editErrors, setEditErrors] = useState({});
@@ -52,14 +51,12 @@ export default function LedgerListPage() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [ledgersRes, outstandingRes] = await Promise.all([
+      const [ledgersRes, typesRes] = await Promise.all([
         ledgerApi.getAll(),
-        accountApi.getOutstanding(),
+        ledgerTypeApi.getAll(),
       ]);
       setLedgers(ledgersRes.data);
-      const infoMap = {};
-      outstandingRes.data.forEach((b) => { infoMap[b.ledger_id || b.id] = b; });
-      setAccountInfo(infoMap);
+      setLedgerTypes(typesRes.data);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -71,7 +68,7 @@ export default function LedgerListPage() {
 
   const openEdit = (ledger) => {
     setEditForm({
-      type: ledger.type,
+      ledger_type_id: ledger.ledger_type_id || '',
       name: ledger.name,
       phone: ledger.phone || '',
       place: ledger.place || '',
@@ -107,6 +104,7 @@ export default function LedgerListPage() {
     try {
       await ledgerApi.update(editModal.ledger.id, {
         ...editForm,
+        ledger_type_id: parseInt(editForm.ledger_type_id),
         name: editForm.name.trim(),
         gst_no: editForm.gst_no.trim().toUpperCase(),
         state_code: editForm.state_code.trim(),
@@ -130,12 +128,15 @@ export default function LedgerListPage() {
     }
   };
 
+  // Build filter options from ledger types
+  const filterOptions = [['all', 'All'], ...ledgerTypes.map((t) => [String(t.id), t.name])];
+
   const filtered = ledgers.filter((l) => {
     const matchesSearch =
       l.name.toLowerCase().includes(search.toLowerCase()) ||
       (l.phone || '').toLowerCase().includes(search.toLowerCase()) ||
       (l.place || '').toLowerCase().includes(search.toLowerCase());
-    const matchesType = typeFilter === 'all' || l.type === typeFilter;
+    const matchesType = typeFilter === 'all' || String(l.ledger_type_id) === typeFilter;
     return matchesSearch && matchesType;
   });
 
@@ -148,7 +149,7 @@ export default function LedgerListPage() {
         <div>
           <h1 className="page-title">Ledgers</h1>
           <p className="text-sm text-slate-500 mt-1">
-            All customer &amp; supplier ledger accounts ({filtered.length})
+            All ledger accounts ({filtered.length})
           </p>
         </div>
         <button onClick={() => navigate('/ledger-creation')} className="btn-primary gap-2">
@@ -169,8 +170,8 @@ export default function LedgerListPage() {
             className="input-field pl-9"
           />
         </div>
-        <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
-          {[['all', 'All'], ['customer', 'Customers'], ['supplier', 'Suppliers']].map(([val, label]) => (
+        <div className="flex gap-1 bg-slate-100 rounded-lg p-1 flex-wrap">
+          {filterOptions.map(([val, label]) => (
             <button
               key={val}
               onClick={() => setTypeFilter(val)}
@@ -211,66 +212,62 @@ export default function LedgerListPage() {
                   <th className="px-4 py-3 text-left font-semibold text-slate-600">Type</th>
                   <th className="px-4 py-3 text-left font-semibold text-slate-600">Phone</th>
                   <th className="px-4 py-3 text-left font-semibold text-slate-600">Place</th>
-                  <th className="px-4 py-3 text-center font-semibold text-slate-600">Accounts</th>
-                  <th className="px-4 py-3 text-right font-semibold text-slate-600">Outstanding</th>
+                  <th className="px-4 py-3 text-right font-semibold text-slate-600">Balance</th>
+                  <th className="px-4 py-3 text-center font-semibold text-slate-600">Status</th>
                   <th className="px-4 py-3 text-center font-semibold text-slate-600">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((ledger) => {
-                  const info = accountInfo[ledger.id];
-                  const outstanding = info ? (info.total_outstanding || 0) : 0;
-                  const acctCount = info ? (info.account_count || 0) : 0;
-                  return (
-                    <tr key={ledger.id} className="border-b border-slate-100">
-                      <td className="px-4 py-2.5 font-medium text-slate-800">{ledger.name}</td>
-                      <td className="px-4 py-2.5">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          ledger.type === 'customer'
-                            ? 'bg-blue-50 text-blue-700'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          {ledger.type === 'customer' ? 'Customer' : 'Supplier'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-2.5 text-slate-600">{ledger.phone || '—'}</td>
-                      <td className="px-4 py-2.5 text-slate-600">{ledger.place || '—'}</td>
-                      <td className="px-4 py-2.5 text-center">
-                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
-                          {acctCount}
-                        </span>
-                      </td>
-                      <td className={`px-4 py-2.5 text-right font-semibold ${outstanding > 0 ? 'text-debit-red' : 'text-slate-400'}`}>
-                        {formatCurrency(outstanding)}
-                      </td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            onClick={() => navigate(`/ledger/${ledger.id}`)}
-                            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-trust-blue transition-colors"
-                            title="View Ledger"
-                          >
-                            <EyeIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => openEdit(ledger)}
-                            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-trust-blue transition-colors"
-                            title="Edit"
-                          >
-                            <PencilSquareIcon className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => setDeleteConfirm(ledger)}
-                            className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-debit-red transition-colors"
-                            title="Delete"
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {filtered.map((ledger) => (
+                  <tr
+                    key={ledger.id}
+                    onClick={() => navigate(`/ledger/${ledger.id}`)}
+                    className="border-b border-slate-100 cursor-pointer hover:bg-blue-50/40 transition-colors"
+                  >
+                    <td className="px-4 py-2.5 font-medium text-slate-800">{ledger.name}</td>
+                    <td className="px-4 py-2.5">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                        ledger.behaviour === 'customer'
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {ledger.type_name || 'Unknown'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-600">{ledger.phone || '—'}</td>
+                    <td className="px-4 py-2.5 text-slate-600">{ledger.place || '—'}</td>
+                    <td className={`px-4 py-2.5 text-right font-semibold ${ledger.current_balance > 0 ? 'text-debit-red' : 'text-slate-400'}`}>
+                      {formatCurrency(ledger.current_balance || 0)}
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                        ledger.status === 'active'
+                          ? 'bg-green-50 text-green-700'
+                          : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {ledger.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openEdit(ledger); }}
+                          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-trust-blue transition-colors"
+                          title="Edit"
+                        >
+                          <PencilSquareIcon className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setDeleteConfirm(ledger); }}
+                          className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-debit-red transition-colors"
+                          title="Delete"
+                        >
+                          <TrashIcon className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -284,36 +281,27 @@ export default function LedgerListPage() {
         title="Edit Ledger"
       >
         <form onSubmit={handleEditSubmit} className="space-y-4" noValidate>
-          {/* Type */}
           <div>
             <label className="label">Ledger Type *</label>
             <select
-              name="type"
-              value={editForm.type || ''}
+              name="ledger_type_id"
+              value={editForm.ledger_type_id || ''}
               onChange={handleEditChange}
               onBlur={handleEditBlur}
-              className={`input-field ${editErrors.type ? 'border-red-400' : ''}`}
+              className={`input-field ${editErrors.ledger_type_id ? 'border-red-400' : ''}`}
             >
               <option value="">— Select type —</option>
-              <option value="customer">Customer</option>
-              <option value="supplier">Supplier</option>
+              {ledgerTypes.map((t) => (
+                <option key={t.id} value={t.id}>{t.name} ({t.behaviour})</option>
+              ))}
             </select>
-            <FieldError msg={editErrors.type} />
+            <FieldError msg={editErrors.ledger_type_id} />
           </div>
-          {/* Name */}
           <div>
             <label className="label">Name *</label>
-            <input
-              type="text"
-              name="name"
-              value={editForm.name || ''}
-              onChange={handleEditChange}
-              onBlur={handleEditBlur}
-              className={`input-field ${editErrors.name ? 'border-red-400' : ''}`}
-            />
+            <input type="text" name="name" value={editForm.name || ''} onChange={handleEditChange} onBlur={handleEditBlur} className={`input-field ${editErrors.name ? 'border-red-400' : ''}`} />
             <FieldError msg={editErrors.name} />
           </div>
-          {/* Phone + Place */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Phone</label>
@@ -325,12 +313,10 @@ export default function LedgerListPage() {
               <input type="text" name="place" value={editForm.place || ''} onChange={handleEditChange} className="input-field" />
             </div>
           </div>
-          {/* Address */}
           <div>
             <label className="label">Address</label>
             <textarea name="address" value={editForm.address || ''} onChange={handleEditChange} rows={2} className="input-field resize-none" />
           </div>
-          {/* GST + State */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">GST Number</label>
@@ -343,7 +329,6 @@ export default function LedgerListPage() {
               <FieldError msg={editErrors.state_code} />
             </div>
           </div>
-          {/* IGST */}
           <div>
             <label className="label">IGST Applicable</label>
             <div className="flex gap-6 mt-1">
@@ -355,7 +340,6 @@ export default function LedgerListPage() {
               ))}
             </div>
           </div>
-          {/* Buttons */}
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setEditModal({ open: false, ledger: null })} className="btn-secondary">Cancel</button>
             <button type="submit" className="btn-primary">Save Changes</button>
@@ -372,7 +356,7 @@ export default function LedgerListPage() {
       >
         <p className="text-sm text-slate-600 mb-6">
           Are you sure you want to delete <strong>{deleteConfirm?.name}</strong>? This will also
-          delete all associated accounts and payments. This action cannot be undone.
+          delete all associated transactions. This action cannot be undone.
         </p>
         <div className="flex justify-end gap-3">
           <button onClick={() => setDeleteConfirm(null)} className="btn-secondary">Cancel</button>

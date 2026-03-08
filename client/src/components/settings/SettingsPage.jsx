@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { getDefaultPassword, getCustomPassword, setCustomPassword } from '../../utils/auth';
+import { expenseApi } from '../../api';
 import toast from 'react-hot-toast';
-import { LockClosedIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import Modal from '../ui/Modal';
+import { LockClosedIcon, EyeIcon, EyeSlashIcon, PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 
 export default function SettingsPage() {
   const [showDefaultPassword, setShowDefaultPassword] = useState(false);
@@ -9,12 +11,86 @@ export default function SettingsPage() {
   const [showCustomPassword, setShowCustomPassword] = useState(false);
   const passwordRef = useRef(null);
 
+  // Expense categories
+  const [expenseModuleEnabled, setExpenseModuleEnabled] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [catName, setCatName] = useState('');
+  const [catSaving, setCatSaving] = useState(false);
+  const [editingCat, setEditingCat] = useState(null);
+  const [deleteCatModal, setDeleteCatModal] = useState({ open: false, cat: null });
+
   useEffect(() => {
     const savedPassword = getCustomPassword();
     if (savedPassword) {
       setCustomPasswordState(savedPassword);
     }
   }, []);
+
+  useEffect(() => {
+    expenseApi.isEnabled().then((res) => {
+      const val = res.data?.value;
+      const enabled = val === true || val === 'true';
+      setExpenseModuleEnabled(enabled);
+      if (enabled) fetchCategories();
+    }).catch(() => {});
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const res = await expenseApi.getCategories();
+      setCategories(res.data || []);
+    } catch {
+      toast.error('Failed to load expense categories');
+    }
+  };
+
+  const handleCreateCategory = async (e) => {
+    e.preventDefault();
+    if (!catName.trim()) return;
+    try {
+      setCatSaving(true);
+      const res = await expenseApi.createCategory(catName.trim());
+      setCatName('');
+      toast.success('Category created');
+      if (res?.data) {
+        setCategories((prev) => [...prev, res.data].sort((a, b) => a.name.localeCompare(b.name)));
+      }
+      await fetchCategories();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setCatSaving(false);
+    }
+  };
+
+  const handleUpdateCategory = async (e) => {
+    e.preventDefault();
+    if (!editingCat || !editingCat.name.trim()) return;
+    try {
+      setCatSaving(true);
+      await expenseApi.updateCategory(editingCat.id, editingCat.name.trim());
+      setEditingCat(null);
+      toast.success('Category updated');
+      fetchCategories();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setCatSaving(false);
+    }
+  };
+
+  const handleDeleteCategory = async () => {
+    const id = deleteCatModal.cat?.id;
+    if (!id) return;
+    try {
+      await expenseApi.deleteCategory(id);
+      toast.success('Category deleted');
+      setDeleteCatModal({ open: false, cat: null });
+      fetchCategories();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
 
   const handleSavePassword = () => {
     try {
@@ -32,13 +108,87 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-3 max-w-3xl">
       <div>
         <h1 className="page-title">Settings</h1>
         <p className="text-sm text-slate-500 mt-1">Manage application settings</p>
       </div>
 
-      {/* Password Configuration */}
+
+      {/* Expense Categories (only shown when expense module is enabled) */}
+      {expenseModuleEnabled && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-orange-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z" />
+            </svg>
+            <h2 className="text-base font-semibold text-slate-900">Expense Categories</h2>
+          </div>
+          <p className="text-xs text-slate-500 mb-4">Create categories to organise your business expenses (e.g. Salary, Stationery, Utilities).</p>
+
+          {/* Add Category */}
+          <form onSubmit={handleCreateCategory} className="flex items-end gap-3 mb-4">
+            <div className="flex-1">
+              <label className="label">New Category Name</label>
+              <input
+                type="text"
+                value={catName}
+                onChange={(e) => setCatName(e.target.value)}
+                className="input-field"
+                placeholder="e.g. Salary, Postage, Rent"
+              />
+            </div>
+            <button type="submit" disabled={catSaving || !catName.trim()} className="btn-primary text-sm gap-1 whitespace-nowrap">
+              <PlusIcon className="h-4 w-4" />
+              Add
+            </button>
+          </form>
+
+          {/* Category List */}
+          <div className="space-y-2">
+            {categories.map((cat) => (
+              <div key={cat.id} className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 bg-white">
+                {editingCat?.id === cat.id ? (
+                  <form onSubmit={handleUpdateCategory} className="flex items-center gap-3 flex-1">
+                    <input
+                      type="text"
+                      value={editingCat.name}
+                      onChange={(e) => setEditingCat((p) => ({ ...p, name: e.target.value }))}
+                      className="input-field flex-1"
+                      autoFocus
+                    />
+                    <button type="submit" disabled={catSaving} className="btn-primary text-xs">Save</button>
+                    <button type="button" onClick={() => setEditingCat(null)} className="btn-secondary text-xs">Cancel</button>
+                  </form>
+                ) : (
+                  <>
+                    <span className="flex-1 text-sm font-medium text-slate-800">{cat.name}</span>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setEditingCat({ id: cat.id, name: cat.name })}
+                        className="p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                      >
+                        <PencilIcon className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setDeleteCatModal({ open: true, cat })}
+                        className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+            {categories.length === 0 && (
+              <p className="text-sm text-slate-400 text-center py-4">No categories yet</p>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Password Configurations */}
       <div className="card">
         <div className="flex items-center gap-2 mb-4">
           <LockClosedIcon className="h-5 w-5 text-slate-600" />
@@ -94,6 +244,20 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+      <Modal
+        open={deleteCatModal.open}
+        onClose={() => setDeleteCatModal({ open: false, cat: null })}
+        title="Delete Category"
+        size="sm"
+      >
+        <p className="text-sm text-slate-600 mb-6">
+          Delete <strong>{deleteCatModal.cat?.name}</strong>? Expenses using it will become uncategorised.
+        </p>
+        <div className="flex justify-end gap-3">
+          <button onClick={() => setDeleteCatModal({ open: false, cat: null })} className="btn-secondary">Cancel</button>
+          <button onClick={handleDeleteCategory} className="btn-danger">Delete</button>
+        </div>
+      </Modal>
     </div>
   );
 }

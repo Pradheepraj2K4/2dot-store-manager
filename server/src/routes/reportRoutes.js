@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const txnController = require('../controllers/transactionController');
+const transactionController = require('../controllers/paymentController');
 
-// Statement of Account
-router.get('/statement/:partyId', (req, res, next) => txnController.getStatement(req, res, next));
+// Transaction reports with filters (entryType=payment or entryType=receipt)
+router.get('/transactions', (req, res, next) => transactionController.getAll(req, res, next));
+router.get('/transactions/summary', (req, res, next) => transactionController.getSummary(req, res, next));
 
 module.exports = router;

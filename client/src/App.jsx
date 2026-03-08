@@ -6,12 +6,14 @@ import DashboardPage from './components/dashboard/DashboardPage';
 import LedgerCreationPage from './components/ledgers/LedgerCreationPage';
 import LedgerListPage from './components/ledgers/LedgerListPage';
 import LedgerPage from './components/ledgers/LedgerPage';
-import AccountCreationPage from './components/accounts/AccountCreationPage';
-import AccountDetailPage from './components/accounts/AccountDetailPage';
 import PendingInterestPage from './components/accounts/PendingInterestPage';
 import ReportsPage from './components/reports/ReportsPage';
+import OutstandingBalanceReportPage from './components/reports/OutstandingBalanceReportPage';
+import StatementOfAccountPage from './components/reports/StatementOfAccountPage';
 import SettingsPage from './components/settings/SettingsPage';
 import DeveloperSettingsPage from './components/settings/DeveloperSettingsPage';
+import ExpensePage from './components/expenses/ExpensePage';
+import ExpenseReportsPage from './components/expenses/ExpenseReportsPage';
 
 export default function App() {
   return (
@@ -27,12 +29,14 @@ export default function App() {
                 <Route path="/ledger-creation" element={<LedgerCreationPage />} />
                 <Route path="/ledgers" element={<LedgerListPage />} />
                 <Route path="/ledger/:id" element={<LedgerPage />} />
-                <Route path="/account-creation" element={<AccountCreationPage />} />
-                <Route path="/account/:id" element={<AccountDetailPage />} />
                 <Route path="/pending-interest" element={<PendingInterestPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
+                <Route path="/outstanding-balances" element={<OutstandingBalanceReportPage />} />
+                <Route path="/statement-of-account" element={<StatementOfAccountPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/developer-settings" element={<DeveloperSettingsPage />} />
+                <Route path="/expenses" element={<ExpensePage />} />
+                <Route path="/expense-reports" element={<ExpenseReportsPage />} />
               </Routes>
             </AppLayout>
           </ProtectedRoute>

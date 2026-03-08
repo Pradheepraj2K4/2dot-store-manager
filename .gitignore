@@ -73,15 +73,6 @@ __snapshots__/
 # Exclude electron-packager output
 release-builds/
 
-# Exclude public assets
-/client/public/
 
 # Exclude cache
 .cache/
-
-# Exclude database
-/server/src/db/database.js
-
-# Exclude migrations and seeds
-/server/src/db/migrations/
-/server/src/db/seeds/

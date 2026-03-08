@@ -18,7 +18,7 @@ const DEFAULT_SETTINGS = [
     'receipt_config',
     JSON.stringify({
       format: 'a4',
-      header:    { show: true,  title: 'Payment Receipt', fontSize: 18 },
+      header:    { show: true,  title: 'Transaction Receipt', fontSize: 18 },
       footer:    { show: true,  text: 'Thank you for your business!', fontSize: 10 },
       body:      { fontSize: 12 },
       showLogo:  false,

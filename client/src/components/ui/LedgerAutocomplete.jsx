@@ -1,35 +1,24 @@
-import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ledgerApi } from '../../api';
 
-const LedgerAutocomplete = forwardRef(function LedgerAutocomplete(
-  { ledgers, value, onChange, placeholder = 'Search ledger...', onEnterWhenSelected },
-  ref
-) {
+export default function LedgerAutocomplete({ value, onChange, placeholder = 'Search ledger...' }) {
+  const [ledgers, setLedgers] = useState([]);
   const [search, setSearch] = useState('');
   const [isOpen, setIsOpen] = useState(false);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
   const inputRef = useRef(null);
   const dropdownRef = useRef(null);
-  const wrapperRef = useRef(null);
 
-  useImperativeHandle(ref, () => ({
-    focus: () => {
-      if (selectedLedger && wrapperRef.current) {
-        wrapperRef.current.focus();
-      } else if (inputRef.current) {
-        inputRef.current.focus();
-      }
-    },
-  }));
-
-  const selectedLedger = ledgers.find((l) => l.id === value);
+  useEffect(() => {
+    ledgerApi.getAll().then((res) => setLedgers(res.data)).catch(() => {});
+  }, []);
 
   const filtered = ledgers.filter((l) =>
-    l.name.toLowerCase().includes(search.toLowerCase())
+    l.name.toLowerCase().includes(search.toLowerCase()) ||
+    (l.phone || '').includes(search) ||
+    (l.place || '').toLowerCase().includes(search.toLowerCase())
   );
-
-  const customers = filtered.filter((l) => l.type === 'customer');
-  const suppliers = filtered.filter((l) => l.type === 'supplier');
 
   useEffect(() => {
     if (isOpen) setHighlightedIndex(0);
@@ -50,13 +39,13 @@ const LedgerAutocomplete = forwardRef(function LedgerAutocomplete(
   }, []);
 
   const handleSelect = (ledger) => {
-    onChange(ledger.id);
+    onChange(ledger);
     setSearch('');
     setIsOpen(false);
   };
 
   const handleClear = () => {
-    onChange('');
+    onChange(null);
     setSearch('');
     inputRef.current?.focus();
   };
@@ -69,10 +58,8 @@ const LedgerAutocomplete = forwardRef(function LedgerAutocomplete(
       }
       return;
     }
-
     const totalItems = filtered.length;
     if (totalItems === 0) return;
-
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
@@ -94,13 +81,6 @@ const LedgerAutocomplete = forwardRef(function LedgerAutocomplete(
     }
   };
 
-  const handleSelectedKeyDown = (e) => {
-    if (e.key === 'Enter' && onEnterWhenSelected) {
-      e.preventDefault();
-      onEnterWhenSelected();
-    }
-  };
-
   useEffect(() => {
     if (isOpen && highlightedIndex !== -1 && dropdownRef.current) {
       const highlighted = dropdownRef.current.querySelector(`[data-index="${highlightedIndex}"]`);
@@ -110,17 +90,12 @@ const LedgerAutocomplete = forwardRef(function LedgerAutocomplete(
 
   return (
     <div className="relative">
-      {selectedLedger ? (
-        <div
-          ref={wrapperRef}
-          tabIndex={0}
-          onKeyDown={handleSelectedKeyDown}
-          className="flex items-center gap-2 input-field pr-2"
-        >
+      {value ? (
+        <div className="flex items-center gap-2 input-field pr-2">
           <div className="flex-1 min-w-0">
-            <p className="font-medium text-slate-800 truncate">{selectedLedger.name}</p>
-            <p className="text-xs text-slate-400 capitalize">
-              {selectedLedger.type} · {selectedLedger.place || 'No location'}
+            <p className="font-medium text-slate-800 truncate">{value.name}</p>
+            <p className="text-xs text-slate-400">
+              {value.type_name || ''} · {value.place || 'No location'}
             </p>
           </div>
           <button
@@ -160,56 +135,27 @@ const LedgerAutocomplete = forwardRef(function LedgerAutocomplete(
                   {search ? 'No ledgers found' : 'Start typing to search'}
                 </div>
               ) : (
-                <>
-                  {customers.length > 0 && (
-                    <div>
-                      <div className="px-3 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50 border-b border-slate-200">
-                        Customers
-                      </div>
-                      {customers.map((ledger) => {
-                        const globalIdx = filtered.findIndex((l) => l.id === ledger.id);
-                        return (
-                          <button
-                            key={ledger.id}
-                            type="button"
-                            data-index={globalIdx}
-                            onClick={() => handleSelect(ledger)}
-                            className={`w-full px-3 py-2 text-left hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 ${globalIdx === highlightedIndex ? 'bg-trust-blue/10' : ''}`}
-                          >
-                            <p className="text-sm font-medium text-slate-800">{ledger.name}</p>
-                            <p className="text-xs text-slate-400">
-                              {ledger.phone || 'No phone'} · {ledger.place || 'No location'}
-                            </p>
-                          </button>
-                        );
-                      })}
+                filtered.map((ledger, idx) => (
+                  <button
+                    key={ledger.id}
+                    type="button"
+                    data-index={idx}
+                    onClick={() => handleSelect(ledger)}
+                    className={`w-full px-3 py-2 text-left hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 ${idx === highlightedIndex ? 'bg-trust-blue/10' : ''}`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-slate-800">{ledger.name}</p>
+                      <span className={`text-[10px] font-medium rounded-full px-1.5 py-0.5 ${
+                        ledger.behaviour === 'customer' ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {ledger.type_name}
+                      </span>
                     </div>
-                  )}
-                  {suppliers.length > 0 && (
-                    <div>
-                      <div className="px-3 py-1.5 text-xs font-semibold text-slate-500 bg-slate-50 border-b border-slate-200">
-                        Suppliers
-                      </div>
-                      {suppliers.map((ledger) => {
-                        const globalIdx = filtered.findIndex((l) => l.id === ledger.id);
-                        return (
-                          <button
-                            key={ledger.id}
-                            type="button"
-                            data-index={globalIdx}
-                            onClick={() => handleSelect(ledger)}
-                            className={`w-full px-3 py-2 text-left hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 ${globalIdx === highlightedIndex ? 'bg-trust-blue/10' : ''}`}
-                          >
-                            <p className="text-sm font-medium text-slate-800">{ledger.name}</p>
-                            <p className="text-xs text-slate-400">
-                              {ledger.phone || 'No phone'} · {ledger.place || 'No location'}
-                            </p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </>
+                    <p className="text-xs text-slate-400">
+                      {ledger.phone || 'No phone'} · {ledger.place || 'No location'}
+                    </p>
+                  </button>
+                ))
               )}
             </div>
           )}
@@ -217,6 +163,4 @@ const LedgerAutocomplete = forwardRef(function LedgerAutocomplete(
       )}
     </div>
   );
-});
-
-export default LedgerAutocomplete;
+}

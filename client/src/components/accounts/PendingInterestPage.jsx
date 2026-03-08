@@ -1,19 +1,19 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { accountApi } from '../../api';
+import { ledgerApi, ledgerTypeApi } from '../../api';
 import { formatCurrency, formatDate } from '../../utils/helpers';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
 import toast from 'react-hot-toast';
 import {
   ClockIcon,
-  EyeIcon,
   MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 
 export default function PendingInterestPage() {
   const navigate = useNavigate();
-  const [accounts, setAccounts] = useState([]);
+  const [ledgers, setLedgers] = useState([]);
+  const [ledgerTypes, setLedgerTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
@@ -21,8 +21,12 @@ export default function PendingInterestPage() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await accountApi.getPendingInterest();
-      setAccounts(res.data);
+      const [res, typesRes] = await Promise.all([
+        ledgerApi.getPendingInterest(),
+        ledgerTypeApi.getAll(),
+      ]);
+      setLedgers(res.data);
+      setLedgerTypes(typesRes.data);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -32,17 +36,19 @@ export default function PendingInterestPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const filtered = accounts.filter((a) => {
+  const filterOptions = [['all', 'All'], ...ledgerTypes.map((t) => [String(t.id), t.name])];
+
+  const filtered = ledgers.filter((l) => {
     const matchesSearch =
-      a.ledger_name.toLowerCase().includes(search.toLowerCase()) ||
-      (a.ledger_phone || '').includes(search) ||
-      (a.ledger_place || '').toLowerCase().includes(search.toLowerCase());
-    const matchesType = typeFilter === 'all' || a.ledger_type === typeFilter;
+      l.name.toLowerCase().includes(search.toLowerCase()) ||
+      (l.phone || '').includes(search) ||
+      (l.place || '').toLowerCase().includes(search.toLowerCase());
+    const matchesType = typeFilter === 'all' || String(l.ledger_type_id) === typeFilter;
     return matchesSearch && matchesType;
   });
 
-  const totalPending = filtered.reduce((sum, a) => sum + a.pending_interest, 0);
-  const totalOutstanding = filtered.reduce((sum, a) => sum + a.outstanding, 0);
+  const totalPending = filtered.reduce((sum, l) => sum + (l.pending_interest || 0), 0);
+  const totalOutstanding = filtered.reduce((sum, l) => sum + (l.current_balance || 0), 0);
 
   if (loading) return <LoadingSpinner className="py-20" size="lg" />;
 
@@ -55,7 +61,7 @@ export default function PendingInterestPage() {
           Pending Interest
         </h1>
         <p className="text-sm text-slate-500 mt-1">
-          Accounts with pending due interest ({filtered.length} accounts)
+          Ledgers with pending due interest ({filtered.length} ledgers)
         </p>
       </div>
 
@@ -70,7 +76,7 @@ export default function PendingInterestPage() {
           <p className="text-xl font-bold text-debit-red mt-1">{formatCurrency(totalOutstanding)}</p>
         </div>
         <div className="card text-center">
-          <p className="text-xs font-medium text-slate-500">Accounts</p>
+          <p className="text-xs font-medium text-slate-500">Ledgers</p>
           <p className="text-xl font-bold text-slate-800 mt-1">{filtered.length}</p>
         </div>
       </div>
@@ -87,8 +93,8 @@ export default function PendingInterestPage() {
             className="input-field pl-9"
           />
         </div>
-        <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
-          {[['all', 'All'], ['customer', 'Customers'], ['supplier', 'Suppliers']].map(([val, label]) => (
+        <div className="flex gap-1 bg-slate-100 rounded-lg p-1 flex-wrap">
+          {filterOptions.map(([val, label]) => (
             <button
               key={val}
               onClick={() => setTypeFilter(val)}
@@ -109,7 +115,7 @@ export default function PendingInterestPage() {
         <EmptyState
           icon={ClockIcon}
           title="No pending interest"
-          description="All accounts are up to date with interest payments"
+          description="All ledgers are up to date with interest"
         />
       ) : (
         <div className="card p-0 overflow-hidden">
@@ -122,36 +128,28 @@ export default function PendingInterestPage() {
                   <th className="px-4 py-3 text-right font-semibold text-slate-600">Current Balance</th>
                   <th className="px-4 py-3 text-right font-semibold text-slate-600">Pending Interest</th>
                   <th className="px-4 py-3 text-center font-semibold text-slate-600">Pending Count</th>
-                  <th className="px-4 py-3 text-right font-semibold text-slate-600">Outstanding</th>
-                  <th className="px-4 py-3 text-left font-semibold text-slate-600">Earliest Due</th>
-                  <th className="px-4 py-3 text-center font-semibold text-slate-600">Action</th>
+                  <th className="px-4 py-3 text-left font-semibold text-slate-600">Interest Rate</th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((a) => (
-                  <tr key={a.id} className="border-b border-slate-100">
-                    <td className="px-4 py-2.5 font-medium text-slate-800">{a.ledger_name}</td>
+                {filtered.map((l) => (
+                  <tr
+                    key={l.id}
+                    onClick={() => navigate(`/ledger/${l.id}`)}
+                    className="border-b border-slate-100 cursor-pointer hover:bg-blue-50/40 transition-colors"
+                  >
+                    <td className="px-4 py-2.5 font-medium text-slate-800">{l.name}</td>
                     <td className="px-4 py-2.5">
                       <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                        a.ledger_type === 'customer' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'
+                        l.behaviour === 'customer' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'
                       }`}>
-                        {a.ledger_type === 'customer' ? 'Customer' : 'Supplier'}
+                        {l.type_name || 'Unknown'}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatCurrency(a.current_balance)}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold text-amber-700">{formatCurrency(a.pending_interest)}</td>
-                    <td className="px-4 py-2.5 text-center text-slate-600">{a.pending_count}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold text-debit-red">{formatCurrency(a.outstanding)}</td>
-                    <td className="px-4 py-2.5 text-slate-500">{a.earliest_pending_date ? formatDate(a.earliest_pending_date) : '—'}</td>
-                    <td className="px-4 py-2.5 text-center">
-                      <button
-                        onClick={() => navigate(`/account/${a.id}`)}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-trust-blue transition-colors"
-                        title="View Account"
-                      >
-                        <EyeIcon className="h-4 w-4" />
-                      </button>
-                    </td>
+                    <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatCurrency(l.current_balance)}</td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-amber-700">{formatCurrency(l.pending_interest)}</td>
+                    <td className="px-4 py-2.5 text-center text-slate-600">{l.pending_count}</td>
+                    <td className="px-4 py-2.5 text-slate-500">{l.interest_rate}% {l.interest_scheme}</td>
                   </tr>
                 ))}
               </tbody>

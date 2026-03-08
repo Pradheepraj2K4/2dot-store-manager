@@ -23380,46 +23380,170 @@ var require_v1 = __commonJS({
   "src/db/migrations/v1.js"(exports2, module2) {
     var VERSION = 1;
     var SQL = `
-  CREATE TABLE IF NOT EXISTS parties (
+  -- \u2500\u2500 Ledger Types \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  CREATE TABLE IF NOT EXISTS ledger_types (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT    NOT NULL UNIQUE,
+    behaviour   TEXT    NOT NULL CHECK(behaviour IN ('customer', 'supplier')),
+    is_system   INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+  );
+
+  -- Seed the two built-in types
+  INSERT INTO ledger_types (name, behaviour, is_system) VALUES ('Customer', 'customer', 1);
+  INSERT INTO ledger_types (name, behaviour, is_system) VALUES ('Supplier', 'supplier', 1);
+
+  -- \u2500\u2500 Ledgers (1:1 with account) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  CREATE TABLE IF NOT EXISTS ledgers (
     id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    type            TEXT    NOT NULL CHECK(type IN ('customer', 'supplier')),
+    ledger_type_id  INTEGER NOT NULL,
     name            TEXT    NOT NULL,
     address         TEXT    NOT NULL DEFAULT '',
     phone           TEXT    NOT NULL DEFAULT '',
     place           TEXT    NOT NULL DEFAULT '',
-    opening_balance REAL    NOT NULL DEFAULT 0,
     gst_no          TEXT    NOT NULL DEFAULT '',
     state_code      TEXT    NOT NULL DEFAULT '',
     igst_status     TEXT    NOT NULL DEFAULT 'NO' CHECK(igst_status IN ('YES', 'NO')),
-    created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
-    updated_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
-  );
-
-  CREATE TABLE IF NOT EXISTS transactions (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    party_id        INTEGER NOT NULL,
-    date            TEXT    NOT NULL DEFAULT (date('now', 'localtime')),
-    type            TEXT    NOT NULL CHECK(type IN ('credit', 'debit')),
-    amount          REAL    NOT NULL CHECK(amount > 0),
-    reference       TEXT    NOT NULL DEFAULT '',
+    opening_balance REAL    NOT NULL DEFAULT 0,
+    current_balance REAL    NOT NULL DEFAULT 0,
+    interest_rate   REAL    NOT NULL DEFAULT 0,
+    interest_scheme TEXT    NOT NULL DEFAULT 'NONE'
+                    CHECK(interest_scheme IN ('NONE', 'DAILY', 'MONTHLY')),
+    status          TEXT    NOT NULL DEFAULT 'active'
+                    CHECK(status IN ('active', 'closed')),
     notes           TEXT    NOT NULL DEFAULT '',
-    receipt_number  TEXT    UNIQUE,
-    balance_after   REAL    NOT NULL DEFAULT 0,
     created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
-    FOREIGN KEY (party_id) REFERENCES parties(id) ON DELETE CASCADE
+    updated_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (ledger_type_id) REFERENCES ledger_types(id)
   );
 
+  -- \u2500\u2500 Interest Entries \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  CREATE TABLE IF NOT EXISTS interest_entries (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    ledger_id         INTEGER NOT NULL,
+    amount            REAL    NOT NULL DEFAULT 0,
+    from_date         TEXT    NOT NULL,
+    to_date           TEXT    NOT NULL,
+    days              INTEGER NOT NULL DEFAULT 0,
+    rate              REAL    NOT NULL DEFAULT 0,
+    principal_at_time REAL    NOT NULL DEFAULT 0,
+    status            TEXT    NOT NULL DEFAULT 'pending'
+                      CHECK(status IN ('pending', 'paid')),
+    paid_date         TEXT,
+    created_at        TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (ledger_id) REFERENCES ledgers(id) ON DELETE CASCADE
+  );
+
+  -- \u2500\u2500 Transactions (payments & receipts) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  CREATE TABLE IF NOT EXISTS transactions (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    ledger_id         INTEGER NOT NULL,
+    entry_type        TEXT    NOT NULL CHECK(entry_type IN ('payment', 'receipt')),
+    amount            REAL    NOT NULL CHECK(amount > 0),
+    running_number    TEXT    NOT NULL,
+    date              TEXT    NOT NULL DEFAULT (date('now', 'localtime')),
+    reference         TEXT    NOT NULL DEFAULT '',
+    notes             TEXT    NOT NULL DEFAULT '',
+    interest_entry_id INTEGER,
+    created_at        TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (ledger_id)         REFERENCES ledgers(id) ON DELETE CASCADE,
+    FOREIGN KEY (interest_entry_id) REFERENCES interest_entries(id)
+  );
+
+  -- \u2500\u2500 Settings \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL DEFAULT ''
   );
 
-  CREATE INDEX IF NOT EXISTS idx_transactions_party ON transactions(party_id);
-  CREATE INDEX IF NOT EXISTS idx_transactions_date  ON transactions(date);
-  CREATE INDEX IF NOT EXISTS idx_parties_type       ON parties(type);
+  -- \u2500\u2500 Indexes \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  CREATE INDEX IF NOT EXISTS idx_ledgers_type            ON ledgers(ledger_type_id);
+  CREATE INDEX IF NOT EXISTS idx_ledgers_status          ON ledgers(status);
+  CREATE INDEX IF NOT EXISTS idx_interest_entries_ledger  ON interest_entries(ledger_id);
+  CREATE INDEX IF NOT EXISTS idx_interest_entries_status  ON interest_entries(status);
+  CREATE INDEX IF NOT EXISTS idx_transactions_ledger      ON transactions(ledger_id);
+  CREATE INDEX IF NOT EXISTS idx_transactions_entry_type  ON transactions(entry_type);
+  CREATE INDEX IF NOT EXISTS idx_transactions_date        ON transactions(date);
 `;
     function up(db) {
       db.exec(SQL);
+    }
+    module2.exports = { VERSION, up };
+  }
+});
+
+// src/db/migrations/v2.js
+var require_v2 = __commonJS({
+  "src/db/migrations/v2.js"(exports2, module2) {
+    var VERSION = 2;
+    function up(_db) {
+    }
+    module2.exports = { VERSION, up };
+  }
+});
+
+// src/db/migrations/v3.js
+var require_v3 = __commonJS({
+  "src/db/migrations/v3.js"(exports2, module2) {
+    var VERSION = 3;
+    function up(_db) {
+    }
+    module2.exports = { VERSION, up };
+  }
+});
+
+// src/db/migrations/v4.js
+var require_v4 = __commonJS({
+  "src/db/migrations/v4.js"(exports2, module2) {
+    var VERSION = 4;
+    var SQL = `
+  -- \u2500\u2500 Expense Categories \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  CREATE TABLE IF NOT EXISTS expense_categories (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT    NOT NULL UNIQUE,
+    created_at TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+  );
+
+  -- \u2500\u2500 Expenses \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  CREATE TABLE IF NOT EXISTS expenses (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    expense_name        TEXT    NOT NULL,
+    expense_category_id INTEGER,
+    amount              REAL    NOT NULL CHECK(amount > 0),
+    date                TEXT    NOT NULL DEFAULT (date('now', 'localtime')),
+    notes               TEXT    NOT NULL DEFAULT '',
+    created_at          TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (expense_category_id) REFERENCES expense_categories(id)
+  );
+
+  -- \u2500\u2500 Indexes \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  CREATE INDEX IF NOT EXISTS idx_expenses_date     ON expenses(date);
+  CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(expense_category_id);
+  CREATE INDEX IF NOT EXISTS idx_expenses_name     ON expenses(expense_name);
+`;
+    function up(db) {
+      db.exec(SQL);
+    }
+    module2.exports = { VERSION, up };
+  }
+});
+
+// src/db/migrations/v5.js
+var require_v5 = __commonJS({
+  "src/db/migrations/v5.js"(exports2, module2) {
+    var VERSION = 5;
+    var LEGACY_DEFAULTS = [
+      "Salary",
+      "Stationery",
+      "Utilities",
+      "Transport",
+      "Miscellaneous"
+    ];
+    function up(db) {
+      const expenseCount = db.prepare("SELECT COUNT(*) AS count FROM expenses").get().count;
+      if (expenseCount > 0) return;
+      const placeholders = LEGACY_DEFAULTS.map(() => "?").join(", ");
+      db.prepare(`DELETE FROM expense_categories WHERE name IN (${placeholders})`).run(...LEGACY_DEFAULTS);
     }
     module2.exports = { VERSION, up };
   }
@@ -23429,9 +23553,17 @@ var require_v1 = __commonJS({
 var require_migrations = __commonJS({
   "src/db/migrations/index.js"(exports2, module2) {
     var v1 = require_v1();
+    var v2 = require_v2();
+    var v3 = require_v3();
+    var v4 = require_v4();
+    var v5 = require_v5();
     var MIGRATIONS = [
-      v1
-      // v2, v3, … add future migrations here
+      v1,
+      v2,
+      v3,
+      v4,
+      v5
+      // v6, v7, … add future migrations here
     ];
     function bootstrapVersionTable(db) {
       db.exec(`
@@ -23487,11 +23619,12 @@ var require_settings = __commonJS({
       ["logo_path", ""],
       ["phone", ""],
       ["email", ""],
+      ["interest_module_enabled", "false"],
       [
         "receipt_config",
         JSON.stringify({
           format: "a4",
-          header: { show: true, title: "Payment Receipt", fontSize: 18 },
+          header: { show: true, title: "Transaction Receipt", fontSize: 18 },
           footer: { show: true, text: "Thank you for your business!", fontSize: 10 },
           body: { fontSize: 12 },
           showLogo: false,
@@ -23559,697 +23692,221 @@ var require_errorHandler = __commonJS({
   }
 });
 
-// src/repositories/partyRepository.js
-var require_partyRepository = __commonJS({
-  "src/repositories/partyRepository.js"(exports2, module2) {
+// src/repositories/ledgerRepository.js
+var require_ledgerRepository = __commonJS({
+  "src/repositories/ledgerRepository.js"(exports2, module2) {
     var { getDb } = require_database();
-    var PartyRepository = class {
-      findAll(type = null) {
-        const db = getDb();
-        if (type) {
-          return db.prepare("SELECT * FROM parties WHERE type = ? ORDER BY name ASC").all(type);
-        }
-        return db.prepare("SELECT * FROM parties ORDER BY name ASC").all();
-      }
-      findById(id) {
-        const db = getDb();
-        return db.prepare("SELECT * FROM parties WHERE id = ?").get(id);
-      }
-      create({ type, name, address, phone, place, opening_balance, gst_no, state_code, igst_status }) {
-        const db = getDb();
-        const stmt = db.prepare(`
-      INSERT INTO parties (type, name, address, phone, place, opening_balance, gst_no, state_code, igst_status)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-        const result = stmt.run(
-          type,
-          name,
-          address || "",
-          phone || "",
-          place || "",
-          opening_balance || 0,
-          gst_no || "",
-          state_code || "",
-          igst_status || "NO"
-        );
-        return this.findById(result.lastInsertRowid);
-      }
-      update(id, { name, address, phone, place, type, gst_no, state_code, igst_status }) {
-        const db = getDb();
-        const stmt = db.prepare(`
-      UPDATE parties
-      SET name = ?, address = ?, phone = ?, place = ?, type = ?,
-          gst_no = ?, state_code = ?, igst_status = ?,
-          updated_at = datetime('now', 'localtime')
-      WHERE id = ?
-    `);
-        stmt.run(
-          name,
-          address || "",
-          phone || "",
-          place || "",
-          type,
-          gst_no || "",
-          state_code || "",
-          igst_status || "NO",
-          id
-        );
-        return this.findById(id);
-      }
-      delete(id) {
-        const db = getDb();
-        return db.prepare("DELETE FROM parties WHERE id = ?").run(id);
-      }
-      search(query) {
-        const db = getDb();
-        const like = `%${query}%`;
-        return db.prepare(`
-      SELECT * FROM parties
-      WHERE name LIKE ? OR phone LIKE ? OR place LIKE ?
-      ORDER BY name ASC
-    `).all(like, like, like);
-      }
-      count() {
-        const db = getDb();
-        return db.prepare("SELECT type, COUNT(*) as count FROM parties GROUP BY type").all();
-      }
-    };
-    module2.exports = new PartyRepository();
-  }
-});
-
-// src/services/partyService.js
-var require_partyService = __commonJS({
-  "src/services/partyService.js"(exports2, module2) {
-    var partyRepository = require_partyRepository();
-    var { AppError } = require_errorHandler();
-    var PartyService = class {
-      getAllParties(type = null) {
-        return partyRepository.findAll(type);
-      }
-      getPartyById(id) {
-        const party = partyRepository.findById(id);
-        if (!party) {
-          throw new AppError("Party not found", 404);
-        }
-        return party;
-      }
-      createParty(data) {
-        const { type, name, igst_status } = data;
-        if (!type || !["customer", "supplier"].includes(type)) {
-          throw new AppError('Invalid party type. Must be "customer" or "supplier".', 400);
-        }
-        if (!name || name.trim().length === 0) {
-          throw new AppError("Party name is required.", 400);
-        }
-        if (!igst_status || !["YES", "NO"].includes(igst_status)) {
-          throw new AppError('IGST Status is required. Must be "YES" or "NO".', 400);
-        }
-        return partyRepository.create({
-          ...data,
-          name: name.trim(),
-          opening_balance: parseFloat(data.opening_balance) || 0
-        });
-      }
-      updateParty(id, data) {
-        const existing = partyRepository.findById(id);
-        if (!existing) {
-          throw new AppError("Party not found", 404);
-        }
-        if (!data.name || data.name.trim().length === 0) {
-          throw new AppError("Party name is required.", 400);
-        }
-        if (!data.igst_status || !["YES", "NO"].includes(data.igst_status)) {
-          throw new AppError('IGST Status is required. Must be "YES" or "NO".', 400);
-        }
-        return partyRepository.update(id, {
-          ...data,
-          name: data.name.trim()
-        });
-      }
-      deleteParty(id) {
-        const existing = partyRepository.findById(id);
-        if (!existing) {
-          throw new AppError("Party not found", 404);
-        }
-        partyRepository.delete(id);
-        return { message: "Party deleted successfully" };
-      }
-      searchParties(query) {
-        if (!query || query.trim().length === 0) {
-          return partyRepository.findAll();
-        }
-        return partyRepository.search(query.trim());
-      }
-      getPartyCounts() {
-        return partyRepository.count();
-      }
-    };
-    module2.exports = new PartyService();
-  }
-});
-
-// src/controllers/partyController.js
-var require_partyController = __commonJS({
-  "src/controllers/partyController.js"(exports2, module2) {
-    var partyService = require_partyService();
-    var PartyController = class {
-      getAll(req, res, next) {
-        try {
-          const { type, search } = req.query;
-          let parties;
-          if (search) {
-            parties = partyService.searchParties(search);
-          } else {
-            parties = partyService.getAllParties(type || null);
-          }
-          res.json({ success: true, data: parties });
-        } catch (err) {
-          next(err);
-        }
-      }
-      getById(req, res, next) {
-        try {
-          const party = partyService.getPartyById(parseInt(req.params.id));
-          res.json({ success: true, data: party });
-        } catch (err) {
-          next(err);
-        }
-      }
-      create(req, res, next) {
-        try {
-          const party = partyService.createParty(req.body);
-          res.status(201).json({ success: true, data: party });
-        } catch (err) {
-          next(err);
-        }
-      }
-      update(req, res, next) {
-        try {
-          const party = partyService.updateParty(parseInt(req.params.id), req.body);
-          res.json({ success: true, data: party });
-        } catch (err) {
-          next(err);
-        }
-      }
-      delete(req, res, next) {
-        try {
-          const result = partyService.deleteParty(parseInt(req.params.id));
-          res.json({ success: true, data: result });
-        } catch (err) {
-          next(err);
-        }
-      }
-      getCounts(req, res, next) {
-        try {
-          const counts = partyService.getPartyCounts();
-          res.json({ success: true, data: counts });
-        } catch (err) {
-          next(err);
-        }
-      }
-    };
-    module2.exports = new PartyController();
-  }
-});
-
-// src/routes/partyRoutes.js
-var require_partyRoutes = __commonJS({
-  "src/routes/partyRoutes.js"(exports2, module2) {
-    var express2 = require_express2();
-    var router = express2.Router();
-    var partyController = require_partyController();
-    router.get("/", (req, res, next) => partyController.getAll(req, res, next));
-    router.get("/counts", (req, res, next) => partyController.getCounts(req, res, next));
-    router.get("/:id", (req, res, next) => partyController.getById(req, res, next));
-    router.post("/", (req, res, next) => partyController.create(req, res, next));
-    router.put("/:id", (req, res, next) => partyController.update(req, res, next));
-    router.delete("/:id", (req, res, next) => partyController.delete(req, res, next));
-    module2.exports = router;
-  }
-});
-
-// src/repositories/transactionRepository.js
-var require_transactionRepository = __commonJS({
-  "src/repositories/transactionRepository.js"(exports2, module2) {
-    var { getDb } = require_database();
-    var TransactionRepository = class {
-      findAll({ partyId, startDate, endDate, type, limit, offset } = {}) {
+    var LedgerRepository = class {
+      findAll({ ledgerTypeId, status, behaviour } = {}) {
         const db = getDb();
         let query = `
-      SELECT t.*, p.name as party_name, p.type as party_type
-      FROM transactions t
-      JOIN parties p ON t.party_id = p.id
+      SELECT l.*, lt.name AS type_name, lt.behaviour
+      FROM ledgers l
+      JOIN ledger_types lt ON l.ledger_type_id = lt.id
       WHERE 1=1
     `;
         const params = [];
-        if (partyId) {
-          query += " AND t.party_id = ?";
-          params.push(partyId);
+        if (ledgerTypeId) {
+          query += " AND l.ledger_type_id = ?";
+          params.push(ledgerTypeId);
         }
-        if (startDate) {
-          query += " AND t.date >= ?";
-          params.push(startDate);
+        if (status) {
+          query += " AND l.status = ?";
+          params.push(status);
         }
-        if (endDate) {
-          query += " AND t.date <= ?";
-          params.push(endDate);
+        if (behaviour) {
+          query += " AND lt.behaviour = ?";
+          params.push(behaviour);
         }
-        if (type) {
-          query += " AND t.type = ?";
-          params.push(type);
-        }
-        query += " ORDER BY t.date DESC, t.id DESC";
-        if (limit) {
-          query += " LIMIT ?";
-          params.push(limit);
-          if (offset) {
-            query += " OFFSET ?";
-            params.push(offset);
-          }
-        }
+        query += " ORDER BY l.name ASC";
         return db.prepare(query).all(...params);
       }
       findById(id) {
         const db = getDb();
         return db.prepare(`
-      SELECT t.*, p.name as party_name, p.type as party_type
-      FROM transactions t
-      JOIN parties p ON t.party_id = p.id
-      WHERE t.id = ?
+      SELECT l.*, lt.name AS type_name, lt.behaviour
+      FROM ledgers l
+      JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      WHERE l.id = ?
     `).get(id);
       }
-      findByPartyId(partyId) {
+      create(data) {
         const db = getDb();
-        return db.prepare(`
-      SELECT * FROM transactions
-      WHERE party_id = ?
-      ORDER BY date ASC, id ASC
-    `).all(partyId);
+        const stmt = db.prepare(`
+      INSERT INTO ledgers (ledger_type_id, name, address, phone, place, gst_no, state_code, igst_status,
+                           opening_balance, current_balance, interest_rate, interest_scheme, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+        const result = stmt.run(
+          data.ledger_type_id,
+          data.name,
+          data.address || "",
+          data.phone || "",
+          data.place || "",
+          data.gst_no || "",
+          data.state_code || "",
+          data.igst_status || "NO",
+          data.opening_balance || 0,
+          data.opening_balance || 0,
+          data.interest_rate || 0,
+          data.interest_scheme || "NONE",
+          data.notes || ""
+        );
+        return this.findById(result.lastInsertRowid);
       }
-      findByReceiptNumber(receiptNumber) {
-        const db = getDb();
-        return db.prepare("SELECT * FROM transactions WHERE receipt_number = ?").get(receiptNumber);
-      }
-      update(id, { date, type, amount, reference, notes }) {
+      update(id, data) {
         const db = getDb();
         db.prepare(`
-      UPDATE transactions
-      SET date = ?, type = ?, amount = ?, reference = ?, notes = ?
+      UPDATE ledgers
+      SET ledger_type_id = ?, name = ?, address = ?, phone = ?, place = ?,
+          gst_no = ?, state_code = ?, igst_status = ?,
+          interest_rate = ?, interest_scheme = ?, notes = ?,
+          status = ?,
+          updated_at = datetime('now', 'localtime')
       WHERE id = ?
-    `).run(date, type, amount, reference ?? "", notes ?? "", id);
+    `).run(
+          data.ledger_type_id,
+          data.name,
+          data.address || "",
+          data.phone || "",
+          data.place || "",
+          data.gst_no || "",
+          data.state_code || "",
+          data.igst_status || "NO",
+          data.interest_rate || 0,
+          data.interest_scheme || "NONE",
+          data.notes || "",
+          data.status || "active",
+          id
+        );
         return this.findById(id);
       }
-      updateBalanceAfter(id, balance_after) {
+      updateBalance(id, newBalance) {
         const db = getDb();
-        db.prepare("UPDATE transactions SET balance_after = ? WHERE id = ?").run(balance_after, id);
+        db.prepare(`
+      UPDATE ledgers SET current_balance = ?, updated_at = datetime('now', 'localtime') WHERE id = ?
+    `).run(newBalance, id);
+        return this.findById(id);
+      }
+      close(id) {
+        const db = getDb();
+        db.prepare(`UPDATE ledgers SET status = 'closed', updated_at = datetime('now', 'localtime') WHERE id = ?`).run(id);
+        return this.findById(id);
       }
       delete(id) {
         const db = getDb();
-        return db.prepare("DELETE FROM transactions WHERE id = ?").run(id);
+        return db.prepare("DELETE FROM ledgers WHERE id = ?").run(id);
       }
-      create({ party_id, date, type, amount, reference, notes, receipt_number, balance_after }) {
+      search(query) {
         const db = getDb();
-        const stmt = db.prepare(`
-      INSERT INTO transactions (party_id, date, type, amount, reference, notes, receipt_number, balance_after)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-        const result = stmt.run(party_id, date, type, amount, reference || "", notes || "", receipt_number, balance_after);
-        return this.findById(result.lastInsertRowid);
+        const like = `%${query}%`;
+        return db.prepare(`
+      SELECT l.*, lt.name AS type_name, lt.behaviour
+      FROM ledgers l
+      JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      WHERE l.name LIKE ? OR l.phone LIKE ? OR l.place LIKE ?
+      ORDER BY l.name ASC
+    `).all(like, like, like);
       }
-      getPartyBalance(partyId) {
-        const db = getDb();
-        const party = db.prepare("SELECT opening_balance, type FROM parties WHERE id = ?").get(partyId);
-        if (!party) return null;
-        const totals = db.prepare(`
-      SELECT
-        COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE 0 END), 0) as total_credit,
-        COALESCE(SUM(CASE WHEN type = 'debit' THEN amount ELSE 0 END), 0) as total_debit
-      FROM transactions
-      WHERE party_id = ?
-    `).get(partyId);
-        const current_balance = party.type === "customer" ? party.opening_balance - totals.total_credit + totals.total_debit : party.opening_balance + totals.total_credit - totals.total_debit;
-        return {
-          opening_balance: party.opening_balance,
-          total_credit: totals.total_credit,
-          total_debit: totals.total_debit,
-          current_balance
-        };
-      }
-      getAllBalances() {
+      count() {
         const db = getDb();
         return db.prepare(`
-      SELECT
-        p.id,
-        p.name,
-        p.type,
-        p.phone,
-        p.place,
-        p.opening_balance,
-        COALESCE(SUM(CASE WHEN t.type = 'credit' THEN t.amount ELSE 0 END), 0) as total_credit,
-        COALESCE(SUM(CASE WHEN t.type = 'debit' THEN t.amount ELSE 0 END), 0) as total_debit,
-        CASE
-          WHEN p.type = 'customer' THEN
-            (p.opening_balance -
-              COALESCE(SUM(CASE WHEN t.type = 'credit' THEN t.amount ELSE 0 END), 0) +
-              COALESCE(SUM(CASE WHEN t.type = 'debit' THEN t.amount ELSE 0 END), 0))
-          ELSE
-            (p.opening_balance +
-              COALESCE(SUM(CASE WHEN t.type = 'credit' THEN t.amount ELSE 0 END), 0) -
-              COALESCE(SUM(CASE WHEN t.type = 'debit' THEN t.amount ELSE 0 END), 0))
-        END as current_balance
-      FROM parties p
-      LEFT JOIN transactions t ON p.id = t.party_id
-      GROUP BY p.id
-      ORDER BY p.name ASC
+      SELECT lt.id AS ledger_type_id, lt.name AS type_name, lt.behaviour, COUNT(l.id) as count
+      FROM ledger_types lt
+      LEFT JOIN ledgers l ON l.ledger_type_id = lt.id
+      GROUP BY lt.id
     `).all();
       }
-      getLastReceiptNumber(type) {
-        const db = getDb();
-        const prefix = type === "debit" ? "PAY-%" : "REC-%";
-        const row = db.prepare(`
-      SELECT receipt_number FROM transactions
-      WHERE receipt_number IS NOT NULL
-        AND receipt_number LIKE ?
-      ORDER BY id DESC LIMIT 1
-    `).get(prefix);
-        return row ? row.receipt_number : null;
-      }
-      getRecentTransactions(limit = 10) {
+      getAllWithOutstanding() {
         const db = getDb();
         return db.prepare(`
-      SELECT t.*, p.name as party_name, p.type as party_type
-      FROM transactions t
-      JOIN parties p ON t.party_id = p.id
-      ORDER BY t.created_at DESC
-      LIMIT ?
-    `).all(limit);
+      SELECT l.*, lt.name AS type_name, lt.behaviour,
+        COALESCE((SELECT SUM(ie.amount) FROM interest_entries ie
+                  WHERE ie.ledger_id = l.id AND ie.status = 'pending'), 0) AS pending_interest,
+        l.current_balance + COALESCE((SELECT SUM(ie.amount) FROM interest_entries ie
+                  WHERE ie.ledger_id = l.id AND ie.status = 'pending'), 0) AS outstanding,
+        COALESCE((SELECT SUM(t.amount) FROM transactions t
+                  WHERE t.ledger_id = l.id AND t.entry_type = 'payment'), 0) AS total_payments,
+        COALESCE((SELECT SUM(t.amount) FROM transactions t
+                  WHERE t.ledger_id = l.id AND t.entry_type = 'receipt'), 0) AS total_receipts
+      FROM ledgers l
+      JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      ORDER BY l.name ASC
+    `).all();
       }
-      getSummary() {
+      getOutstandingByType(ledgerTypeId) {
         const db = getDb();
         return db.prepare(`
-      SELECT
-        COUNT(*) as total_transactions,
-        COALESCE(SUM(CASE WHEN type = 'credit' THEN amount ELSE 0 END), 0) as total_credits,
-        COALESCE(SUM(CASE WHEN type = 'debit' THEN amount ELSE 0 END), 0) as total_debits
-      FROM transactions
-    `).get();
+      SELECT l.*, lt.name AS type_name, lt.behaviour,
+        COALESCE((SELECT SUM(ie.amount) FROM interest_entries ie
+                  WHERE ie.ledger_id = l.id AND ie.status = 'pending'), 0) AS pending_interest,
+        l.current_balance + COALESCE((SELECT SUM(ie.amount) FROM interest_entries ie
+                  WHERE ie.ledger_id = l.id AND ie.status = 'pending'), 0) AS outstanding
+      FROM ledgers l
+      JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      WHERE l.ledger_type_id = ? AND l.status = 'active'
+      ORDER BY l.current_balance DESC
+    `).all(ledgerTypeId);
+      }
+      getWithPendingInterest() {
+        const db = getDb();
+        return db.prepare(`
+      SELECT l.*, lt.name AS type_name, lt.behaviour,
+        COALESCE(SUM(ie.amount), 0)                           AS pending_interest,
+        COUNT(ie.id)                                           AS pending_count,
+        l.current_balance + COALESCE(SUM(ie.amount), 0)       AS outstanding,
+        MIN(ie.from_date)                                      AS earliest_pending_date
+      FROM ledgers l
+      JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      JOIN interest_entries ie ON ie.ledger_id = l.id AND ie.status = 'pending'
+      WHERE l.status = 'active'
+      GROUP BY l.id
+      HAVING pending_interest > 0
+      ORDER BY pending_interest DESC
+    `).all();
       }
     };
-    module2.exports = new TransactionRepository();
+    module2.exports = new LedgerRepository();
   }
 });
 
-// src/services/transactionService.js
-var require_transactionService = __commonJS({
-  "src/services/transactionService.js"(exports2, module2) {
-    var transactionRepository = require_transactionRepository();
-    var partyRepository = require_partyRepository();
-    var { AppError } = require_errorHandler();
-    var TransactionService = class {
-      getAllTransactions(filters = {}) {
-        return transactionRepository.findAll(filters);
+// src/repositories/accountRepository.js
+var require_accountRepository = __commonJS({
+  "src/repositories/accountRepository.js"(exports2, module2) {
+    var { getDb } = require_database();
+    var LedgerTypeRepository = class {
+      findAll() {
+        const db = getDb();
+        return db.prepare("SELECT * FROM ledger_types ORDER BY is_system DESC, name ASC").all();
       }
-      getTransactionById(id) {
-        const txn = transactionRepository.findById(id);
-        if (!txn) {
-          throw new AppError("Transaction not found", 404);
-        }
-        return txn;
+      findById(id) {
+        const db = getDb();
+        return db.prepare("SELECT * FROM ledger_types WHERE id = ?").get(id);
       }
-      getTransactionsByParty(partyId) {
-        const party = partyRepository.findById(partyId);
-        if (!party) {
-          throw new AppError("Party not found", 404);
-        }
-        const transactions = transactionRepository.findByPartyId(partyId);
-        const balance = transactionRepository.getPartyBalance(partyId);
-        return { party, transactions, balance };
+      findByName(name) {
+        const db = getDb();
+        return db.prepare("SELECT * FROM ledger_types WHERE LOWER(name) = LOWER(?)").get(name);
       }
-      recordPayment({ party_id, date, type, amount, reference, notes }) {
-        const party = partyRepository.findById(party_id);
-        if (!party) {
-          throw new AppError("Party not found", 404);
-        }
-        if (!type || !["credit", "debit"].includes(type)) {
-          throw new AppError('Invalid transaction type. Must be "credit" or "debit".', 400);
-        }
-        const parsedAmount = parseFloat(amount);
-        if (isNaN(parsedAmount) || parsedAmount <= 0) {
-          throw new AppError("Amount must be a positive number.", 400);
-        }
-        const currentBalanceData = transactionRepository.getPartyBalance(party_id);
-        let balanceAfter = currentBalanceData.current_balance;
-        if (party.type === "customer") {
-          if (type === "credit") {
-            balanceAfter -= parsedAmount;
-          } else {
-            balanceAfter += parsedAmount;
-          }
-        } else {
-          if (type === "credit") {
-            balanceAfter += parsedAmount;
-          } else {
-            balanceAfter -= parsedAmount;
-          }
-        }
-        const receiptNumber = this._generateReceiptNumber(type);
-        const txnDate = date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
-        const transaction = transactionRepository.create({
-          party_id,
-          date: txnDate,
-          type,
-          amount: parsedAmount,
-          reference: reference || "",
-          notes: notes || "",
-          receipt_number: receiptNumber,
-          balance_after: balanceAfter
-        });
-        return transaction;
+      create({ name, behaviour }) {
+        const db = getDb();
+        const result = db.prepare("INSERT INTO ledger_types (name, behaviour, is_system) VALUES (?, ?, 0)").run(name, behaviour);
+        return this.findById(result.lastInsertRowid);
       }
-      getOutstandingBalances() {
-        return transactionRepository.getAllBalances();
+      update(id, { name, behaviour }) {
+        const db = getDb();
+        db.prepare("UPDATE ledger_types SET name = ?, behaviour = ? WHERE id = ? AND is_system = 0").run(name, behaviour, id);
+        return this.findById(id);
       }
-      updateTransaction(id, { date, type, amount, reference, notes }) {
-        const txn = transactionRepository.findById(id);
-        if (!txn) throw new AppError("Transaction not found", 404);
-        if (!type || !["credit", "debit"].includes(type)) {
-          throw new AppError('Invalid transaction type. Must be "credit" or "debit".', 400);
-        }
-        const parsedAmount = parseFloat(amount);
-        if (isNaN(parsedAmount) || parsedAmount <= 0) {
-          throw new AppError("Amount must be a positive number.", 400);
-        }
-        transactionRepository.update(id, {
-          date: date || txn.date,
-          type,
-          amount: parsedAmount,
-          reference: reference ?? txn.reference,
-          notes: notes ?? txn.notes
-        });
-        this._recalculatePartyBalances(txn.party_id);
-        return transactionRepository.findById(id);
+      countLedgers(id) {
+        const db = getDb();
+        return db.prepare("SELECT COUNT(*) AS count FROM ledgers WHERE ledger_type_id = ?").get(id).count;
       }
-      deleteTransaction(id) {
-        const txn = transactionRepository.findById(id);
-        if (!txn) throw new AppError("Transaction not found", 404);
-        const partyId = txn.party_id;
-        transactionRepository.delete(id);
-        this._recalculatePartyBalances(partyId);
-      }
-      // Recalculate balance_after for every transaction of a party in chronological order
-      _recalculatePartyBalances(partyId) {
-        const party = partyRepository.findById(partyId);
-        if (!party) return;
-        const txns = transactionRepository.findByPartyId(partyId);
-        let runningBalance = party.opening_balance;
-        for (const t of txns) {
-          if (party.type === "customer") {
-            runningBalance = t.type === "credit" ? runningBalance - t.amount : runningBalance + t.amount;
-          } else {
-            runningBalance = t.type === "credit" ? runningBalance + t.amount : runningBalance - t.amount;
-          }
-          transactionRepository.updateBalanceAfter(t.id, runningBalance);
-        }
-      }
-      getPartyBalance(partyId) {
-        const party = partyRepository.findById(partyId);
-        if (!party) {
-          throw new AppError("Party not found", 404);
-        }
-        return transactionRepository.getPartyBalance(partyId);
-      }
-      getRecentTransactions(limit = 10) {
-        return transactionRepository.getRecentTransactions(limit);
-      }
-      getSummary() {
-        return transactionRepository.getSummary();
-      }
-      getStatementOfAccount(partyId, startDate, endDate) {
-        const party = partyRepository.findById(partyId);
-        if (!party) {
-          throw new AppError("Party not found", 404);
-        }
-        const transactions = transactionRepository.findAll({
-          partyId,
-          startDate,
-          endDate
-        });
-        const balance = transactionRepository.getPartyBalance(partyId);
-        return {
-          party,
-          transactions,
-          balance,
-          period: { startDate, endDate }
-        };
-      }
-      getNextReceiptNumber(type = "credit") {
-        return this._generateReceiptNumber(type);
-      }
-      _generateReceiptNumber(type = "credit") {
-        const isDebit = type === "debit";
-        const prefix = isDebit ? "PAY" : "REC";
-        const regex = isDebit ? /PAY-(\d+)/ : /REC-(\d+)/;
-        const lastReceipt = transactionRepository.getLastReceiptNumber(type);
-        let nextNum = 1;
-        if (lastReceipt) {
-          const match = lastReceipt.match(regex);
-          if (match) {
-            nextNum = parseInt(match[1], 10) + 1;
-          }
-        }
-        return `${prefix}-${String(nextNum).padStart(6, "0")}`;
+      delete(id) {
+        const db = getDb();
+        return db.prepare("DELETE FROM ledger_types WHERE id = ? AND is_system = 0").run(id);
       }
     };
-    module2.exports = new TransactionService();
-  }
-});
-
-// src/controllers/transactionController.js
-var require_transactionController = __commonJS({
-  "src/controllers/transactionController.js"(exports2, module2) {
-    var transactionService = require_transactionService();
-    var TransactionController = class {
-      getAll(req, res, next) {
-        try {
-          const { partyId, startDate, endDate, type, limit, offset } = req.query;
-          const transactions = transactionService.getAllTransactions({
-            partyId: partyId ? parseInt(partyId) : null,
-            startDate,
-            endDate,
-            type,
-            limit: limit ? parseInt(limit) : null,
-            offset: offset ? parseInt(offset) : null
-          });
-          res.json({ success: true, data: transactions });
-        } catch (err) {
-          next(err);
-        }
-      }
-      getById(req, res, next) {
-        try {
-          const transaction = transactionService.getTransactionById(parseInt(req.params.id));
-          res.json({ success: true, data: transaction });
-        } catch (err) {
-          next(err);
-        }
-      }
-      getByParty(req, res, next) {
-        try {
-          const result = transactionService.getTransactionsByParty(parseInt(req.params.partyId));
-          res.json({ success: true, data: result });
-        } catch (err) {
-          next(err);
-        }
-      }
-      recordPayment(req, res, next) {
-        try {
-          const transaction = transactionService.recordPayment(req.body);
-          res.status(201).json({ success: true, data: transaction });
-        } catch (err) {
-          next(err);
-        }
-      }
-      getOutstanding(req, res, next) {
-        try {
-          const balances = transactionService.getOutstandingBalances();
-          res.json({ success: true, data: balances });
-        } catch (err) {
-          next(err);
-        }
-      }
-      getPartyBalance(req, res, next) {
-        try {
-          const balance = transactionService.getPartyBalance(parseInt(req.params.partyId));
-          res.json({ success: true, data: balance });
-        } catch (err) {
-          next(err);
-        }
-      }
-      getStatement(req, res, next) {
-        try {
-          const { partyId } = req.params;
-          const { startDate, endDate } = req.query;
-          const statement = transactionService.getStatementOfAccount(
-            parseInt(partyId),
-            startDate,
-            endDate
-          );
-          res.json({ success: true, data: statement });
-        } catch (err) {
-          next(err);
-        }
-      }
-      getNextReceiptNumber(req, res, next) {
-        try {
-          const type = req.query.type || "credit";
-          const receiptNumber = transactionService.getNextReceiptNumber(type);
-          res.json({ success: true, data: { receipt_number: receiptNumber } });
-        } catch (err) {
-          next(err);
-        }
-      }
-      updateTransaction(req, res, next) {
-        try {
-          const transaction = transactionService.updateTransaction(
-            parseInt(req.params.id),
-            req.body
-          );
-          res.json({ success: true, data: transaction });
-        } catch (err) {
-          next(err);
-        }
-      }
-      deleteTransaction(req, res, next) {
-        try {
-          transactionService.deleteTransaction(parseInt(req.params.id));
-          res.json({ success: true });
-        } catch (err) {
-          next(err);
-        }
-      }
-    };
-    module2.exports = new TransactionController();
-  }
-});
-
-// src/routes/transactionRoutes.js
-var require_transactionRoutes = __commonJS({
-  "src/routes/transactionRoutes.js"(exports2, module2) {
-    var express2 = require_express2();
-    var router = express2.Router();
-    var txnController = require_transactionController();
-    router.get("/", (req, res, next) => txnController.getAll(req, res, next));
-    router.get("/outstanding", (req, res, next) => txnController.getOutstanding(req, res, next));
-    router.get("/next-receipt", (req, res, next) => txnController.getNextReceiptNumber(req, res, next));
-    router.get("/party/:partyId", (req, res, next) => txnController.getByParty(req, res, next));
-    router.get("/party/:partyId/balance", (req, res, next) => txnController.getPartyBalance(req, res, next));
-    router.get("/party/:partyId/statement", (req, res, next) => txnController.getStatement(req, res, next));
-    router.get("/:id", (req, res, next) => txnController.getById(req, res, next));
-    router.post("/", (req, res, next) => txnController.recordPayment(req, res, next));
-    router.put("/:id", (req, res, next) => txnController.updateTransaction(req, res, next));
-    router.delete("/:id", (req, res, next) => txnController.deleteTransaction(req, res, next));
-    module2.exports = router;
+    module2.exports = new LedgerTypeRepository();
   }
 });
 
@@ -24311,6 +23968,753 @@ var require_settingsRepository = __commonJS({
       }
     };
     module2.exports = new SettingsRepository();
+  }
+});
+
+// src/services/ledgerService.js
+var require_ledgerService = __commonJS({
+  "src/services/ledgerService.js"(exports2, module2) {
+    var ledgerRepository = require_ledgerRepository();
+    var ledgerTypeRepository = require_accountRepository();
+    var settingsRepository = require_settingsRepository();
+    var { AppError } = require_errorHandler();
+    var LedgerService = class {
+      isInterestEnabled() {
+        const val = settingsRepository.get("interest_module_enabled");
+        return val === true || val === "true";
+      }
+      getAllLedgers(filters = {}) {
+        return ledgerRepository.findAll(filters);
+      }
+      getLedgerById(id) {
+        const ledger = ledgerRepository.findById(id);
+        if (!ledger) throw new AppError("Ledger not found", 404);
+        return ledger;
+      }
+      createLedger(data) {
+        const { ledger_type_id, name, igst_status } = data;
+        if (!ledger_type_id) throw new AppError("Ledger type is required", 400);
+        const lt = ledgerTypeRepository.findById(ledger_type_id);
+        if (!lt) throw new AppError("Invalid ledger type", 400);
+        if (!name || name.trim().length === 0) throw new AppError("Ledger name is required.", 400);
+        if (igst_status && !["YES", "NO"].includes(igst_status)) {
+          throw new AppError('IGST Status must be "YES" or "NO".', 400);
+        }
+        let rate = 0;
+        let scheme = "NONE";
+        if (this.isInterestEnabled()) {
+          rate = parseFloat(data.interest_rate) || 0;
+          scheme = data.interest_scheme || "NONE";
+          if (!["NONE", "DAILY", "MONTHLY"].includes(scheme)) throw new AppError("Invalid interest scheme", 400);
+          if (rate < 0) throw new AppError("Interest rate cannot be negative", 400);
+        }
+        return ledgerRepository.create({
+          ...data,
+          name: name.trim(),
+          interest_rate: rate,
+          interest_scheme: scheme
+        });
+      }
+      updateLedger(id, data) {
+        const existing = ledgerRepository.findById(id);
+        if (!existing) throw new AppError("Ledger not found", 404);
+        if (!data.name || data.name.trim().length === 0) throw new AppError("Ledger name is required.", 400);
+        if (!data.ledger_type_id) throw new AppError("Ledger type is required", 400);
+        return ledgerRepository.update(id, { ...data, name: data.name.trim() });
+      }
+      deleteLedger(id) {
+        const existing = ledgerRepository.findById(id);
+        if (!existing) throw new AppError("Ledger not found", 404);
+        ledgerRepository.delete(id);
+        return { message: "Ledger deleted successfully" };
+      }
+      searchLedgers(query) {
+        if (!query || query.trim().length === 0) return ledgerRepository.findAll();
+        return ledgerRepository.search(query.trim());
+      }
+      getLedgerCounts() {
+        return ledgerRepository.count();
+      }
+      getAllWithOutstanding() {
+        return ledgerRepository.getAllWithOutstanding();
+      }
+      getOutstandingByType(ledgerTypeId) {
+        return ledgerRepository.getOutstandingByType(ledgerTypeId);
+      }
+      getLedgersWithPendingInterest() {
+        return ledgerRepository.getWithPendingInterest();
+      }
+    };
+    module2.exports = new LedgerService();
+  }
+});
+
+// src/controllers/ledgerController.js
+var require_ledgerController = __commonJS({
+  "src/controllers/ledgerController.js"(exports2, module2) {
+    var ledgerService = require_ledgerService();
+    var LedgerController = class {
+      getAll(req, res, next) {
+        try {
+          const { ledgerTypeId, status, behaviour, search } = req.query;
+          let ledgers;
+          if (search) {
+            ledgers = ledgerService.searchLedgers(search);
+          } else {
+            ledgers = ledgerService.getAllLedgers({
+              ledgerTypeId: ledgerTypeId ? parseInt(ledgerTypeId) : void 0,
+              status: status || void 0,
+              behaviour: behaviour || void 0
+            });
+          }
+          res.json({ success: true, data: ledgers });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getById(req, res, next) {
+        try {
+          const ledger = ledgerService.getLedgerById(parseInt(req.params.id));
+          res.json({ success: true, data: ledger });
+        } catch (err) {
+          next(err);
+        }
+      }
+      create(req, res, next) {
+        try {
+          const ledger = ledgerService.createLedger(req.body);
+          res.status(201).json({ success: true, data: ledger });
+        } catch (err) {
+          next(err);
+        }
+      }
+      update(req, res, next) {
+        try {
+          const ledger = ledgerService.updateLedger(parseInt(req.params.id), req.body);
+          res.json({ success: true, data: ledger });
+        } catch (err) {
+          next(err);
+        }
+      }
+      delete(req, res, next) {
+        try {
+          const result = ledgerService.deleteLedger(parseInt(req.params.id));
+          res.json({ success: true, data: result });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getCounts(req, res, next) {
+        try {
+          const counts = ledgerService.getLedgerCounts();
+          res.json({ success: true, data: counts });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getOutstanding(req, res, next) {
+        try {
+          const ledgers = ledgerService.getAllWithOutstanding();
+          res.json({ success: true, data: ledgers });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getOutstandingByType(req, res, next) {
+        try {
+          const ledgers = ledgerService.getOutstandingByType(parseInt(req.params.typeId));
+          res.json({ success: true, data: ledgers });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getPendingInterest(req, res, next) {
+        try {
+          const ledgers = ledgerService.getLedgersWithPendingInterest();
+          res.json({ success: true, data: ledgers });
+        } catch (err) {
+          next(err);
+        }
+      }
+    };
+    module2.exports = new LedgerController();
+  }
+});
+
+// src/routes/ledgerRoutes.js
+var require_ledgerRoutes = __commonJS({
+  "src/routes/ledgerRoutes.js"(exports2, module2) {
+    var express2 = require_express2();
+    var router = express2.Router();
+    var ledgerController = require_ledgerController();
+    router.get("/outstanding", (req, res, next) => ledgerController.getOutstanding(req, res, next));
+    router.get("/outstanding/type/:typeId", (req, res, next) => ledgerController.getOutstandingByType(req, res, next));
+    router.get("/pending-interest", (req, res, next) => ledgerController.getPendingInterest(req, res, next));
+    router.get("/counts", (req, res, next) => ledgerController.getCounts(req, res, next));
+    router.get("/:id", (req, res, next) => ledgerController.getById(req, res, next));
+    router.get("/", (req, res, next) => ledgerController.getAll(req, res, next));
+    router.post("/", (req, res, next) => ledgerController.create(req, res, next));
+    router.put("/:id", (req, res, next) => ledgerController.update(req, res, next));
+    router.delete("/:id", (req, res, next) => ledgerController.delete(req, res, next));
+    module2.exports = router;
+  }
+});
+
+// src/services/accountService.js
+var require_accountService = __commonJS({
+  "src/services/accountService.js"(exports2, module2) {
+    var ledgerTypeRepository = require_accountRepository();
+    var { AppError } = require_errorHandler();
+    var LedgerTypeService = class {
+      getAllTypes() {
+        return ledgerTypeRepository.findAll();
+      }
+      getTypeById(id) {
+        const lt = ledgerTypeRepository.findById(id);
+        if (!lt) throw new AppError("Ledger type not found", 404);
+        return lt;
+      }
+      createType(data) {
+        const { name, behaviour } = data;
+        if (!name || name.trim().length === 0) throw new AppError("Name is required", 400);
+        if (!behaviour || !["customer", "supplier"].includes(behaviour)) {
+          throw new AppError('Behaviour must be "customer" or "supplier"', 400);
+        }
+        const existing = ledgerTypeRepository.findByName(name.trim());
+        if (existing) throw new AppError("A ledger type with this name already exists", 400);
+        return ledgerTypeRepository.create({ name: name.trim(), behaviour });
+      }
+      updateType(id, data) {
+        const existing = ledgerTypeRepository.findById(id);
+        if (!existing) throw new AppError("Ledger type not found", 404);
+        if (existing.is_system) throw new AppError("System ledger types cannot be modified", 400);
+        if (!data.name || data.name.trim().length === 0) throw new AppError("Name is required", 400);
+        if (!data.behaviour || !["customer", "supplier"].includes(data.behaviour)) {
+          throw new AppError('Behaviour must be "customer" or "supplier"', 400);
+        }
+        return ledgerTypeRepository.update(id, { name: data.name.trim(), behaviour: data.behaviour });
+      }
+      deleteType(id) {
+        const existing = ledgerTypeRepository.findById(id);
+        if (!existing) throw new AppError("Ledger type not found", 404);
+        if (existing.is_system) throw new AppError("System ledger types cannot be deleted", 400);
+        const inUse = ledgerTypeRepository.countLedgers(id);
+        if (inUse > 0) throw new AppError(`Cannot delete "${existing.name}" \u2014 ${inUse} ledger${inUse !== 1 ? "s are" : " is"} using this type`, 400);
+        ledgerTypeRepository.delete(id);
+        return { message: "Ledger type deleted successfully" };
+      }
+    };
+    module2.exports = new LedgerTypeService();
+  }
+});
+
+// src/controllers/accountController.js
+var require_accountController = __commonJS({
+  "src/controllers/accountController.js"(exports2, module2) {
+    var ledgerTypeService = require_accountService();
+    var LedgerTypeController = class {
+      getAll(req, res, next) {
+        try {
+          const types = ledgerTypeService.getAllTypes();
+          res.json({ success: true, data: types });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getById(req, res, next) {
+        try {
+          const type = ledgerTypeService.getTypeById(parseInt(req.params.id));
+          res.json({ success: true, data: type });
+        } catch (err) {
+          next(err);
+        }
+      }
+      create(req, res, next) {
+        try {
+          const type = ledgerTypeService.createType(req.body);
+          res.status(201).json({ success: true, data: type });
+        } catch (err) {
+          next(err);
+        }
+      }
+      update(req, res, next) {
+        try {
+          const type = ledgerTypeService.updateType(parseInt(req.params.id), req.body);
+          res.json({ success: true, data: type });
+        } catch (err) {
+          next(err);
+        }
+      }
+      delete(req, res, next) {
+        try {
+          const result = ledgerTypeService.deleteType(parseInt(req.params.id));
+          res.json({ success: true, data: result });
+        } catch (err) {
+          next(err);
+        }
+      }
+    };
+    module2.exports = new LedgerTypeController();
+  }
+});
+
+// src/routes/accountRoutes.js
+var require_accountRoutes = __commonJS({
+  "src/routes/accountRoutes.js"(exports2, module2) {
+    var express2 = require_express2();
+    var router = express2.Router();
+    var ledgerTypeController = require_accountController();
+    router.get("/", (req, res, next) => ledgerTypeController.getAll(req, res, next));
+    router.get("/:id", (req, res, next) => ledgerTypeController.getById(req, res, next));
+    router.post("/", (req, res, next) => ledgerTypeController.create(req, res, next));
+    router.put("/:id", (req, res, next) => ledgerTypeController.update(req, res, next));
+    router.delete("/:id", (req, res, next) => ledgerTypeController.delete(req, res, next));
+    module2.exports = router;
+  }
+});
+
+// src/repositories/paymentRepository.js
+var require_paymentRepository = __commonJS({
+  "src/repositories/paymentRepository.js"(exports2, module2) {
+    var { getDb } = require_database();
+    var TransactionRepository = class {
+      findAll({ ledgerId, entryType, fromDate, toDate, ledgerTypeId, behaviour } = {}) {
+        const db = getDb();
+        let query = `
+      SELECT t.*, l.name AS ledger_name, lt.name AS type_name, lt.behaviour,
+             l.phone AS ledger_phone, l.place AS ledger_place
+      FROM transactions t
+      JOIN ledgers l ON t.ledger_id = l.id
+      JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      WHERE 1=1
+    `;
+        const params = [];
+        if (ledgerId) {
+          query += " AND t.ledger_id = ?";
+          params.push(ledgerId);
+        }
+        if (entryType) {
+          query += " AND t.entry_type = ?";
+          params.push(entryType);
+        }
+        if (fromDate) {
+          query += " AND t.date >= ?";
+          params.push(fromDate);
+        }
+        if (toDate) {
+          query += " AND t.date <= ?";
+          params.push(toDate);
+        }
+        if (ledgerTypeId) {
+          query += " AND l.ledger_type_id = ?";
+          params.push(ledgerTypeId);
+        }
+        if (behaviour) {
+          query += " AND lt.behaviour = ?";
+          params.push(behaviour);
+        }
+        query += " ORDER BY t.date DESC, t.id DESC";
+        return db.prepare(query).all(...params);
+      }
+      findById(id) {
+        const db = getDb();
+        return db.prepare(`
+      SELECT t.*, l.name AS ledger_name, lt.name AS type_name, lt.behaviour
+      FROM transactions t
+      JOIN ledgers l ON t.ledger_id = l.id
+      JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      WHERE t.id = ?
+    `).get(id);
+      }
+      findByLedgerId(ledgerId) {
+        const db = getDb();
+        return db.prepare(`
+      SELECT t.* FROM transactions t WHERE t.ledger_id = ? ORDER BY t.date DESC, t.id DESC
+    `).all(ledgerId);
+      }
+      create({ ledger_id, entry_type, amount, date, reference, notes, running_number, interest_entry_id }) {
+        const db = getDb();
+        const stmt = db.prepare(`
+      INSERT INTO transactions (ledger_id, entry_type, amount, date, reference, notes, running_number, interest_entry_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+        const result = stmt.run(
+          ledger_id,
+          entry_type,
+          amount,
+          date,
+          reference || "",
+          notes || "",
+          running_number,
+          interest_entry_id || null
+        );
+        return this.findById(result.lastInsertRowid);
+      }
+      getNextRunningNumber(entryType) {
+        const db = getDb();
+        const prefix = entryType === "payment" ? "PAY" : "REC";
+        const row = db.prepare(`
+      SELECT running_number FROM transactions
+      WHERE entry_type = ? AND running_number LIKE ?
+      ORDER BY id DESC LIMIT 1
+    `).get(entryType, `${prefix}-%`);
+        if (!row || !row.running_number) return `${prefix}-00001`;
+        const match = row.running_number.match(/(\d+)$/);
+        if (!match) return `${prefix}-00001`;
+        const num = parseInt(match[1]) + 1;
+        return `${prefix}-${String(num).padStart(5, "0")}`;
+      }
+      getSummary({ fromDate, toDate } = {}) {
+        const db = getDb();
+        let query = `
+      SELECT t.entry_type, COUNT(*) AS count, SUM(t.amount) AS total
+      FROM transactions t WHERE 1=1
+    `;
+        const params = [];
+        if (fromDate) {
+          query += " AND t.date >= ?";
+          params.push(fromDate);
+        }
+        if (toDate) {
+          query += " AND t.date <= ?";
+          params.push(toDate);
+        }
+        query += " GROUP BY t.entry_type";
+        return db.prepare(query).all(...params);
+      }
+      getRecentTransactions(limit = 10) {
+        const db = getDb();
+        return db.prepare(`
+      SELECT t.*, l.name AS ledger_name, lt.name AS type_name, lt.behaviour
+      FROM transactions t
+      JOIN ledgers l ON t.ledger_id = l.id
+      JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      ORDER BY t.date DESC, t.id DESC
+      LIMIT ?
+    `).all(limit);
+      }
+      deleteById(id) {
+        const db = getDb();
+        db.prepare("DELETE FROM transactions WHERE id = ?").run(id);
+      }
+    };
+    module2.exports = new TransactionRepository();
+  }
+});
+
+// src/repositories/interestRepository.js
+var require_interestRepository = __commonJS({
+  "src/repositories/interestRepository.js"(exports2, module2) {
+    var { getDb } = require_database();
+    var InterestRepository = class {
+      findAll({ ledgerId, status, fromDate, toDate } = {}) {
+        const db = getDb();
+        let query = `
+      SELECT ie.*, l.name AS ledger_name, lt.name AS type_name, lt.behaviour,
+             l.current_balance, l.interest_rate AS ledger_rate, l.interest_scheme AS ledger_scheme
+      FROM interest_entries ie
+      JOIN ledgers l ON ie.ledger_id = l.id
+      JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      WHERE 1=1
+    `;
+        const params = [];
+        if (ledgerId) {
+          query += " AND ie.ledger_id = ?";
+          params.push(ledgerId);
+        }
+        if (status) {
+          query += " AND ie.status = ?";
+          params.push(status);
+        }
+        if (fromDate) {
+          query += " AND ie.from_date >= ?";
+          params.push(fromDate);
+        }
+        if (toDate) {
+          query += " AND ie.to_date <= ?";
+          params.push(toDate);
+        }
+        query += " ORDER BY ie.from_date DESC, ie.id DESC";
+        return db.prepare(query).all(...params);
+      }
+      findById(id) {
+        const db = getDb();
+        return db.prepare(`
+      SELECT ie.*, l.name AS ledger_name, lt.name AS type_name, lt.behaviour,
+             l.current_balance
+      FROM interest_entries ie
+      JOIN ledgers l ON ie.ledger_id = l.id
+      JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      WHERE ie.id = ?
+    `).get(id);
+      }
+      findByLedgerId(ledgerId) {
+        const db = getDb();
+        return db.prepare("SELECT * FROM interest_entries WHERE ledger_id = ? ORDER BY from_date ASC, id ASC").all(ledgerId);
+      }
+      getPendingByLedger(ledgerId) {
+        const db = getDb();
+        return db.prepare(`
+      SELECT * FROM interest_entries WHERE ledger_id = ? AND status = 'pending' ORDER BY from_date ASC, id ASC
+    `).all(ledgerId);
+      }
+      getTotalPendingByLedger(ledgerId) {
+        const db = getDb();
+        const row = db.prepare(`
+      SELECT COALESCE(SUM(amount), 0) AS total_pending FROM interest_entries WHERE ledger_id = ? AND status = 'pending'
+    `).get(ledgerId);
+        return row ? row.total_pending : 0;
+      }
+      getLastEntryToDate(ledgerId) {
+        const db = getDb();
+        const row = db.prepare("SELECT MAX(to_date) AS last_to_date FROM interest_entries WHERE ledger_id = ?").get(ledgerId);
+        return row ? row.last_to_date : null;
+      }
+      existsForPeriod(ledgerId, fromDate, toDate) {
+        const db = getDb();
+        const row = db.prepare("SELECT COUNT(*) AS cnt FROM interest_entries WHERE ledger_id = ? AND from_date = ? AND to_date = ?").get(ledgerId, fromDate, toDate);
+        return row.cnt > 0;
+      }
+      create({ ledger_id, amount, from_date, to_date, days, rate, principal_at_time }) {
+        const db = getDb();
+        const stmt = db.prepare(`
+      INSERT INTO interest_entries (ledger_id, amount, from_date, to_date, days, rate, principal_at_time)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+        const result = stmt.run(ledger_id, amount, from_date, to_date, days, rate, principal_at_time);
+        return this.findById(result.lastInsertRowid);
+      }
+      createMany(entries) {
+        const db = getDb();
+        const stmt = db.prepare(`
+      INSERT INTO interest_entries (ledger_id, amount, from_date, to_date, days, rate, principal_at_time)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `);
+        const insertAll = db.transaction((items) => {
+          for (const e of items) {
+            stmt.run(e.ledger_id, e.amount, e.from_date, e.to_date, e.days, e.rate, e.principal_at_time);
+          }
+        });
+        insertAll(entries);
+      }
+      markPaid(id, paidDate) {
+        const db = getDb();
+        db.prepare("UPDATE interest_entries SET status = 'paid', paid_date = ? WHERE id = ?").run(paidDate, id);
+        return this.findById(id);
+      }
+      deleteByLedgerId(ledgerId) {
+        const db = getDb();
+        return db.prepare("DELETE FROM interest_entries WHERE ledger_id = ?").run(ledgerId);
+      }
+    };
+    module2.exports = new InterestRepository();
+  }
+});
+
+// src/services/paymentService.js
+var require_paymentService = __commonJS({
+  "src/services/paymentService.js"(exports2, module2) {
+    var transactionRepository = require_paymentRepository();
+    var ledgerRepository = require_ledgerRepository();
+    var ledgerTypeRepository = require_accountRepository();
+    var interestRepository = require_interestRepository();
+    var { AppError } = require_errorHandler();
+    var { getDb } = require_database();
+    var TransactionService = class {
+      /**
+       * Create a transaction (payment or receipt).
+       * Balance logic:
+       *   customer behaviour: payment ADDS to balance, receipt SUBTRACTS
+       *   supplier behaviour: payment SUBTRACTS from balance, receipt ADDS
+       */
+      createTransaction({ ledger_id, entry_type, amount, date, reference, notes, interest_entry_id }) {
+        const db = getDb();
+        const ledger = ledgerRepository.findById(ledger_id);
+        if (!ledger) throw new AppError("Ledger not found", 404);
+        if (ledger.status === "closed") throw new AppError("Cannot transact on a closed ledger", 400);
+        if (!["payment", "receipt"].includes(entry_type)) throw new AppError('entry_type must be "payment" or "receipt"', 400);
+        const amt = parseFloat(amount);
+        if (isNaN(amt) || amt <= 0) throw new AppError("Amount must be a positive number", 400);
+        const txDate = date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0];
+        const runningNumber = transactionRepository.getNextRunningNumber(entry_type);
+        const behaviour = ledger.behaviour || "customer";
+        let projectedBalance = ledger.current_balance;
+        if (behaviour === "customer") {
+          projectedBalance = entry_type === "payment" ? projectedBalance + amt : projectedBalance - amt;
+        } else {
+          projectedBalance = entry_type === "payment" ? projectedBalance - amt : projectedBalance + amt;
+        }
+        if (projectedBalance < 0) throw new AppError("This entry would make the balance negative", 400);
+        const run = db.transaction(() => {
+          const tx = transactionRepository.create({
+            ledger_id,
+            entry_type,
+            amount: amt,
+            date: txDate,
+            reference: reference || "",
+            notes: notes || "",
+            running_number: runningNumber,
+            interest_entry_id: interest_entry_id || null
+          });
+          let newBalance = ledger.current_balance;
+          if (behaviour === "customer") {
+            newBalance = entry_type === "payment" ? newBalance + amt : newBalance - amt;
+          } else {
+            newBalance = entry_type === "payment" ? newBalance - amt : newBalance + amt;
+          }
+          if (newBalance < 0) throw new AppError("This entry would make the balance negative", 400);
+          ledgerRepository.updateBalance(ledger_id, newBalance);
+          if (interest_entry_id) {
+            interestRepository.markPaid(interest_entry_id, txDate);
+          }
+          return tx;
+        });
+        return run();
+      }
+      getTransactions(filters = {}) {
+        return transactionRepository.findAll(filters);
+      }
+      getTransactionById(id) {
+        const tx = transactionRepository.findById(id);
+        if (!tx) throw new AppError("Transaction not found", 404);
+        return tx;
+      }
+      getTransactionsByLedger(ledgerId) {
+        return transactionRepository.findByLedgerId(ledgerId);
+      }
+      getTransactionSummary() {
+        return transactionRepository.getSummary();
+      }
+      getRecentTransactions(limit = 10) {
+        return transactionRepository.getRecentTransactions(limit);
+      }
+      getNextRunningNumber(entryType) {
+        return transactionRepository.getNextRunningNumber(entryType);
+      }
+      deleteTransaction(id) {
+        const db = getDb();
+        const tx = transactionRepository.findById(id);
+        if (!tx) throw new AppError("Transaction not found", 404);
+        const ledger = ledgerRepository.findById(tx.ledger_id);
+        if (!ledger) throw new AppError("Ledger not found", 404);
+        const run = db.transaction(() => {
+          const amt = parseFloat(tx.amount);
+          const behaviour = ledger.behaviour || "customer";
+          let newBalance = ledger.current_balance;
+          if (behaviour === "customer") {
+            newBalance = tx.entry_type === "payment" ? newBalance - amt : newBalance + amt;
+          } else {
+            newBalance = tx.entry_type === "payment" ? newBalance + amt : newBalance - amt;
+          }
+          ledgerRepository.updateBalance(tx.ledger_id, newBalance);
+          transactionRepository.deleteById(id);
+        });
+        run();
+      }
+    };
+    module2.exports = new TransactionService();
+  }
+});
+
+// src/controllers/paymentController.js
+var require_paymentController = __commonJS({
+  "src/controllers/paymentController.js"(exports2, module2) {
+    var transactionService = require_paymentService();
+    var TransactionController = class {
+      getAll(req, res, next) {
+        try {
+          const { ledgerId, entryType, fromDate, toDate, ledgerTypeId, behaviour } = req.query;
+          const transactions = transactionService.getTransactions({
+            ledgerId: ledgerId ? parseInt(ledgerId) : void 0,
+            entryType: entryType || void 0,
+            fromDate: fromDate || void 0,
+            toDate: toDate || void 0,
+            ledgerTypeId: ledgerTypeId ? parseInt(ledgerTypeId) : void 0,
+            behaviour: behaviour || void 0
+          });
+          res.json({ success: true, data: transactions });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getById(req, res, next) {
+        try {
+          const tx = transactionService.getTransactionById(parseInt(req.params.id));
+          res.json({ success: true, data: tx });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getByLedger(req, res, next) {
+        try {
+          const txs = transactionService.getTransactionsByLedger(parseInt(req.params.ledgerId));
+          res.json({ success: true, data: txs });
+        } catch (err) {
+          next(err);
+        }
+      }
+      create(req, res, next) {
+        try {
+          const tx = transactionService.createTransaction(req.body);
+          res.status(201).json({ success: true, data: tx });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getSummary(req, res, next) {
+        try {
+          const summary = transactionService.getTransactionSummary();
+          res.json({ success: true, data: summary });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getRecent(req, res, next) {
+        try {
+          const limit = req.query.limit ? parseInt(req.query.limit) : 10;
+          const txs = transactionService.getRecentTransactions(limit);
+          res.json({ success: true, data: txs });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getNextRunningNumber(req, res, next) {
+        try {
+          const entryType = req.query.entryType || "payment";
+          const runningNumber = transactionService.getNextRunningNumber(entryType);
+          res.json({ success: true, data: { runningNumber } });
+        } catch (err) {
+          next(err);
+        }
+      }
+      delete(req, res, next) {
+        try {
+          transactionService.deleteTransaction(parseInt(req.params.id));
+          res.json({ success: true });
+        } catch (err) {
+          next(err);
+        }
+      }
+    };
+    module2.exports = new TransactionController();
+  }
+});
+
+// src/routes/paymentRoutes.js
+var require_paymentRoutes = __commonJS({
+  "src/routes/paymentRoutes.js"(exports2, module2) {
+    var express2 = require_express2();
+    var router = express2.Router();
+    var transactionController = require_paymentController();
+    router.get("/summary", (req, res, next) => transactionController.getSummary(req, res, next));
+    router.get("/recent", (req, res, next) => transactionController.getRecent(req, res, next));
+    router.get("/next-number", (req, res, next) => transactionController.getNextRunningNumber(req, res, next));
+    router.get("/ledger/:ledgerId", (req, res, next) => transactionController.getByLedger(req, res, next));
+    router.get("/:id", (req, res, next) => transactionController.getById(req, res, next));
+    router.get("/", (req, res, next) => transactionController.getAll(req, res, next));
+    router.post("/", (req, res, next) => transactionController.create(req, res, next));
+    router.delete("/:id", (req, res, next) => transactionController.delete(req, res, next));
+    module2.exports = router;
   }
 });
 
@@ -24479,36 +24883,290 @@ var require_reportRoutes = __commonJS({
   "src/routes/reportRoutes.js"(exports2, module2) {
     var express2 = require_express2();
     var router = express2.Router();
-    var txnController = require_transactionController();
-    router.get("/statement/:partyId", (req, res, next) => txnController.getStatement(req, res, next));
+    var transactionController = require_paymentController();
+    router.get("/transactions", (req, res, next) => transactionController.getAll(req, res, next));
+    router.get("/transactions/summary", (req, res, next) => transactionController.getSummary(req, res, next));
     module2.exports = router;
+  }
+});
+
+// src/repositories/expenseRepository.js
+var require_expenseRepository = __commonJS({
+  "src/repositories/expenseRepository.js"(exports2, module2) {
+    var { getDb } = require_database();
+    var ExpenseRepository = class {
+      // ── Categories ────────────────────────────────────────────────────────
+      getAllCategories() {
+        const db = getDb();
+        return db.prepare("SELECT * FROM expense_categories ORDER BY name ASC").all();
+      }
+      getCategoryById(id) {
+        const db = getDb();
+        return db.prepare("SELECT * FROM expense_categories WHERE id = ?").get(id);
+      }
+      createCategory(name) {
+        const db = getDb();
+        const info = db.prepare("INSERT INTO expense_categories (name) VALUES (?)").run(name.trim());
+        return this.getCategoryById(info.lastInsertRowid);
+      }
+      updateCategory(id, name) {
+        const db = getDb();
+        db.prepare("UPDATE expense_categories SET name = ? WHERE id = ?").run(name.trim(), id);
+        return this.getCategoryById(id);
+      }
+      deleteCategory(id) {
+        const db = getDb();
+        db.prepare("UPDATE expenses SET expense_category_id = NULL WHERE expense_category_id = ?").run(id);
+        return db.prepare("DELETE FROM expense_categories WHERE id = ?").run(id);
+      }
+      // ── Expenses ──────────────────────────────────────────────────────────
+      getAll({ fromDate, toDate, categoryId, expenseName } = {}) {
+        const db = getDb();
+        const conditions = [];
+        const params = [];
+        if (fromDate) {
+          conditions.push("e.date >= ?");
+          params.push(fromDate);
+        }
+        if (toDate) {
+          conditions.push("e.date <= ?");
+          params.push(toDate);
+        }
+        if (categoryId) {
+          conditions.push("e.expense_category_id = ?");
+          params.push(categoryId);
+        }
+        if (expenseName) {
+          conditions.push("LOWER(e.expense_name) LIKE ?");
+          params.push(`%${expenseName.toLowerCase()}%`);
+        }
+        const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+        return db.prepare(`
+      SELECT e.*, c.name AS category_name
+      FROM expenses e
+      LEFT JOIN expense_categories c ON c.id = e.expense_category_id
+      ${where}
+      ORDER BY e.date DESC, e.id DESC
+    `).all(...params);
+      }
+      getById(id) {
+        const db = getDb();
+        return db.prepare(`
+      SELECT e.*, c.name AS category_name
+      FROM expenses e
+      LEFT JOIN expense_categories c ON c.id = e.expense_category_id
+      WHERE e.id = ?
+    `).get(id);
+      }
+      create({ expense_name, expense_category_id, amount, date, notes }) {
+        const db = getDb();
+        const info = db.prepare(`
+      INSERT INTO expenses (expense_name, expense_category_id, amount, date, notes)
+      VALUES (?, ?, ?, ?, ?)
+    `).run(
+          expense_name.trim(),
+          expense_category_id || null,
+          amount,
+          date,
+          (notes || "").trim()
+        );
+        return this.getById(info.lastInsertRowid);
+      }
+      update(id, { expense_name, expense_category_id, amount, date, notes }) {
+        const db = getDb();
+        db.prepare(`
+      UPDATE expenses
+      SET expense_name = ?, expense_category_id = ?, amount = ?, date = ?, notes = ?
+      WHERE id = ?
+    `).run(
+          expense_name.trim(),
+          expense_category_id || null,
+          amount,
+          date,
+          (notes || "").trim(),
+          id
+        );
+        return this.getById(id);
+      }
+      delete(id) {
+        const db = getDb();
+        return db.prepare("DELETE FROM expenses WHERE id = ?").run(id);
+      }
+      // Auto-suggest expense names based on previous entries
+      getSuggestions(prefix) {
+        const db = getDb();
+        return db.prepare(`
+      SELECT DISTINCT expense_name
+      FROM expenses
+      WHERE LOWER(expense_name) LIKE ?
+      ORDER BY expense_name ASC
+      LIMIT 20
+    `).all(`%${prefix.toLowerCase()}%`).map((r) => r.expense_name);
+      }
+      // Summary for dashboard / reports
+      getSummary({ fromDate, toDate } = {}) {
+        const db = getDb();
+        const conditions = [];
+        const params = [];
+        if (fromDate) {
+          conditions.push("e.date >= ?");
+          params.push(fromDate);
+        }
+        if (toDate) {
+          conditions.push("e.date <= ?");
+          params.push(toDate);
+        }
+        const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+        const total = db.prepare(`SELECT COALESCE(SUM(amount), 0) AS total FROM expenses e ${where}`).get(...params);
+        const byCategory = db.prepare(`
+      SELECT c.name AS category_name, COALESCE(SUM(e.amount), 0) AS total, COUNT(*) AS count
+      FROM expenses e
+      LEFT JOIN expense_categories c ON c.id = e.expense_category_id
+      ${where}
+      GROUP BY e.expense_category_id
+      ORDER BY total DESC
+    `).all(...params);
+        return { total: total.total, byCategory };
+      }
+      getTodayTotal() {
+        const db = getDb();
+        const row = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE date = date('now', 'localtime')").get();
+        return row.total;
+      }
+      getMonthTotal() {
+        const db = getDb();
+        const row = db.prepare("SELECT COALESCE(SUM(amount), 0) AS total FROM expenses WHERE strftime('%Y-%m', date) = strftime('%Y-%m', 'now', 'localtime')").get();
+        return row.total;
+      }
+    };
+    module2.exports = new ExpenseRepository();
+  }
+});
+
+// src/services/expenseService.js
+var require_expenseService = __commonJS({
+  "src/services/expenseService.js"(exports2, module2) {
+    var expenseRepository = require_expenseRepository();
+    var ExpenseService = class {
+      // ── Categories ────────────────────────────────────────────────────────
+      getAllCategories() {
+        return expenseRepository.getAllCategories();
+      }
+      createCategory(name) {
+        if (!name || !name.trim()) throw new Error("Category name is required");
+        return expenseRepository.createCategory(name);
+      }
+      updateCategory(id, name) {
+        if (!name || !name.trim()) throw new Error("Category name is required");
+        return expenseRepository.updateCategory(id, name);
+      }
+      deleteCategory(id) {
+        return expenseRepository.deleteCategory(id);
+      }
+      // ── Expenses ──────────────────────────────────────────────────────────
+      getAll(filters = {}) {
+        return expenseRepository.getAll(filters);
+      }
+      getById(id) {
+        const expense = expenseRepository.getById(id);
+        if (!expense) throw new Error("Expense not found");
+        return expense;
+      }
+      create(data) {
+        const { expense_name, amount, date } = data;
+        if (!expense_name || !expense_name.trim()) throw new Error("Expense name is required");
+        if (!amount || Number(amount) <= 0) throw new Error("Amount must be greater than zero");
+        if (!date) throw new Error("Date is required");
+        return expenseRepository.create({ ...data, amount: parseFloat(amount) });
+      }
+      update(id, data) {
+        const { expense_name, amount, date } = data;
+        if (!expense_name || !expense_name.trim()) throw new Error("Expense name is required");
+        if (!amount || Number(amount) <= 0) throw new Error("Amount must be greater than zero");
+        if (!date) throw new Error("Date is required");
+        return expenseRepository.update(id, { ...data, amount: parseFloat(amount) });
+      }
+      delete(id) {
+        return expenseRepository.delete(id);
+      }
+      getSuggestions(prefix) {
+        if (!prefix) return [];
+        return expenseRepository.getSuggestions(prefix);
+      }
+      getSummary(filters = {}) {
+        return expenseRepository.getSummary(filters);
+      }
+      getTodayTotal() {
+        return expenseRepository.getTodayTotal();
+      }
+      getMonthTotal() {
+        return expenseRepository.getMonthTotal();
+      }
+    };
+    module2.exports = new ExpenseService();
   }
 });
 
 // src/controllers/dashboardController.js
 var require_dashboardController = __commonJS({
   "src/controllers/dashboardController.js"(exports2, module2) {
-    var transactionService = require_transactionService();
-    var partyService = require_partyService();
+    var ledgerService = require_ledgerService();
+    var transactionService = require_paymentService();
+    var ledgerTypeService = require_accountService();
+    var settingsRepository = require_settingsRepository();
+    var expenseService = require_expenseService();
     var DashboardController = class {
       getSummary(req, res, next) {
         try {
-          const partyCounts = partyService.getPartyCounts();
-          const txnSummary = transactionService.getSummary();
+          const ledgerCounts = ledgerService.getLedgerCounts();
+          const ledgers = ledgerService.getAllWithOutstanding();
           const recentTransactions = transactionService.getRecentTransactions(10);
-          const outstanding = transactionService.getOutstandingBalances();
-          const totalReceivable = outstanding.filter((p) => p.type === "customer" && p.current_balance > 0).reduce((sum, p) => sum + p.current_balance, 0);
-          const totalPayable = outstanding.filter((p) => p.type === "supplier" && p.current_balance > 0).reduce((sum, p) => sum + p.current_balance, 0);
-          const topOutstanding = outstanding.filter((p) => Math.abs(p.current_balance) > 0).sort((a, b) => Math.abs(b.current_balance) - Math.abs(a.current_balance)).slice(0, 5);
+          const ledgerTypes = ledgerTypeService.getAllTypes();
+          const outstandingByType = {};
+          for (const lt of ledgerTypes) {
+            outstandingByType[lt.id] = {
+              id: lt.id,
+              name: lt.name,
+              behaviour: lt.behaviour,
+              total: 0,
+              count: 0
+            };
+          }
+          for (const l of ledgers) {
+            if (l.current_balance !== 0 && l.status === "active" && outstandingByType[l.ledger_type_id]) {
+              outstandingByType[l.ledger_type_id].total += Math.abs(l.current_balance);
+              outstandingByType[l.ledger_type_id].count += 1;
+            }
+          }
+          const totalReceivable = ledgers.filter((l) => l.behaviour === "customer" && l.current_balance > 0 && l.status === "active").reduce((sum, l) => sum + l.current_balance, 0);
+          const totalPayable = ledgers.filter((l) => l.behaviour === "supplier" && l.current_balance > 0 && l.status === "active").reduce((sum, l) => sum + l.current_balance, 0);
+          const topOutstanding = ledgers.filter((l) => Math.abs(l.current_balance) > 0 && l.status === "active").sort((a, b) => Math.abs(b.current_balance) - Math.abs(a.current_balance)).slice(0, 5);
+          const expenseModuleEnabled = settingsRepository.get("expense_module_enabled");
+          const expenseEnabled = expenseModuleEnabled === true || expenseModuleEnabled === "true";
+          let expenseSummary = null;
+          if (expenseEnabled) {
+            const now = /* @__PURE__ */ new Date();
+            const pad = (n) => String(n).padStart(2, "0");
+            const todayLocal = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+            const monthStart = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+            expenseSummary = {
+              todayTotal: expenseService.getTodayTotal(),
+              monthTotal: expenseService.getMonthTotal(),
+              byCategory: expenseService.getSummary({ fromDate: monthStart, toDate: todayLocal }).byCategory
+            };
+          }
           res.json({
             success: true,
             data: {
-              partyCounts,
-              txnSummary,
+              ledgerCounts,
+              totalLedgers: ledgers.length,
+              activeLedgers: ledgers.filter((l) => l.status === "active").length,
               recentTransactions,
               totalReceivable,
               totalPayable,
-              topOutstanding
+              topOutstanding,
+              outstandingByType: Object.values(outstandingByType),
+              expenseSummary
             }
           });
         } catch (err) {
@@ -24531,6 +25189,362 @@ var require_dashboardRoutes = __commonJS({
   }
 });
 
+// src/services/interestService.js
+var require_interestService = __commonJS({
+  "src/services/interestService.js"(exports2, module2) {
+    var interestRepository = require_interestRepository();
+    var ledgerRepository = require_ledgerRepository();
+    var settingsRepository = require_settingsRepository();
+    var { AppError } = require_errorHandler();
+    var InterestService = class {
+      isModuleEnabled() {
+        const val = settingsRepository.get("interest_module_enabled");
+        return val === true || val === "true";
+      }
+      /**
+       * Generate interest entries for a single ledger up to a given date (or today).
+       * DAILY:   current_balance × rate / 100          per month (rate = monthly %)
+       * MONTHLY: current_balance × rate / 100 / 12     per month (rate = annual %)
+       */
+      generateForLedger(ledgerId, upToDate = null) {
+        if (!this.isModuleEnabled()) return [];
+        const ledger = ledgerRepository.findById(ledgerId);
+        if (!ledger) throw new AppError("Ledger not found", 404);
+        if (ledger.interest_scheme === "NONE" || ledger.interest_rate <= 0) return [];
+        if (ledger.current_balance <= 0) return [];
+        const today = upToDate || this._todayISO();
+        const lastToDate = interestRepository.getLastEntryToDate(ledgerId);
+        let startDate;
+        if (lastToDate) {
+          startDate = this._nextDay(lastToDate);
+        } else {
+          startDate = ledger.created_at ? ledger.created_at.split(" ")[0].split("T")[0] : today;
+        }
+        if (startDate > today) return [];
+        const entries = [];
+        const principal = ledger.current_balance;
+        const rate = ledger.interest_rate;
+        if (ledger.interest_scheme === "DAILY") {
+          let current = startDate;
+          while (current <= today) {
+            const monthEnd = this._endOfMonth(current);
+            const periodEnd = monthEnd <= today ? monthEnd : today;
+            const periodDays = this._dayDiff(current, periodEnd) + 1;
+            if (periodDays > 0 && !interestRepository.existsForPeriod(ledgerId, current, periodEnd)) {
+              const amount = Math.round(principal * rate / 100 * 100) / 100;
+              entries.push({
+                ledger_id: ledgerId,
+                amount,
+                from_date: current,
+                to_date: periodEnd,
+                days: periodDays,
+                rate,
+                principal_at_time: principal
+              });
+            }
+            current = this._firstOfNextMonth(current);
+            if (current > today) break;
+          }
+        } else if (ledger.interest_scheme === "MONTHLY") {
+          let current = startDate;
+          while (current <= today) {
+            const monthEnd = this._endOfMonth(current);
+            const periodEnd = monthEnd <= today ? monthEnd : today;
+            const periodDays = this._dayDiff(current, periodEnd) + 1;
+            if (periodDays > 0 && !interestRepository.existsForPeriod(ledgerId, current, periodEnd)) {
+              const amount = Math.round(principal * rate / 100 / 12 * 100) / 100;
+              entries.push({
+                ledger_id: ledgerId,
+                amount,
+                from_date: current,
+                to_date: periodEnd,
+                days: periodDays,
+                rate,
+                principal_at_time: principal
+              });
+            }
+            current = this._firstOfNextMonth(current);
+            if (current > today) break;
+          }
+        }
+        if (entries.length > 0) {
+          interestRepository.createMany(entries);
+        }
+        return interestRepository.findByLedgerId(ledgerId);
+      }
+      generateAll(upToDate = null) {
+        if (!this.isModuleEnabled()) return { generated: 0 };
+        const { getDb } = require_database();
+        const db = getDb();
+        const ledgers = db.prepare(`
+      SELECT id FROM ledgers
+      WHERE interest_scheme != 'NONE' AND interest_rate > 0 AND status = 'active'
+    `).all();
+        let totalGenerated = 0;
+        for (const l of ledgers) {
+          const entries = this.generateForLedger(l.id, upToDate);
+          totalGenerated += entries.length;
+        }
+        return { generated: totalGenerated };
+      }
+      getEntries(filters = {}) {
+        if (!this.isModuleEnabled()) throw new AppError("Interest module is not enabled", 400);
+        return interestRepository.findAll(filters);
+      }
+      getEntriesByLedger(ledgerId) {
+        if (!this.isModuleEnabled()) throw new AppError("Interest module is not enabled", 400);
+        const ledger = ledgerRepository.findById(ledgerId);
+        if (!ledger) throw new AppError("Ledger not found", 404);
+        this.generateForLedger(ledgerId);
+        return interestRepository.findByLedgerId(ledgerId);
+      }
+      getPendingByLedger(ledgerId) {
+        return interestRepository.getPendingByLedger(ledgerId);
+      }
+      getTotalPendingByLedger(ledgerId) {
+        return interestRepository.getTotalPendingByLedger(ledgerId);
+      }
+      // ── Date utility helpers ─────────────────────────────────────────────────
+      _todayISO() {
+        const d = /* @__PURE__ */ new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      }
+      _nextDay(dateStr) {
+        const d = /* @__PURE__ */ new Date(dateStr + "T00:00:00");
+        d.setDate(d.getDate() + 1);
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      }
+      _endOfMonth(dateStr) {
+        const d = /* @__PURE__ */ new Date(dateStr + "T00:00:00");
+        const end = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+        return `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-${String(end.getDate()).padStart(2, "0")}`;
+      }
+      _firstOfNextMonth(dateStr) {
+        const d = /* @__PURE__ */ new Date(dateStr + "T00:00:00");
+        const first = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+        return `${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, "0")}-${String(first.getDate()).padStart(2, "0")}`;
+      }
+      _dayDiff(dateStr1, dateStr2) {
+        const d1 = /* @__PURE__ */ new Date(dateStr1 + "T00:00:00");
+        const d2 = /* @__PURE__ */ new Date(dateStr2 + "T00:00:00");
+        return Math.round((d2 - d1) / (1e3 * 60 * 60 * 24));
+      }
+    };
+    module2.exports = new InterestService();
+  }
+});
+
+// src/controllers/interestController.js
+var require_interestController = __commonJS({
+  "src/controllers/interestController.js"(exports2, module2) {
+    var interestService = require_interestService();
+    var InterestController = class {
+      getAll(req, res, next) {
+        try {
+          const { ledgerId, status, fromDate, toDate } = req.query;
+          const entries = interestService.getEntries({
+            ledgerId: ledgerId ? parseInt(ledgerId) : void 0,
+            status: status || void 0,
+            fromDate: fromDate || void 0,
+            toDate: toDate || void 0
+          });
+          res.json({ success: true, data: entries });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getByLedger(req, res, next) {
+        try {
+          const entries = interestService.getEntriesByLedger(parseInt(req.params.ledgerId));
+          res.json({ success: true, data: entries });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getPendingByLedger(req, res, next) {
+        try {
+          const entries = interestService.getPendingByLedger(parseInt(req.params.ledgerId));
+          res.json({ success: true, data: entries });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getTotalPending(req, res, next) {
+        try {
+          const total = interestService.getTotalPendingByLedger(parseInt(req.params.ledgerId));
+          res.json({ success: true, data: { total_pending_interest: total } });
+        } catch (err) {
+          next(err);
+        }
+      }
+      generate(req, res, next) {
+        try {
+          const { ledgerId, upToDate } = req.body;
+          let result;
+          if (ledgerId) {
+            const entries = interestService.generateForLedger(parseInt(ledgerId), upToDate || null);
+            result = { generated: entries.length, entries };
+          } else {
+            result = interestService.generateAll(upToDate || null);
+          }
+          res.json({ success: true, data: result });
+        } catch (err) {
+          next(err);
+        }
+      }
+      isEnabled(req, res, next) {
+        try {
+          const enabled = interestService.isModuleEnabled();
+          res.json({ success: true, data: { enabled } });
+        } catch (err) {
+          next(err);
+        }
+      }
+    };
+    module2.exports = new InterestController();
+  }
+});
+
+// src/routes/interestRoutes.js
+var require_interestRoutes = __commonJS({
+  "src/routes/interestRoutes.js"(exports2, module2) {
+    var express2 = require_express2();
+    var router = express2.Router();
+    var interestController = require_interestController();
+    router.get("/enabled", (req, res, next) => interestController.isEnabled(req, res, next));
+    router.get("/ledger/:ledgerId", (req, res, next) => interestController.getByLedger(req, res, next));
+    router.get("/ledger/:ledgerId/pending", (req, res, next) => interestController.getPendingByLedger(req, res, next));
+    router.get("/ledger/:ledgerId/total", (req, res, next) => interestController.getTotalPending(req, res, next));
+    router.get("/", (req, res, next) => interestController.getAll(req, res, next));
+    router.post("/generate", (req, res, next) => interestController.generate(req, res, next));
+    module2.exports = router;
+  }
+});
+
+// src/controllers/expenseController.js
+var require_expenseController = __commonJS({
+  "src/controllers/expenseController.js"(exports2, module2) {
+    var expenseService = require_expenseService();
+    var ExpenseController = class {
+      // ── Categories ────────────────────────────────────────────────────────
+      getCategories(req, res, next) {
+        try {
+          const categories = expenseService.getAllCategories();
+          res.json({ success: true, data: categories });
+        } catch (err) {
+          next(err);
+        }
+      }
+      createCategory(req, res, next) {
+        try {
+          const { name } = req.body;
+          const category = expenseService.createCategory(name);
+          res.status(201).json({ success: true, data: category });
+        } catch (err) {
+          next(err);
+        }
+      }
+      updateCategory(req, res, next) {
+        try {
+          const category = expenseService.updateCategory(parseInt(req.params.id), req.body.name);
+          res.json({ success: true, data: category });
+        } catch (err) {
+          next(err);
+        }
+      }
+      deleteCategory(req, res, next) {
+        try {
+          expenseService.deleteCategory(parseInt(req.params.id));
+          res.json({ success: true });
+        } catch (err) {
+          next(err);
+        }
+      }
+      // ── Expenses ──────────────────────────────────────────────────────────
+      getAll(req, res, next) {
+        try {
+          const { fromDate, toDate, categoryId, expenseName } = req.query;
+          const expenses = expenseService.getAll({ fromDate, toDate, categoryId, expenseName });
+          res.json({ success: true, data: expenses });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getById(req, res, next) {
+        try {
+          const expense = expenseService.getById(parseInt(req.params.id));
+          res.json({ success: true, data: expense });
+        } catch (err) {
+          next(err);
+        }
+      }
+      create(req, res, next) {
+        try {
+          const expense = expenseService.create(req.body);
+          res.status(201).json({ success: true, data: expense });
+        } catch (err) {
+          next(err);
+        }
+      }
+      update(req, res, next) {
+        try {
+          const expense = expenseService.update(parseInt(req.params.id), req.body);
+          res.json({ success: true, data: expense });
+        } catch (err) {
+          next(err);
+        }
+      }
+      delete(req, res, next) {
+        try {
+          expenseService.delete(parseInt(req.params.id));
+          res.json({ success: true });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getSuggestions(req, res, next) {
+        try {
+          const suggestions = expenseService.getSuggestions(req.query.q || "");
+          res.json({ success: true, data: suggestions });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getSummary(req, res, next) {
+        try {
+          const { fromDate, toDate } = req.query;
+          const summary = expenseService.getSummary({ fromDate, toDate });
+          res.json({ success: true, data: summary });
+        } catch (err) {
+          next(err);
+        }
+      }
+    };
+    module2.exports = new ExpenseController();
+  }
+});
+
+// src/routes/expenseRoutes.js
+var require_expenseRoutes = __commonJS({
+  "src/routes/expenseRoutes.js"(exports2, module2) {
+    var express2 = require_express2();
+    var router = express2.Router();
+    var expenseController = require_expenseController();
+    router.get("/categories", (req, res, next) => expenseController.getCategories(req, res, next));
+    router.post("/categories", (req, res, next) => expenseController.createCategory(req, res, next));
+    router.put("/categories/:id", (req, res, next) => expenseController.updateCategory(req, res, next));
+    router.delete("/categories/:id", (req, res, next) => expenseController.deleteCategory(req, res, next));
+    router.get("/suggestions", (req, res, next) => expenseController.getSuggestions(req, res, next));
+    router.get("/summary", (req, res, next) => expenseController.getSummary(req, res, next));
+    router.get("/", (req, res, next) => expenseController.getAll(req, res, next));
+    router.get("/:id", (req, res, next) => expenseController.getById(req, res, next));
+    router.post("/", (req, res, next) => expenseController.create(req, res, next));
+    router.put("/:id", (req, res, next) => expenseController.update(req, res, next));
+    router.delete("/:id", (req, res, next) => expenseController.delete(req, res, next));
+    module2.exports = router;
+  }
+});
+
 // src/index.js
 var express = require_express2();
 var path = require("path");
@@ -24538,11 +25552,14 @@ var cors = require_lib3();
 var morgan = require_morgan();
 var { initializeDatabase } = require_database();
 var { errorHandler } = require_errorHandler();
-var partyRoutes = require_partyRoutes();
-var transactionRoutes = require_transactionRoutes();
+var ledgerRoutes = require_ledgerRoutes();
+var ledgerTypeRoutes = require_accountRoutes();
+var transactionRoutes = require_paymentRoutes();
 var settingsRoutes = require_settingsRoutes();
 var reportRoutes = require_reportRoutes();
 var dashboardRoutes = require_dashboardRoutes();
+var interestRoutes = require_interestRoutes();
+var expenseRoutes = require_expenseRoutes();
 var app = express();
 var PORT = process.env.PORT || 3456;
 app.use(cors());
@@ -24550,11 +25567,14 @@ app.use(morgan("dev"));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 initializeDatabase();
-app.use("/api/parties", partyRoutes);
+app.use("/api/ledgers", ledgerRoutes);
+app.use("/api/ledger-types", ledgerTypeRoutes);
 app.use("/api/transactions", transactionRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/interest", interestRoutes);
+app.use("/api/expenses", expenseRoutes);
 var clientBuildPath = process.env.CLIENT_DIST_PATH || path.join(__dirname, "..", "..", "client", "dist");
 app.use(express.static(clientBuildPath));
 app.get("*", (req, res) => {

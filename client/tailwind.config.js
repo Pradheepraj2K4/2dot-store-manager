@@ -6,7 +6,7 @@ export default {
       colors: {
         sidebar: '#0F172A',
         'sidebar-hover': '#1E293B',
-        'main-bg': '#F8FAFC',
+        'main-bg': '#DDE3ED',
         'trust-blue': '#1D4ED8',
         'trust-blue-hover': '#1E40AF',
         'credit-green': '#059669',

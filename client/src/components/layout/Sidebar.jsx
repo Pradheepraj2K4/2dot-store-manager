@@ -8,40 +8,62 @@ import {
   ArrowLeftOnRectangleIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  BanknotesIcon,
   PlusCircleIcon,
   ClockIcon,
+  CurrencyDollarIcon,
+  DocumentTextIcon,
+  BanknotesIcon,
 } from '@heroicons/react/24/outline';
 import { logout } from '../../utils/auth';
-import { interestApi } from '../../api';
+import { interestApi, expenseApi } from '../../api';
 import toast from 'react-hot-toast';
 
 const baseNavigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
   { name: 'Ledger Creation', href: '/ledger-creation', icon: PlusCircleIcon },
   { name: 'Ledgers', href: '/ledgers', icon: BookOpenIcon },
-  { name: 'Account Creation', href: '/account-creation', icon: BanknotesIcon },
   { name: 'Reports', href: '/reports', icon: DocumentChartBarIcon },
+  { name: 'Outstanding Balances', href: '/outstanding-balances', icon: CurrencyDollarIcon },
+  { name: 'Statement of Account', href: '/statement-of-account', icon: DocumentTextIcon },
   { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
 ];
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const [interestEnabled, setInterestEnabled] = useState(false);
+  const [expenseEnabled, setExpenseEnabled] = useState(false);
 
   useEffect(() => {
     interestApi.isEnabled().then((res) => {
       setInterestEnabled(res.data.enabled);
     }).catch(() => {});
+    expenseApi.isEnabled().then((res) => {
+      const val = res.data?.value;
+      setExpenseEnabled(val === true || val === 'true');
+    }).catch(() => {});
   }, []);
 
-  const navigation = interestEnabled
-    ? [
-        ...baseNavigation.slice(0, 5),
+  const navigation = (() => {
+    let nav = [...baseNavigation];
+    if (interestEnabled) {
+      nav = [
+        ...nav.slice(0, 3),
         { name: 'Pending Interest', href: '/pending-interest', icon: ClockIcon },
-        ...baseNavigation.slice(5),
-      ]
-    : baseNavigation;
+        ...nav.slice(3),
+      ];
+    }
+    if (expenseEnabled) {
+      // Insert Expenses and Expense Reports before Settings
+      const settingsIdx = nav.findIndex((n) => n.href === '/settings');
+      nav = [
+        ...nav.slice(0, settingsIdx),
+        { name: 'Expenses', href: '/expenses', icon: BanknotesIcon },
+        { name: 'Expense Reports', href: '/expense-reports', icon: DocumentChartBarIcon },
+        ...nav.slice(settingsIdx),
+      ];
+    }
+    return nav;
+  })();
 
   const handleLogout = () => {
     logout();

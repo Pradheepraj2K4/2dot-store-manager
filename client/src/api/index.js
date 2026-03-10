@@ -47,6 +47,8 @@ export const settingsApi = {
   getStoreProfile: () => api.get('/settings/store-profile'),
   uploadLogo: (base64) => api.post('/settings/logo', { logo: base64 }),
   deleteLogo: () => api.delete('/settings/logo'),
+  getBackupStatus: () => api.get('/settings/backup/status'),
+  backupNow: () => api.post('/settings/backup/now'),
 };
 
 export const dashboardApi = {
@@ -64,6 +66,7 @@ export const interestApi = {
   },
   generate: (data = {}) => api.post('/interest/generate', data),
   markPaid: (id, paidDate, amount) => api.post(`/interest/${id}/pay`, { paidDate: paidDate || null, amount: amount ?? null }),
+  bulkPay: (data) => api.post('/interest/bulk-pay', data),
   deleteEntry: (id) => api.delete(`/interest/${id}`),
 };
 

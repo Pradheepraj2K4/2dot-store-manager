@@ -67,7 +67,7 @@ export default function PendingInterestPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="card text-center bg-amber-50/50 border-amber-200">
+        <div className="card text-center bg-white border-amber-200">
           <p className="text-xs font-medium text-amber-600">Total Pending Interest</p>
           <p className="text-xl font-bold text-amber-700 mt-1">{formatCurrency(totalPending)}</p>
         </div>

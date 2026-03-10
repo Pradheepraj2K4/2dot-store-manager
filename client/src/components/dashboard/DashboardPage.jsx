@@ -10,6 +10,7 @@ import {
   BanknotesIcon,
   ArrowPathIcon,
   BookOpenIcon,
+  ClockIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -53,31 +54,37 @@ export default function DashboardPage() {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
         <StatCard
-          title="Total Ledgers"
-          value={data.totalLedgers}
-          icon={BookOpenIcon}
-          color="slate"
-        />
-        <StatCard
           title="Active Ledgers"
           value={data.activeLedgers}
-          icon={BanknotesIcon}
+          icon={BookOpenIcon}
           color="blue"
         />
         <StatCard
           title="Total Receivable"
           value={formatCurrency(data.totalReceivable)}
-          subtitle="From customers"
+          subtitle="From customers · click to view"
           icon={ArrowTrendingUpIcon}
           color="green"
+          onClick={() => navigate('/outstanding-balances?behaviour=customer')}
         />
         <StatCard
           title="Total Payable"
           value={formatCurrency(data.totalPayable)}
-          subtitle="To suppliers"
+          subtitle="To suppliers · click to view"
           icon={ArrowTrendingDownIcon}
           color="red"
+          onClick={() => navigate('/outstanding-balances?behaviour=supplier')}
         />
+        {data.pendingInterest !== undefined && (
+          <StatCard
+            title="Pending Interest"
+            value={formatCurrency(data.pendingInterest)}
+            subtitle="Across all ledgers"
+            icon={ClockIcon}
+            color="amber"
+            onClick={() => navigate('/pending-interest')}
+          />
+        )}
       </div>
 
       {/* Expense Summary (shown when expense module is enabled) */}

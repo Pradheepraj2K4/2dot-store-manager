@@ -4,6 +4,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const { initializeDatabase } = require('./db/database');
 const { errorHandler } = require('./middleware/errorHandler');
+const { triggerDailyBackup } = require('./utils/backupService');
 const ledgerRoutes = require('./routes/ledgerRoutes');
 const ledgerTypeRoutes = require('./routes/accountRoutes');
 const transactionRoutes = require('./routes/paymentRoutes');
@@ -21,6 +22,18 @@ app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// After every successful write request, trigger a daily backup (best-effort)
+app.use((req, res, next) => {
+  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
+    res.on('finish', () => {
+      if (res.statusCode < 400) {
+        setImmediate(triggerDailyBackup);
+      }
+    });
+  }
+  next();
+});
 
 // Initialize database
 initializeDatabase();

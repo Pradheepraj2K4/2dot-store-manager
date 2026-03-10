@@ -17,6 +17,9 @@ import {
   ArrowPathIcon,
   PlusIcon,
   PencilIcon,
+  FolderOpenIcon,
+  CircleStackIcon,
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 
 export default function DeveloperSettingsPage() {
@@ -57,6 +60,14 @@ export default function DeveloperSettingsPage() {
   // Expense module state
   const [expenseModuleEnabled, setExpenseModuleEnabled] = useState(false);
 
+  // Backup state
+  const [backupEnabled, setBackupEnabled] = useState(false);
+  const [backupDir, setBackupDir] = useState('');
+  const [backupDirInput, setBackupDirInput] = useState('');
+  const [savingBackup, setSavingBackup] = useState(false);
+  const [backingUpNow, setBackingUpNow] = useState(false);
+  const [todayBackupExists, setTodayBackupExists] = useState(false);
+
   // Ledger types state
   const [ledgerTypes, setLedgerTypes] = useState([]);
   const [ltForm, setLtForm] = useState({ name: '', behaviour: 'customer' });
@@ -93,6 +104,15 @@ export default function DeveloperSettingsPage() {
       setInterestModuleEnabled(data.interest_module_enabled === true || data.interest_module_enabled === 'true');
       // Load expense module setting
       setExpenseModuleEnabled(data.expense_module_enabled === true || data.expense_module_enabled === 'true');
+      // Load backup settings
+      try {
+        const bRes = await settingsApi.getBackupStatus();
+        const bd = bRes.data;
+        setBackupEnabled(bd.enabled);
+        setBackupDir(bd.dir || '');
+        setBackupDirInput(bd.dir || '');
+        setTodayBackupExists(bd.todayBackupExists || false);
+      } catch (_) { /* backup status is non-critical */ }
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -337,10 +357,44 @@ export default function DeveloperSettingsPage() {
 
   if (loading) return <LoadingSpinner className="py-20" size="lg" />;
 
+  // --- Backup ---
+  const handleSaveBackupSettings = async () => {
+    try {
+      setSavingBackup(true);
+      await settingsApi.updateBatch({
+        backup_enabled: String(backupEnabled),
+        backup_dir: backupDirInput.trim(),
+      });
+      setBackupDir(backupDirInput.trim());
+      toast.success('Backup settings saved');
+      // Refresh status
+      const bRes = await settingsApi.getBackupStatus();
+      setTodayBackupExists(bRes.data.todayBackupExists || false);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSavingBackup(false);
+    }
+  };
+
+  const handleBackupNow = async () => {
+    try {
+      setBackingUpNow(true);
+      const res = await settingsApi.backupNow();
+      toast.success(`Backup created: ${res.data.path}`);
+      setTodayBackupExists(true);
+    } catch (err) {
+      toast.error(err.message || 'Backup failed');
+    } finally {
+      setBackingUpNow(false);
+    }
+  };
+
   const tabs = [
     { id: 'profile', label: 'Store Profile' },
     { id: 'ledgerTypes', label: 'Ledger Types' },
     { id: 'modules', label: 'Modules' },
+    { id: 'backup', label: 'Backup' },
     { id: 'layout', label: 'Receipt Layout' },
     { id: 'style', label: 'Receipt Style' },
   ];
@@ -657,6 +711,96 @@ export default function DeveloperSettingsPage() {
                   />
                   <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
                 </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Backup Tab */}
+      {activeTab === 'backup' && (
+        <div className="space-y-4">
+          <div className="card">
+            <div className="flex items-center gap-3 mb-1">
+              <CircleStackIcon className="h-5 w-5 text-slate-500" />
+              <h2 className="text-base font-semibold text-slate-900">Database Backup</h2>
+            </div>
+            <p className="text-xs text-slate-500 mb-6">
+              When enabled, a backup of <code className="bg-slate-100 px-1 rounded">inventory.db</code> is automatically
+              created in the specified directory after each write operation. The backup filename
+              includes the current date (e.g. <code className="bg-slate-100 px-1 rounded">inventory_10-03-2026.db</code>),
+              so only one backup is created per day.
+            </p>
+
+            <div className="space-y-5">
+              {/* Enable toggle */}
+              <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-white">
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-800">Auto Backup</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Automatically back up the database on every write operation.</p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer ml-4">
+                  <input
+                    type="checkbox"
+                    checked={backupEnabled}
+                    onChange={(e) => setBackupEnabled(e.target.checked)}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
+                </label>
+              </div>
+
+              {/* Backup directory */}
+              <div>
+                <label className="label">Backup Directory</label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <FolderOpenIcon className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <input
+                      type="text"
+                      value={backupDirInput}
+                      onChange={(e) => setBackupDirInput(e.target.value)}
+                      className="input-field pl-9 font-mono text-sm"
+                      placeholder="e.g. C:\Backups\Inventory"
+                    />
+                  </div>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">Enter the full path to an existing folder where backups should be saved.</p>
+              </div>
+
+              {/* Status badge */}
+              {backupDir && (
+                <div className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg ${
+                  todayBackupExists
+                    ? 'bg-green-50 text-green-700 border border-green-200'
+                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                }`}>
+                  <CheckCircleIcon className="h-4 w-4 flex-shrink-0" />
+                  {todayBackupExists
+                    ? "Today's backup already exists in the backup directory."
+                    : "Today's backup has not been created yet. It will be created on the next write operation, or use \"Backup Now\"."
+                  }
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex items-center justify-between pt-2">
+                <button
+                  onClick={handleBackupNow}
+                  disabled={backingUpNow || !backupDir}
+                  className="btn-secondary text-sm gap-2"
+                  title={!backupDir ? 'Configure a backup directory first' : ''}
+                >
+                  <CircleStackIcon className="h-4 w-4" />
+                  {backingUpNow ? 'Backing up...' : 'Backup Now'}
+                </button>
+                <button
+                  onClick={handleSaveBackupSettings}
+                  disabled={savingBackup}
+                  className="btn-primary text-sm"
+                >
+                  {savingBackup ? 'Saving...' : 'Save Settings'}
+                </button>
               </div>
             </div>
           </div>

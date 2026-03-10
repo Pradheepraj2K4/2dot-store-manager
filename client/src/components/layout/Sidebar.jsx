@@ -10,7 +10,7 @@ import {
   ChevronRightIcon,
   PlusCircleIcon,
   ClockIcon,
-  CurrencyDollarIcon,
+  CurrencyRupeeIcon,
   DocumentTextIcon,
   BanknotesIcon,
   CheckCircleIcon,
@@ -24,7 +24,7 @@ const baseNavigation = [
   { name: 'Ledger Creation', href: '/ledger-creation', icon: PlusCircleIcon },
   { name: 'Ledgers', href: '/ledgers', icon: BookOpenIcon },
   { name: 'Reports', href: '/reports', icon: DocumentChartBarIcon },
-  { name: 'Outstanding Balances', href: '/outstanding-balances', icon: CurrencyDollarIcon },
+  { name: 'Outstanding Balances', href: '/outstanding-balances', icon: CurrencyRupeeIcon },
   { name: 'Statement of Account', href: '/statement-of-account', icon: DocumentTextIcon },
   { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
 ];

@@ -3,6 +3,7 @@ const transactionService = require('../services/paymentService');
 const ledgerTypeService = require('../services/accountService');
 const settingsRepository = require('../repositories/settingsRepository');
 const expenseService = require('../services/expenseService');
+const interestRepository = require('../repositories/interestRepository');
 
 class DashboardController {
   getSummary(req, res, next) {
@@ -59,6 +60,10 @@ class DashboardController {
         };
       }
 
+      const interestModuleEnabled = settingsRepository.get('interest_module_enabled');
+      const interestEnabled = interestModuleEnabled === true || interestModuleEnabled === 'true';
+      const pendingInterest = interestEnabled ? interestRepository.getTotalPendingAll() : undefined;
+
       res.json({
         success: true,
         data: {
@@ -71,6 +76,7 @@ class DashboardController {
           topOutstanding,
           outstandingByType: Object.values(outstandingByType),
           expenseSummary,
+          ...(pendingInterest !== undefined && { pendingInterest }),
         },
       });
     } catch (err) {

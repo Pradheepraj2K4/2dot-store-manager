@@ -23371,7 +23371,7 @@ var require_connection = __commonJS({
         db = null;
       }
     }
-    module2.exports = { getDb, closeDb };
+    module2.exports = { getDb, closeDb, DB_PATH };
   }
 });
 
@@ -23742,6 +23742,124 @@ var require_errorHandler = __commonJS({
   }
 });
 
+// src/repositories/settingsRepository.js
+var require_settingsRepository = __commonJS({
+  "src/repositories/settingsRepository.js"(exports2, module2) {
+    var { getDb } = require_database();
+    var SettingsRepository = class {
+      getAll() {
+        const db = getDb();
+        const rows = db.prepare("SELECT * FROM settings ORDER BY key ASC").all();
+        const settings = {};
+        for (const row of rows) {
+          try {
+            settings[row.key] = JSON.parse(row.value);
+          } catch {
+            settings[row.key] = row.value;
+          }
+        }
+        return settings;
+      }
+      get(key) {
+        const db = getDb();
+        const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(key);
+        if (!row) return null;
+        try {
+          return JSON.parse(row.value);
+        } catch {
+          return row.value;
+        }
+      }
+      set(key, value) {
+        const db = getDb();
+        const strValue = typeof value === "string" ? value : JSON.stringify(value);
+        db.prepare(`
+      INSERT INTO settings (key, value) VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `).run(key, strValue);
+        return { key, value };
+      }
+      setMultiple(entries) {
+        const db = getDb();
+        const stmt = db.prepare(`
+      INSERT INTO settings (key, value) VALUES (?, ?)
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value
+    `);
+        const updateAll = db.transaction((items) => {
+          for (const [key, value] of Object.entries(items)) {
+            const strValue = typeof value === "string" ? value : JSON.stringify(value);
+            stmt.run(key, strValue);
+          }
+        });
+        updateAll(entries);
+        return this.getAll();
+      }
+      delete(key) {
+        const db = getDb();
+        return db.prepare("DELETE FROM settings WHERE key = ?").run(key);
+      }
+    };
+    module2.exports = new SettingsRepository();
+  }
+});
+
+// src/utils/backupService.js
+var require_backupService = __commonJS({
+  "src/utils/backupService.js"(exports2, module2) {
+    var fs = require("fs");
+    var path2 = require("path");
+    var { DB_PATH } = require_connection();
+    function getTodayDateString() {
+      const now = /* @__PURE__ */ new Date();
+      const dd = String(now.getDate()).padStart(2, "0");
+      const mm = String(now.getMonth() + 1).padStart(2, "0");
+      const yyyy = now.getFullYear();
+      return `${dd}-${mm}-${yyyy}`;
+    }
+    function getBackupSettings() {
+      const settingsRepository = require_settingsRepository();
+      const enabled = settingsRepository.get("backup_enabled");
+      const dir = settingsRepository.get("backup_dir");
+      return {
+        enabled: enabled === true || enabled === "true",
+        dir: dir || ""
+      };
+    }
+    function performBackup(backupDir) {
+      if (!backupDir) {
+        return { success: false, error: "No backup directory configured" };
+      }
+      if (!fs.existsSync(backupDir)) {
+        return { success: false, error: `Backup directory does not exist: ${backupDir}` };
+      }
+      const dateStr = getTodayDateString();
+      const destPath = path2.join(backupDir, `inventory_${dateStr}.db`);
+      try {
+        fs.copyFileSync(DB_PATH, destPath);
+        return { success: true, path: destPath, date: dateStr };
+      } catch (err) {
+        return { success: false, error: err.message };
+      }
+    }
+    function triggerDailyBackup2() {
+      try {
+        const { enabled, dir } = getBackupSettings();
+        if (!enabled || !dir) return;
+        const dateStr = getTodayDateString();
+        const destPath = path2.join(dir, `inventory_${dateStr}.db`);
+        if (fs.existsSync(destPath)) return;
+        performBackup(dir);
+      } catch (_) {
+      }
+    }
+    function triggerBackupNow() {
+      const { dir } = getBackupSettings();
+      return performBackup(dir);
+    }
+    module2.exports = { triggerDailyBackup: triggerDailyBackup2, triggerBackupNow };
+  }
+});
+
 // src/repositories/ledgerRepository.js
 var require_ledgerRepository = __commonJS({
   "src/repositories/ledgerRepository.js"(exports2, module2) {
@@ -23959,67 +24077,6 @@ var require_accountRepository = __commonJS({
       }
     };
     module2.exports = new LedgerTypeRepository();
-  }
-});
-
-// src/repositories/settingsRepository.js
-var require_settingsRepository = __commonJS({
-  "src/repositories/settingsRepository.js"(exports2, module2) {
-    var { getDb } = require_database();
-    var SettingsRepository = class {
-      getAll() {
-        const db = getDb();
-        const rows = db.prepare("SELECT * FROM settings ORDER BY key ASC").all();
-        const settings = {};
-        for (const row of rows) {
-          try {
-            settings[row.key] = JSON.parse(row.value);
-          } catch {
-            settings[row.key] = row.value;
-          }
-        }
-        return settings;
-      }
-      get(key) {
-        const db = getDb();
-        const row = db.prepare("SELECT value FROM settings WHERE key = ?").get(key);
-        if (!row) return null;
-        try {
-          return JSON.parse(row.value);
-        } catch {
-          return row.value;
-        }
-      }
-      set(key, value) {
-        const db = getDb();
-        const strValue = typeof value === "string" ? value : JSON.stringify(value);
-        db.prepare(`
-      INSERT INTO settings (key, value) VALUES (?, ?)
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value
-    `).run(key, strValue);
-        return { key, value };
-      }
-      setMultiple(entries) {
-        const db = getDb();
-        const stmt = db.prepare(`
-      INSERT INTO settings (key, value) VALUES (?, ?)
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value
-    `);
-        const updateAll = db.transaction((items) => {
-          for (const [key, value] of Object.entries(items)) {
-            const strValue = typeof value === "string" ? value : JSON.stringify(value);
-            stmt.run(key, strValue);
-          }
-        });
-        updateAll(entries);
-        return this.getAll();
-      }
-      delete(key) {
-        const db = getDb();
-        return db.prepare("DELETE FROM settings WHERE key = ?").run(key);
-      }
-    };
-    module2.exports = new SettingsRepository();
   }
 });
 
@@ -24517,6 +24574,13 @@ var require_interestRepository = __commonJS({
     `).get(ledgerId);
         return row ? row.total_pending : 0;
       }
+      getTotalPendingAll() {
+        const db = getDb();
+        const row = db.prepare(`
+      SELECT COALESCE(SUM(amount), 0) AS total_pending FROM interest_entries WHERE status = 'pending'
+    `).get();
+        return row ? row.total_pending : 0;
+      }
       getLastEntryToDate(ledgerId) {
         const db = getDb();
         const row = db.prepare("SELECT MAX(to_date) AS last_to_date FROM interest_entries WHERE ledger_id = ?").get(ledgerId);
@@ -24945,6 +25009,39 @@ var require_settingsRoutes = __commonJS({
       settingsService.updateSetting("logo_path", "");
       res.json({ success: true });
     });
+    router.get("/backup/status", (req, res, next) => {
+      try {
+        const settingsService = require_settingsService();
+        const allSettings = settingsService.getAllSettings();
+        const backupDir = allSettings.backup_dir || "";
+        const enabled = allSettings.backup_enabled === true || allSettings.backup_enabled === "true";
+        let todayBackupExists = false;
+        if (backupDir && fs.existsSync(backupDir)) {
+          const now = /* @__PURE__ */ new Date();
+          const dd = String(now.getDate()).padStart(2, "0");
+          const mm = String(now.getMonth() + 1).padStart(2, "0");
+          const yyyy = now.getFullYear();
+          const dateStr = `${dd}-${mm}-${yyyy}`;
+          todayBackupExists = fs.existsSync(path2.join(backupDir, `inventory_${dateStr}.db`));
+        }
+        res.json({ success: true, data: { enabled, dir: backupDir, todayBackupExists } });
+      } catch (err) {
+        next(err);
+      }
+    });
+    router.post("/backup/now", (req, res, next) => {
+      try {
+        const { triggerBackupNow } = require_backupService();
+        const result = triggerBackupNow();
+        if (result.success) {
+          res.json({ success: true, data: result });
+        } else {
+          res.status(400).json({ success: false, error: result.error });
+        }
+      } catch (err) {
+        next(err);
+      }
+    });
     router.get("/:key", (req, res, next) => settingsController.get(req, res, next));
     router.put("/batch", (req, res, next) => settingsController.updateMultiple(req, res, next));
     router.put("/:key", (req, res, next) => settingsController.update(req, res, next));
@@ -25189,6 +25286,7 @@ var require_dashboardController = __commonJS({
     var ledgerTypeService = require_accountService();
     var settingsRepository = require_settingsRepository();
     var expenseService = require_expenseService();
+    var interestRepository = require_interestRepository();
     var DashboardController = class {
       getSummary(req, res, next) {
         try {
@@ -25229,6 +25327,9 @@ var require_dashboardController = __commonJS({
               byCategory: expenseService.getSummary({ fromDate: monthStart, toDate: todayLocal }).byCategory
             };
           }
+          const interestModuleEnabled = settingsRepository.get("interest_module_enabled");
+          const interestEnabled = interestModuleEnabled === true || interestModuleEnabled === "true";
+          const pendingInterest = interestEnabled ? interestRepository.getTotalPendingAll() : void 0;
           res.json({
             success: true,
             data: {
@@ -25240,7 +25341,8 @@ var require_dashboardController = __commonJS({
               totalPayable,
               topOutstanding,
               outstandingByType: Object.values(outstandingByType),
-              expenseSummary
+              expenseSummary,
+              ...pendingInterest !== void 0 && { pendingInterest }
             }
           });
         } catch (err) {
@@ -25383,6 +25485,48 @@ var require_interestService = __commonJS({
         const parsedAmount = amount != null ? parseFloat(amount) : null;
         return interestRepository.markPaid(id, paidDate || this._todayISO(), isNaN(parsedAmount) ? null : parsedAmount);
       }
+      /**
+       * Bulk pay: distributes a given amount across pending entries (oldest first).
+       * Fully-covered entries are marked paid. If the amount only partially covers
+       * an entry, that entry is marked paid with the partial amount and a new
+       * pending entry is created for the remainder (same period/rate details).
+       */
+      bulkPay(ledgerId, amount, paidDate) {
+        if (!this.isModuleEnabled()) throw new AppError("Interest module is not enabled", 400);
+        const pending = interestRepository.getPendingByLedger(ledgerId);
+        if (!pending.length) throw new AppError("No pending interest entries", 400);
+        const { getDb } = require_database();
+        const db = getDb();
+        let remaining = Math.round(parseFloat(amount) * 100) / 100;
+        let paidCount = 0;
+        const run = db.transaction(() => {
+          for (const entry of pending) {
+            if (remaining <= 0) break;
+            if (remaining >= entry.amount) {
+              interestRepository.markPaid(entry.id, paidDate, entry.amount);
+              remaining = Math.round((remaining - entry.amount) * 100) / 100;
+              paidCount++;
+            } else {
+              const partialAmount = Math.round(remaining * 100) / 100;
+              const remainderAmount = Math.round((entry.amount - partialAmount) * 100) / 100;
+              interestRepository.markPaid(entry.id, paidDate, partialAmount);
+              interestRepository.create({
+                ledger_id: entry.ledger_id,
+                amount: remainderAmount,
+                from_date: entry.from_date,
+                to_date: entry.to_date,
+                days: entry.days,
+                rate: entry.rate,
+                principal_at_time: entry.principal_at_time
+              });
+              paidCount++;
+              remaining = 0;
+            }
+          }
+        });
+        run();
+        return { paid_count: paidCount, leftover_amount: remaining };
+      }
       deleteEntry(id) {
         if (!this.isModuleEnabled()) throw new AppError("Interest module is not enabled", 400);
         const entry = interestRepository.findById(id);
@@ -25493,6 +25637,18 @@ var require_interestController = __commonJS({
           next(err);
         }
       }
+      bulkPay(req, res, next) {
+        try {
+          const { ledgerId, amount, paidDate } = req.body;
+          if (!ledgerId || !amount || !paidDate) {
+            return res.status(400).json({ success: false, error: "ledgerId, amount and paidDate are required" });
+          }
+          const result = interestService.bulkPay(parseInt(ledgerId), parseFloat(amount), paidDate);
+          res.json({ success: true, data: result });
+        } catch (err) {
+          next(err);
+        }
+      }
       deleteEntry(req, res, next) {
         try {
           interestService.deleteEntry(parseInt(req.params.id));
@@ -25526,6 +25682,7 @@ var require_interestRoutes = __commonJS({
     router.get("/ledger/:ledgerId/total", (req, res, next) => interestController.getTotalPending(req, res, next));
     router.get("/", (req, res, next) => interestController.getAll(req, res, next));
     router.post("/generate", (req, res, next) => interestController.generate(req, res, next));
+    router.post("/bulk-pay", (req, res, next) => interestController.bulkPay(req, res, next));
     router.post("/:id/pay", (req, res, next) => interestController.markPaid(req, res, next));
     router.delete("/:id", (req, res, next) => interestController.deleteEntry(req, res, next));
     module2.exports = router;
@@ -25663,6 +25820,7 @@ var cors = require_lib3();
 var morgan = require_morgan();
 var { initializeDatabase } = require_database();
 var { errorHandler } = require_errorHandler();
+var { triggerDailyBackup } = require_backupService();
 var ledgerRoutes = require_ledgerRoutes();
 var ledgerTypeRoutes = require_accountRoutes();
 var transactionRoutes = require_paymentRoutes();
@@ -25677,6 +25835,16 @@ app.use(cors());
 app.use(morgan("dev"));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
+app.use((req, res, next) => {
+  if (["POST", "PUT", "DELETE", "PATCH"].includes(req.method)) {
+    res.on("finish", () => {
+      if (res.statusCode < 400) {
+        setImmediate(triggerDailyBackup);
+      }
+    });
+  }
+  next();
+});
 initializeDatabase();
 app.use("/api/ledgers", ledgerRoutes);
 app.use("/api/ledger-types", ledgerTypeRoutes);

@@ -52,6 +52,14 @@ class InterestRepository {
     return row ? row.total_pending : 0;
   }
 
+  getTotalPendingAll() {
+    const db = getDb();
+    const row = db.prepare(`
+      SELECT COALESCE(SUM(amount), 0) AS total_pending FROM interest_entries WHERE status = 'pending'
+    `).get();
+    return row ? row.total_pending : 0;
+  }
+
   getLastEntryToDate(ledgerId) {
     const db = getDb();
     const row = db.prepare('SELECT MAX(to_date) AS last_to_date FROM interest_entries WHERE ledger_id = ?').get(ledgerId);

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ledgerApi, transactionApi, interestApi, settingsApi } from '../../api';
+import { ledgerApi, transactionApi, interestApi, settingsApi, ledgerTypeApi } from '../../api';
 import { formatCurrency, formatDate, formatDateTime, todayISO } from '../../utils/helpers';
 import { buildInterestReceiptHtml, fetchLogoDataUrl } from '../../utils/interestReceipt';
 import { buildTransactionReceiptHtml } from '../../utils/transactionReceipt';
@@ -16,7 +16,47 @@ import {
   CalculatorIcon,
   TrashIcon,
   PrinterIcon,
+  PencilSquareIcon,
 } from '@heroicons/react/24/outline';
+
+/* ─── Validation helpers (shared by edit modal) ───────────────────── */
+const GST_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z0-9]{1}Z[A-Z0-9]{1}$/;
+const PHONE_REGEX = /^\d{10}$/;
+const STATE_REGEX = /^\d{2}$/;
+
+function validateLedgerForm(form) {
+  const errors = {};
+  if (!form.ledger_type_id) errors.ledger_type_id = 'Please select a ledger type.';
+  if (!form.name.trim()) errors.name = 'Name is required.';
+  else if (form.name.trim().length < 2) errors.name = 'Name must be at least 2 characters.';
+  if (form.phone && !PHONE_REGEX.test(form.phone.replace(/\s/g, ''))) errors.phone = 'Enter a valid 10-digit number.';
+  if (form.gst_no && !GST_REGEX.test(form.gst_no.trim().toUpperCase())) errors.gst_no = 'Invalid GST number.';
+  if (form.state_code && !STATE_REGEX.test(form.state_code.trim())) errors.state_code = 'State code must be 2 digits.';
+  if (form.gst_no && !form.state_code) errors.state_code = 'Required when GST is set.';
+  return errors;
+}
+
+function FieldError({ msg }) {
+  if (!msg) return null;
+  return <p className="text-xs text-red-500 mt-1">{msg}</p>;
+}
+
+/* ─── Bulk-pay distribution helper ───────────────────────────────── */
+function computeBulkDistribution(pending, rawAmount) {
+  let remaining = Math.round((parseFloat(rawAmount) || 0) * 100) / 100;
+  return pending.map((entry) => {
+    if (remaining <= 0) return { ...entry, willPay: 0, leftover: entry.amount, rowStatus: 'untouched' };
+    if (remaining >= entry.amount) {
+      const willPay = entry.amount;
+      remaining = Math.round((remaining - entry.amount) * 100) / 100;
+      return { ...entry, willPay, leftover: 0, rowStatus: 'full' };
+    }
+    const willPay  = Math.round(remaining * 100) / 100;
+    const leftover = Math.round((entry.amount - willPay) * 100) / 100;
+    remaining = 0;
+    return { ...entry, willPay, leftover, rowStatus: 'partial' };
+  });
+}
 
 /* ─── Transaction Entry Form ──────────────────────────────────────── */
 function TransactionForm({ ledgerId, entryType, onCreated, currentBalance, behaviour }) {
@@ -24,13 +64,13 @@ function TransactionForm({ ledgerId, entryType, onCreated, currentBalance, behav
   const [form, setForm] = useState({ amount: '', date: todayISO(), notes: '' });
   const [submitting, setSubmitting] = useState(false);
   const amountRef = useRef(null);
-  const dateRef   = useRef(null);
-  const notesRef  = useRef(null);
+  const dateRef = useRef(null);
+  const notesRef = useRef(null);
   const submitRef = useRef(null);
 
   // Compute what balance would be after this entry
   const amt = parseFloat(form.amount);
-  const wouldGoNegative = !isNaN(amt) && amt > 0 && (() => {
+  const projectedBalance = !isNaN(amt) && amt > 0 ? (() => {
     let projected = currentBalance ?? 0;
     const beh = behaviour || 'customer';
     if (beh === 'customer') {
@@ -38,11 +78,12 @@ function TransactionForm({ ledgerId, entryType, onCreated, currentBalance, behav
     } else {
       projected = entryType === 'payment' ? projected - amt : projected + amt;
     }
-    return projected < 0;
-  })();
+    return projected;
+  })() : null;
+  const wouldGoNegative = projectedBalance !== null && projectedBalance < 0;
 
   useEffect(() => {
-    transactionApi.getNextRunningNumber(entryType).then((res) => setNextNum(res.data.runningNumber)).catch(() => {});
+    transactionApi.getNextRunningNumber(entryType).then((res) => setNextNum(res.data.runningNumber)).catch(() => { });
   }, [entryType]);
 
   const handleSubmit = async (e) => {
@@ -60,7 +101,7 @@ function TransactionForm({ ledgerId, entryType, onCreated, currentBalance, behav
       toast.success(`${entryType === 'payment' ? 'Payment' : 'Receipt'} recorded`);
       setForm({ amount: '', date: todayISO(), notes: '' });
       // refresh next number
-      transactionApi.getNextRunningNumber(entryType).then((r) => setNextNum(r.data.runningNumber)).catch(() => {});
+      transactionApi.getNextRunningNumber(entryType).then((r) => setNextNum(r.data.runningNumber)).catch(() => { });
       onCreated(created.data);
     } catch (err) {
       toast.error(err.message);
@@ -97,6 +138,12 @@ function TransactionForm({ ledgerId, entryType, onCreated, currentBalance, behav
             placeholder="0.00"
             autoFocus
           />
+          {projectedBalance !== null && (
+            <p className={`text-xs mt-1 ${wouldGoNegative ? 'text-red-500' : 'text-slate-500'}`}>
+              Balance after {entryType === 'payment' ? 'payment' : 'receipt'}:{' '}
+              <span className="font-medium">{formatCurrency(projectedBalance)}</span>
+            </p>
+          )}
         </div>
         <div>
           <label className="label">Date</label>
@@ -127,11 +174,10 @@ function TransactionForm({ ledgerId, entryType, onCreated, currentBalance, behav
           ref={submitRef}
           type="submit"
           disabled={submitting}
-          className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${
-            isPayment
+          className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${isPayment
               ? 'bg-red-600 hover:bg-red-700 disabled:bg-red-300'
               : 'bg-green-600 hover:bg-green-700 disabled:bg-green-300'
-          }`}
+            }`}
         >
           {submitting ? 'Saving…' : `Record ${isPayment ? 'Payment' : 'Receipt'}`}
         </button>
@@ -154,6 +200,10 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
   const [previewModal, setPreviewModal] = useState({ open: false, html: '' });
   const iframeRef = useRef(null);
   const pendingRefreshRef = useRef(false);
+
+  // Bulk pay
+  const [bulkPayModal, setBulkPayModal] = useState({ open: false, amount: '', paidDate: todayISO() });
+  const [bulkPaying, setBulkPaying] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -248,6 +298,29 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
     }
   };
 
+  const handleBulkPay = async () => {
+    const amt = parseFloat(bulkPayModal.amount);
+    if (!amt || amt <= 0) { toast.error('Enter a valid amount'); return; }
+    if (!bulkPayModal.paidDate) { toast.error('Select a paid date'); return; }
+    try {
+      setBulkPaying(true);
+      const res = await interestApi.bulkPay({
+        ledgerId: parseInt(ledgerId),
+        amount: amt,
+        paidDate: bulkPayModal.paidDate,
+      });
+      const { paid_count } = res.data;
+      toast.success(`${paid_count} interest entr${paid_count === 1 ? 'y' : 'ies'} settled`);
+      setBulkPayModal({ open: false, amount: '', paidDate: todayISO() });
+      fetchInterest();
+      onRefresh();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setBulkPaying(false);
+    }
+  };
+
   const pending = entries.filter((e) => e.status === 'pending');
   const paid = entries.filter((e) => e.status === 'paid');
   const totalPending = pending.reduce((s, e) => s + e.amount, 0);
@@ -276,20 +349,31 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
               Pending: {formatCurrency(totalPending)}
             </span>
           )}
-          <button
+          {/* <button
             onClick={handleGenerate}
             disabled={generating}
             className="btn-secondary text-xs"
           >
             {generating ? 'Generating…' : 'Generate Interest'}
-          </button>
+          </button> */}
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* ── Pending ── */}
         <div>
-          <p className="text-sm font-semibold text-amber-700 mb-2">Pending ({pending.length})</p>
+          <div className="flex justify-between items-center mb-2">
+            <p className="text-sm font-semibold text-amber-700">Pending ({pending.length})</p>
+            {pending.length > 0 && (
+              <button
+                onClick={() => setBulkPayModal({ open: true, amount: String(totalPending), paidDate: todayISO() })}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-100 border-2 text-amber-800 hover:bg-amber-200 transition-colors"
+              >
+                <BanknotesIcon className="h-3.5 w-3.5" />
+                Bulk Pay
+              </button>
+            )}
+          </div>
           {pending.length === 0 ? (
             <p className="text-sm text-slate-400 py-3 text-center">No pending interest</p>
           ) : (
@@ -407,6 +491,128 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
         </div>
       </div>
 
+      {/* Bulk Pay Modal */}
+      <Modal
+        open={bulkPayModal.open}
+        onClose={() => setBulkPayModal((p) => ({ ...p, open: false }))}
+        title="Bulk Interest Payment"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Amount to Pay</label>
+              <input
+                type="number"
+                value={bulkPayModal.amount}
+                onChange={(e) => setBulkPayModal((p) => ({ ...p, amount: e.target.value }))}
+                className="input-field"
+                placeholder="0.00"
+                min="0.01"
+                step="0.01"
+                autoFocus
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                Total pending: <span className="font-medium text-amber-700">{formatCurrency(totalPending)}</span>
+              </p>
+            </div>
+            <div>
+              <label className="label">Paid On</label>
+              <input
+                type="date"
+                value={bulkPayModal.paidDate}
+                onChange={(e) => setBulkPayModal((p) => ({ ...p, paidDate: e.target.value }))}
+                className="input-field"
+              />
+            </div>
+          </div>
+
+          {pending.length > 0 && parseFloat(bulkPayModal.amount) > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-slate-600 mb-2">Distribution Preview</p>
+              <div className="rounded-lg border border-slate-200 overflow-hidden">
+                <div className="max-h-52 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-slate-50 text-slate-600">
+                      <tr>
+                        <th className="px-3 py-2 text-left font-medium">Period</th>
+                        <th className="px-3 py-2 text-right font-medium">Due</th>
+                        <th className="px-3 py-2 text-right font-medium">Will Pay</th>
+                        <th className="px-3 py-2 text-right font-medium">Remaining</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {computeBulkDistribution(pending, bulkPayModal.amount).map((row) => (
+                        <tr
+                          key={row.id}
+                          className={`border-t border-slate-100 ${
+                            row.rowStatus === 'untouched' ? 'opacity-40' : ''
+                          }`}
+                        >
+                          <td className="px-3 py-2 text-slate-600">
+                            {row.from_date === row.to_date
+                              ? formatDate(row.from_date)
+                              : `${formatDate(row.from_date)} – ${formatDate(row.to_date)}`}
+                            {row.rowStatus === 'partial' && (
+                              <span className="ml-1.5 text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-medium">partial</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right font-medium text-amber-700">{formatCurrency(row.amount)}</td>
+                          <td className="px-3 py-2 text-right font-semibold">
+                            {row.willPay > 0 ? (
+                              <span className={row.rowStatus === 'partial' ? 'text-orange-600' : 'text-green-600'}>
+                                {formatCurrency(row.willPay)}
+                              </span>
+                            ) : (
+                              <span className="text-slate-300">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            {row.leftover > 0 ? (
+                              <span className="text-red-500 font-medium">{formatCurrency(row.leftover)}</span>
+                            ) : (
+                              <span className="text-slate-300">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {parseFloat(bulkPayModal.amount) > totalPending && (
+                <p className="text-xs text-amber-600 mt-1.5">
+                  Amount exceeds total pending ({formatCurrency(totalPending)}). Only the pending amount will be settled.
+                </p>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => setBulkPayModal((p) => ({ ...p, open: false }))}
+              className="btn-secondary"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkPay}
+              disabled={
+                bulkPaying ||
+                !bulkPayModal.amount ||
+                parseFloat(bulkPayModal.amount) <= 0 ||
+                !bulkPayModal.paidDate
+              }
+              className="btn-primary"
+            >
+              {bulkPaying ? 'Processing…' : 'Confirm Payment'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Pay Modal */}
       <Modal
         open={payModal.open}
@@ -518,6 +724,14 @@ export default function LedgerPage() {
   const txnIframeRef = useRef(null);
   const txnPendingRefreshRef = useRef(false);
 
+  // Edit ledger modal
+  const [ledgerTypes, setLedgerTypes] = useState([]);
+  const [editModal, setEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({});
+  const [editErrors, setEditErrors] = useState({});
+  const [editTouched, setEditTouched] = useState({});
+  const [editSaving, setEditSaving] = useState(false);
+
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -537,6 +751,10 @@ export default function LedgerPage() {
   }, [id]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    ledgerTypeApi.getAll().then((res) => setLedgerTypes(res.data)).catch(() => { });
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -585,6 +803,64 @@ export default function LedgerPage() {
     }
   };
 
+  const openEditModal = () => {
+    setEditForm({
+      ledger_type_id: ledger.ledger_type_id || '',
+      name: ledger.name || '',
+      phone: ledger.phone || '',
+      place: ledger.place || '',
+      address: ledger.address || '',
+      gst_no: ledger.gst_no || '',
+      state_code: ledger.state_code || '',
+      igst_status: ledger.igst_status || 'NO',
+      ledger_date: ledger.ledger_date || '',
+      interest_rate: ledger.interest_rate != null ? String(ledger.interest_rate) : '',
+      interest_scheme: ledger.interest_scheme || 'NONE',
+      notes: ledger.notes || '',
+    });
+    setEditErrors({});
+    setEditTouched({});
+    setEditModal(true);
+  };
+
+  const handleEditChange = (e) => {
+    const { name, value } = e.target;
+    const next = { ...editForm, [name]: value };
+    setEditForm(next);
+    if (editTouched[name]) setEditErrors(validateLedgerForm(next));
+  };
+
+  const handleEditBlur = (e) => {
+    const { name } = e.target;
+    setEditTouched((p) => ({ ...p, [name]: true }));
+    setEditErrors(validateLedgerForm(editForm));
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    const errs = validateLedgerForm(editForm);
+    setEditErrors(errs);
+    setEditTouched(Object.fromEntries(Object.keys(editForm).map((k) => [k, true])));
+    if (Object.keys(errs).length > 0) return;
+    try {
+      setEditSaving(true);
+      await ledgerApi.update(id, {
+        ...editForm,
+        ledger_type_id: parseInt(editForm.ledger_type_id),
+        name: editForm.name.trim(),
+        gst_no: editForm.gst_no.trim().toUpperCase(),
+        state_code: editForm.state_code.trim(),
+      });
+      toast.success('Ledger updated');
+      setEditModal(false);
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   const handleReopenLedger = async () => {
     try {
       await ledgerApi.update(id, { ...ledger, status: 'active' });
@@ -614,10 +890,10 @@ export default function LedgerPage() {
   const hasInterest = interestEnabled && ledger.interest_rate > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-2">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1">
           <button
             onClick={() => navigate('/ledgers')}
             className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
@@ -625,25 +901,31 @@ export default function LedgerPage() {
             <ArrowLeftIcon className="h-5 w-5" />
           </button>
           <div>
-            <h1 className="page-title">{ledger.name}</h1>
+            <h1 className="page-title">Ledger Transaction Entry : {ledger.name}</h1>
             <p className="text-sm text-slate-500">
               {ledger.type_name} ({ledger.behaviour}) · {ledger.place || 'No location'} · {ledger.phone || 'No phone'}
             </p>
           </div>
         </div>
-        {isActive ? (
-          <button onClick={() => setCloseLedgerModal(true)} className="btn-secondary text-xs text-red-500">
-            Close Ledger
+        <div className="flex items-center gap-2">
+          <button onClick={openEditModal} className="btn-secondary text-xs gap-1">
+            <PencilSquareIcon className="h-4 w-4" />
+            Edit
           </button>
-        ) : (
-          <button onClick={() => setReopenLedgerModal(true)} className="btn-secondary text-xs text-green-600">
-            Reopen Ledger
-          </button>
-        )}
+          {isActive ? (
+            <button onClick={() => setCloseLedgerModal(true)} className="btn-secondary text-xs text-red-500">
+              Close Ledger
+            </button>
+          ) : (
+            <button onClick={() => setReopenLedgerModal(true)} className="btn-secondary text-xs text-green-600">
+              Reopen Ledger
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Summary Cards */}
-      <div className={`grid grid-cols-2 ${hasInterest ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-4`}>
+      <div className={`grid grid-cols-2 ${hasInterest ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-2`}>
         <div className="card text-center">
           <p className="text-xs font-medium text-slate-500">Opening Balance</p>
           <p className="text-lg font-bold text-slate-800 mt-1">{formatCurrency(ledger.opening_balance || 0)}</p>
@@ -687,7 +969,7 @@ export default function LedgerPage() {
 
       {/* Transaction Entry Forms (only when active) */}
       {isActive && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
           <TransactionForm ledgerId={id} entryType="payment" onCreated={(txn) => { if (txn) openTxnPreview(txn, true); else fetchData(); }} currentBalance={ledger.current_balance} behaviour={ledger.behaviour} />
           <TransactionForm ledgerId={id} entryType="receipt" onCreated={(txn) => { if (txn) openTxnPreview(txn, true); else fetchData(); }} currentBalance={ledger.current_balance} behaviour={ledger.behaviour} />
         </div>
@@ -730,9 +1012,8 @@ export default function LedgerPage() {
                     <tr key={txn.id} className="border-b border-slate-100">
                       <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{txn.running_number}</td>
                       <td className="px-4 py-2.5">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                          isPayment ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
-                        }`}>
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${isPayment ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
+                          }`}>
                           {isPayment ? 'Payment' : 'Receipt'}
                         </span>
                       </td>
@@ -825,6 +1106,184 @@ export default function LedgerPage() {
           <button onClick={() => setReopenLedgerModal(false)} className="btn-secondary">Cancel</button>
           <button onClick={handleReopenLedger} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors">Reopen Ledger</button>
         </div>
+      </Modal>
+
+      {/* Edit Ledger Modal */}
+      <Modal open={editModal} onClose={() => setEditModal(false)} title="Edit Ledger" size="lg">
+        <form onSubmit={handleEditSubmit} className="space-y-2" noValidate>
+          <div>
+            <label className="label">Ledger Type *</label>
+            <select
+              name="ledger_type_id"
+              value={editForm.ledger_type_id || ''}
+              onChange={handleEditChange}
+              onBlur={handleEditBlur}
+              className={`input-field ${editErrors.ledger_type_id ? 'border-red-400' : ''}`}
+            >
+              <option value="">— Select type —</option>
+              {ledgerTypes.map((t) => (
+                <option key={t.id} value={t.id}>{t.name} ({t.behaviour})</option>
+              ))}
+            </select>
+            <FieldError msg={editErrors.ledger_type_id} />
+          </div>
+          <div>
+            <label className="label">Name *</label>
+            <input
+              type="text"
+              name="name"
+              value={editForm.name || ''}
+              onChange={handleEditChange}
+              onBlur={handleEditBlur}
+              className={`input-field ${editErrors.name ? 'border-red-400' : ''}`}
+            />
+            <FieldError msg={editErrors.name} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Phone</label>
+              <input
+                type="text"
+                name="phone"
+                value={editForm.phone || ''}
+                onChange={handleEditChange}
+                onBlur={handleEditBlur}
+                className={`input-field ${editErrors.phone ? 'border-red-400' : ''}`}
+                maxLength={10}
+              />
+              <FieldError msg={editErrors.phone} />
+            </div>
+            <div>
+              <label className="label">Place</label>
+              <input
+                type="text"
+                name="place"
+                value={editForm.place || ''}
+                onChange={handleEditChange}
+                className="input-field"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="label">Address</label>
+            <textarea
+              name="address"
+              value={editForm.address || ''}
+              onChange={handleEditChange}
+              rows={2}
+              className="input-field resize-none"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">GST Number</label>
+              <input
+                type="text"
+                name="gst_no"
+                value={editForm.gst_no || ''}
+                onChange={handleEditChange}
+                onBlur={handleEditBlur}
+                className={`input-field uppercase ${editErrors.gst_no ? 'border-red-400' : ''}`}
+                maxLength={15}
+              />
+              <FieldError msg={editErrors.gst_no} />
+            </div>
+            <div>
+              <label className="label">State Code</label>
+              <input
+                type="text"
+                name="state_code"
+                value={editForm.state_code || ''}
+                onChange={handleEditChange}
+                onBlur={handleEditBlur}
+                className={`input-field ${editErrors.state_code ? 'border-red-400' : ''}`}
+                maxLength={2}
+              />
+              <FieldError msg={editErrors.state_code} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">IGST Applicable</label>
+              <div className="flex gap-6 mt-1">
+                {['YES', 'NO'].map((opt) => (
+                  <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="igst_status"
+                      value={opt}
+                      checked={editForm.igst_status === opt}
+                      onChange={handleEditChange}
+                      className="text-trust-blue focus:ring-trust-blue"
+                    />
+                    <span className="text-sm text-slate-700">{opt}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="label">Ledger Date</label>
+              <input
+                type="date"
+                name="ledger_date"
+                value={editForm.ledger_date || ''}
+                onChange={handleEditChange}
+                className="input-field"
+              />
+            </div>
+          </div>
+          {interestEnabled && (
+            <div className="border-t border-slate-200 pt-4">
+              <h3 className="text-sm font-semibold text-slate-700 mb-3">Interest Configuration</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="label">Interest Rate (%)</label>
+                  <input
+                    type="number"
+                    name="interest_rate"
+                    value={editForm.interest_rate || ''}
+                    onChange={handleEditChange}
+                    onWheel={(e) => e.target.blur()}
+                    className="input-field"
+                    placeholder="0"
+                    min="0"
+                    step="0.01"
+                  />
+                </div>
+                <div>
+                  <label className="label">Interest Scheme</label>
+                  <select
+                    name="interest_scheme"
+                    value={editForm.interest_scheme || 'NONE'}
+                    onChange={handleEditChange}
+                    className="input-field"
+                  >
+                    <option value="NONE">None</option>
+                    <option value="DAILY">Daily (monthly rate)</option>
+                    <option value="MONTHLY">Monthly (monthly rate)</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+          <div>
+            <label className="label">Notes</label>
+            <textarea
+              name="notes"
+              value={editForm.notes || ''}
+              onChange={handleEditChange}
+              rows={2}
+              className="input-field resize-none"
+              placeholder="Optional"
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={() => setEditModal(false)} className="btn-secondary">Cancel</button>
+            <button type="submit" disabled={editSaving} className="btn-primary">
+              {editSaving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
       </Modal>
 
       {/* Delete Transaction Confirmation */}

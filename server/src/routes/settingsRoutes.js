@@ -71,6 +71,47 @@ router.delete('/logo', (req, res) => {
   res.json({ success: true });
 });
 
+// ── Backup routes (MUST be before the generic /:key routes) ─────────────────
+
+// GET /settings/backup/status — returns backup settings + whether today's backup exists
+router.get('/backup/status', (req, res, next) => {
+  try {
+    const settingsService = require('../services/settingsService');
+    const allSettings = settingsService.getAllSettings();
+    const backupDir  = allSettings.backup_dir || '';
+    const enabled    = allSettings.backup_enabled === true || allSettings.backup_enabled === 'true';
+
+    let todayBackupExists = false;
+    if (backupDir && fs.existsSync(backupDir)) {
+      const now  = new Date();
+      const dd   = String(now.getDate()).padStart(2, '0');
+      const mm   = String(now.getMonth() + 1).padStart(2, '0');
+      const yyyy = now.getFullYear();
+      const dateStr  = `${dd}-${mm}-${yyyy}`;
+      todayBackupExists = fs.existsSync(path.join(backupDir, `inventory_${dateStr}.db`));
+    }
+
+    res.json({ success: true, data: { enabled, dir: backupDir, todayBackupExists } });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /settings/backup/now — trigger an immediate backup
+router.post('/backup/now', (req, res, next) => {
+  try {
+    const { triggerBackupNow } = require('../utils/backupService');
+    const result = triggerBackupNow();
+    if (result.success) {
+      res.json({ success: true, data: result });
+    } else {
+      res.status(400).json({ success: false, error: result.error });
+    }
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Dynamic key routes (MUST be after all specific routes)
 router.get('/:key', (req, res, next) => settingsController.get(req, res, next));
 router.put('/batch', (req, res, next) => settingsController.updateMultiple(req, res, next));

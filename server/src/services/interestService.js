@@ -143,6 +143,53 @@ class InterestService {
     return interestRepository.markPaid(id, paidDate || this._todayISO(), isNaN(parsedAmount) ? null : parsedAmount);
   }
 
+  /**
+   * Bulk pay: distributes a given amount across pending entries (oldest first).
+   * Fully-covered entries are marked paid. If the amount only partially covers
+   * an entry, that entry is marked paid with the partial amount and a new
+   * pending entry is created for the remainder (same period/rate details).
+   */
+  bulkPay(ledgerId, amount, paidDate) {
+    if (!this.isModuleEnabled()) throw new AppError('Interest module is not enabled', 400);
+    const pending = interestRepository.getPendingByLedger(ledgerId);
+    if (!pending.length) throw new AppError('No pending interest entries', 400);
+
+    const { getDb } = require('../db/database');
+    const db = getDb();
+
+    let remaining = Math.round(parseFloat(amount) * 100) / 100;
+    let paidCount = 0;
+
+    const run = db.transaction(() => {
+      for (const entry of pending) {
+        if (remaining <= 0) break;
+        if (remaining >= entry.amount) {
+          interestRepository.markPaid(entry.id, paidDate, entry.amount);
+          remaining = Math.round((remaining - entry.amount) * 100) / 100;
+          paidCount++;
+        } else {
+          const partialAmount   = Math.round(remaining * 100) / 100;
+          const remainderAmount = Math.round((entry.amount - partialAmount) * 100) / 100;
+          interestRepository.markPaid(entry.id, paidDate, partialAmount);
+          interestRepository.create({
+            ledger_id:          entry.ledger_id,
+            amount:             remainderAmount,
+            from_date:          entry.from_date,
+            to_date:            entry.to_date,
+            days:               entry.days,
+            rate:               entry.rate,
+            principal_at_time:  entry.principal_at_time,
+          });
+          paidCount++;
+          remaining = 0;
+        }
+      }
+    });
+
+    run();
+    return { paid_count: paidCount, leftover_amount: remaining };
+  }
+
   deleteEntry(id) {
     if (!this.isModuleEnabled()) throw new AppError('Interest module is not enabled', 400);
     const entry = interestRepository.findById(id);

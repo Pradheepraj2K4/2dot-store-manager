@@ -72,6 +72,19 @@ class InterestController {
     }
   }
 
+  bulkPay(req, res, next) {
+    try {
+      const { ledgerId, amount, paidDate } = req.body;
+      if (!ledgerId || !amount || !paidDate) {
+        return res.status(400).json({ success: false, error: 'ledgerId, amount and paidDate are required' });
+      }
+      const result = interestService.bulkPay(parseInt(ledgerId), parseFloat(amount), paidDate);
+      res.json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   deleteEntry(req, res, next) {
     try {
       interestService.deleteEntry(parseInt(req.params.id));

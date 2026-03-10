@@ -19,6 +19,7 @@ export default function OutstandingBalanceReportPage() {
   const [ledgerTypes, setLedgerTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState(searchParams.get('typeId') || 'all');
+  const [behaviourFilter, setBehaviourFilter] = useState(searchParams.get('behaviour') || 'all');
   const [search, setSearch] = useState('');
 
   const fetchData = useCallback(async () => {
@@ -48,9 +49,10 @@ export default function OutstandingBalanceReportPage() {
         (l.phone || '').includes(search) ||
         (l.place || '').toLowerCase().includes(search.toLowerCase());
       const matchesType = typeFilter === 'all' || String(l.ledger_type_id) === typeFilter;
-      return matchesSearch && matchesType;
+      const matchesBehaviour = behaviourFilter === 'all' || l.behaviour === behaviourFilter;
+      return matchesSearch && matchesType && matchesBehaviour;
     });
-  }, [ledgers, search, typeFilter]);
+  }, [ledgers, search, typeFilter, behaviourFilter]);
 
   const totalOutstanding = useMemo(() => filtered.reduce((s, l) => s + (l.current_balance || 0), 0), [filtered]);
 
@@ -119,6 +121,21 @@ export default function OutstandingBalanceReportPage() {
             placeholder="Search ledgers…"
             className="input-field pl-9"
           />
+        </div>
+        <div className="flex gap-1 bg-slate-100 rounded-lg p-1 flex-wrap">
+          {[['all', 'All'], ['customer', 'Customer'], ['supplier', 'Supplier']].map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => { setBehaviourFilter(val); setTypeFilter('all'); }}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                behaviourFilter === val
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
         <div className="flex gap-1 bg-slate-100 rounded-lg p-1 flex-wrap">
           {filterOptions.map(([val, label]) => (

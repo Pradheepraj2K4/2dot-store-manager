@@ -112,6 +112,12 @@ router.post('/backup/now', (req, res, next) => {
   }
 });
 
+// POST /settings/data/clear — delete all non-settings data (ledgers, transactions, interest, expenses)
+router.post('/data/clear', (req, res, next) => settingsController.clearData(req, res, next));
+
+// POST /settings/reset — reset all settings to their seeded defaults
+router.post('/reset', (req, res, next) => settingsController.resetSettings(req, res, next));
+
 // Dynamic key routes (MUST be after all specific routes)
 router.get('/:key', (req, res, next) => settingsController.get(req, res, next));
 router.put('/batch', (req, res, next) => settingsController.updateMultiple(req, res, next));

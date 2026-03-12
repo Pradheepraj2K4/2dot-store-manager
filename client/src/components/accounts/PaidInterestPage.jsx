@@ -17,6 +17,7 @@ export default function PaidInterestPage() {
   const [fromDate, setFromDate] = useState(firstOfMonthISO);
   const [toDate, setToDate] = useState(todayISO);
   const [search, setSearch] = useState('');
+  const [dirFilter, setDirFilter] = useState('incoming');
 
   const fetchData = useCallback(async () => {
     try {
@@ -32,9 +33,12 @@ export default function PaidInterestPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const filtered = entries.filter((e) =>
-    !search || (e.ledger_name || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = entries.filter((e) => {
+    const matchesSearch = !search || (e.ledger_name || '').toLowerCase().includes(search.toLowerCase());
+    const isIncoming = e.behaviour === 'customer';
+    const matchesDir = dirFilter === 'incoming' ? isIncoming : !isIncoming;
+    return matchesSearch && matchesDir;
+  });
 
   const totalPaid = filtered.reduce((s, e) => s + e.amount, 0);
 
@@ -53,9 +57,9 @@ export default function PaidInterestPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-        <div className="card text-center bg-green-50/50 border-green-200">
-          <p className="text-xs font-medium text-green-700">Total Paid (filtered)</p>
-          <p className="text-xl font-bold text-green-700 mt-1">{formatCurrency(totalPaid)}</p>
+        <div className={`card text-center bg-white ${dirFilter === 'incoming' ? 'bg-green-50/50 border-green-200' : 'bg-red-50/50 border-red-200'}`}>
+          <p className={`text-xs font-medium ${dirFilter === 'incoming' ? 'text-green-700' : 'text-red-700'}`}>Total Paid (filtered)</p>
+          <p className={`text-xl font-bold mt-1 ${dirFilter === 'incoming' ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(totalPaid)}</p>
         </div>
         <div className="card text-center">
           <p className="text-xs font-medium text-slate-500">Entries</p>
@@ -74,6 +78,28 @@ export default function PaidInterestPage() {
             placeholder="Search by ledger name…"
             className="input-field pl-9"
           />
+        </div>
+        <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+          <button
+            onClick={() => setDirFilter('incoming')}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              dirFilter === 'incoming'
+                ? 'bg-green-500 text-white shadow-sm'
+                : 'text-slate-500 hover:text-green-600'
+            }`}
+          >
+            Incoming
+          </button>
+          <button
+            onClick={() => setDirFilter('outgoing')}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              dirFilter === 'outgoing'
+                ? 'bg-red-500 text-white shadow-sm'
+                : 'text-slate-500 hover:text-red-600'
+            }`}
+          >
+            Outgoing
+          </button>
         </div>
         <div className="flex items-center gap-2">
           <label className="text-xs text-slate-500 whitespace-nowrap">From</label>
@@ -129,7 +155,7 @@ export default function PaidInterestPage() {
                     <td className="px-4 py-2.5 text-right text-xs text-slate-500">
                       {formatCurrency(e.principal_at_time)}
                     </td>
-                    <td className="px-4 py-2.5 text-right font-semibold text-green-700">
+                    <td className={`px-4 py-2.5 text-right font-semibold ${e.behaviour === 'customer' ? 'text-green-700' : 'text-red-700'}`}>
                       {formatCurrency(e.amount)}
                     </td>
                     <td className="px-4 py-2.5 text-slate-500 text-xs">
@@ -139,9 +165,9 @@ export default function PaidInterestPage() {
                 ))}
               </tbody>
               <tfoot>
-                <tr className="bg-green-50 border-t-2 border-green-200">
-                  <td colSpan={3} className="px-4 py-2 text-xs font-semibold text-green-700">Total</td>
-                  <td className="px-4 py-2 text-right font-bold text-green-700">{formatCurrency(totalPaid)}</td>
+                <tr className={`border-t-2 ${dirFilter === 'incoming' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                  <td colSpan={3} className={`px-4 py-2 text-xs font-semibold ${dirFilter === 'incoming' ? 'text-green-700' : 'text-red-700'}`}>Total</td>
+                  <td className={`px-4 py-2 text-right font-bold ${dirFilter === 'incoming' ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(totalPaid)}</td>
                   <td></td>
                 </tr>
               </tfoot>

@@ -57,6 +57,10 @@ class LedgerService {
   deleteLedger(id) {
     const existing = ledgerRepository.findById(id);
     if (!existing) throw new AppError('Ledger not found', 404);
+    const db = require('../db/connection').getDb();
+    const txCount = db.prepare('SELECT COUNT(*) AS cnt FROM transactions WHERE ledger_id = ?').get(id);
+    if (txCount && txCount.cnt > 0)
+      throw new AppError('Cannot delete a ledger that has transactions. Close it instead.', 400);
     ledgerRepository.delete(id);
     return { message: 'Ledger deleted successfully' };
   }

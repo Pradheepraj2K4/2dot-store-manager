@@ -54,6 +54,24 @@ class SettingsController {
       next(err);
     }
   }
+
+  clearData(req, res, next) {
+    try {
+      settingsService.clearData();
+      res.json({ success: true, data: { message: 'All data cleared' } });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  resetSettings(req, res, next) {
+    try {
+      settingsService.resetSettings();
+      res.json({ success: true, data: { message: 'Settings reset to defaults' } });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 module.exports = new SettingsController();

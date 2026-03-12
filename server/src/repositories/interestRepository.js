@@ -128,6 +128,12 @@ class InterestRepository {
     return db.prepare('DELETE FROM interest_entries WHERE ledger_id = ?').run(ledgerId);
   }
 
+  unmarkPaid(id) {
+    const db = getDb();
+    db.prepare("UPDATE interest_entries SET status = 'pending', paid_date = NULL WHERE id = ?").run(id);
+    return this.findById(id);
+  }
+
   deleteById(id) {
     const db = getDb();
     return db.prepare('DELETE FROM interest_entries WHERE id = ?').run(id);

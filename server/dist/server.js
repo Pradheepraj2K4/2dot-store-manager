@@ -23670,6 +23670,9 @@ var require_settings = __commonJS({
       ["phone", ""],
       ["email", ""],
       ["interest_module_enabled", "false"],
+      ["expense_module_enabled", "false"],
+      ["print_receipts_payment_enabled", "false"],
+      ["print_receipts_interest_enabled", "false"],
       [
         "receipt_config",
         JSON.stringify({
@@ -24134,6 +24137,10 @@ var require_ledgerService = __commonJS({
       deleteLedger(id) {
         const existing = ledgerRepository.findById(id);
         if (!existing) throw new AppError("Ledger not found", 404);
+        const db = require_connection().getDb();
+        const txCount = db.prepare("SELECT COUNT(*) AS cnt FROM transactions WHERE ledger_id = ?").get(id);
+        if (txCount && txCount.cnt > 0)
+          throw new AppError("Cannot delete a ledger that has transactions. Close it instead.", 400);
         ledgerRepository.delete(id);
         return { message: "Ledger deleted successfully" };
       }
@@ -24642,6 +24649,11 @@ var require_interestRepository = __commonJS({
         const db = getDb();
         return db.prepare("DELETE FROM interest_entries WHERE ledger_id = ?").run(ledgerId);
       }
+      unmarkPaid(id) {
+        const db = getDb();
+        db.prepare("UPDATE interest_entries SET status = 'pending', paid_date = NULL WHERE id = ?").run(id);
+        return this.findById(id);
+      }
       deleteById(id) {
         const db = getDb();
         return db.prepare("DELETE FROM interest_entries WHERE id = ?").run(id);
@@ -24886,6 +24898,30 @@ var require_settingsService = __commonJS({
           logo_path: settingsRepository.get("logo_path")
         };
       }
+      clearData() {
+        const { getDb } = require_database();
+        const db = getDb();
+        const tables = ["interest_entries", "transactions", "expenses", "ledgers", "ledger_types", "schema_version"];
+        db.transaction(() => {
+          for (const table of tables) {
+            try {
+              db.prepare(`DELETE FROM ${table}`).run();
+            } catch (_) {
+            }
+          }
+          try {
+            db.prepare(`DELETE FROM sqlite_sequence WHERE name IN ('interest_entries','transactions','expenses','ledgers','ledger_types')`).run();
+          } catch (_) {
+          }
+        })();
+      }
+      resetSettings() {
+        const { getDb } = require_database();
+        const { seedSettings } = require_settings();
+        const db = getDb();
+        db.prepare("DELETE FROM settings").run();
+        seedSettings(db);
+      }
     };
     module2.exports = new SettingsService();
   }
@@ -24940,6 +24976,22 @@ var require_settingsController = __commonJS({
         try {
           const profile = settingsService.getStoreProfile();
           res.json({ success: true, data: profile });
+        } catch (err) {
+          next(err);
+        }
+      }
+      clearData(req, res, next) {
+        try {
+          settingsService.clearData();
+          res.json({ success: true, data: { message: "All data cleared" } });
+        } catch (err) {
+          next(err);
+        }
+      }
+      resetSettings(req, res, next) {
+        try {
+          settingsService.resetSettings();
+          res.json({ success: true, data: { message: "Settings reset to defaults" } });
         } catch (err) {
           next(err);
         }
@@ -25042,6 +25094,8 @@ var require_settingsRoutes = __commonJS({
         next(err);
       }
     });
+    router.post("/data/clear", (req, res, next) => settingsController.clearData(req, res, next));
+    router.post("/reset", (req, res, next) => settingsController.resetSettings(req, res, next));
     router.get("/:key", (req, res, next) => settingsController.get(req, res, next));
     router.put("/batch", (req, res, next) => settingsController.updateMultiple(req, res, next));
     router.put("/:key", (req, res, next) => settingsController.update(req, res, next));
@@ -25482,6 +25536,9 @@ var require_interestService = __commonJS({
         if (!this.isModuleEnabled()) throw new AppError("Interest module is not enabled", 400);
         const entry = interestRepository.findById(id);
         if (!entry) throw new AppError("Interest entry not found", 404);
+        const oldest = interestRepository.getPendingByLedger(entry.ledger_id)[0];
+        if (!oldest || oldest.id !== entry.id)
+          throw new AppError("Earlier interest entries must be paid first", 400);
         const parsedAmount = amount != null ? parseFloat(amount) : null;
         return interestRepository.markPaid(id, paidDate || this._todayISO(), isNaN(parsedAmount) ? null : parsedAmount);
       }
@@ -25531,7 +25588,14 @@ var require_interestService = __commonJS({
         if (!this.isModuleEnabled()) throw new AppError("Interest module is not enabled", 400);
         const entry = interestRepository.findById(id);
         if (!entry) throw new AppError("Interest entry not found", 404);
-        interestRepository.deleteById(id);
+        if (entry.status !== "paid") throw new AppError("Only paid entries can be reverted", 400);
+        const db = require_connection().getDb();
+        const latest = db.prepare(
+          "SELECT id FROM interest_entries WHERE ledger_id = ? AND status = 'paid' ORDER BY paid_date DESC, id DESC LIMIT 1"
+        ).get(entry.ledger_id);
+        if (!latest || latest.id !== entry.id)
+          throw new AppError("Only the most recently paid entry can be reverted", 400);
+        return interestRepository.unmarkPaid(id);
       }
       // ── Date utility helpers ─────────────────────────────────────────────────
       _todayISO() {

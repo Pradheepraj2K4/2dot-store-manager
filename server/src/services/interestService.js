@@ -139,6 +139,10 @@ class InterestService {
     if (!this.isModuleEnabled()) throw new AppError('Interest module is not enabled', 400);
     const entry = interestRepository.findById(id);
     if (!entry) throw new AppError('Interest entry not found', 404);
+    // Enforce sequential payment: no older pending entry must exist for this ledger
+    const oldest = interestRepository.getPendingByLedger(entry.ledger_id)[0];
+    if (!oldest || oldest.id !== entry.id)
+      throw new AppError('Earlier interest entries must be paid first', 400);
     const parsedAmount = amount != null ? parseFloat(amount) : null;
     return interestRepository.markPaid(id, paidDate || this._todayISO(), isNaN(parsedAmount) ? null : parsedAmount);
   }
@@ -194,7 +198,15 @@ class InterestService {
     if (!this.isModuleEnabled()) throw new AppError('Interest module is not enabled', 400);
     const entry = interestRepository.findById(id);
     if (!entry) throw new AppError('Interest entry not found', 404);
-    interestRepository.deleteById(id);
+    if (entry.status !== 'paid') throw new AppError('Only paid entries can be reverted', 400);
+    // Enforce sequential revert: only the most recently paid entry for this ledger can be reverted
+    const db = require('../db/connection').getDb();
+    const latest = db.prepare(
+      "SELECT id FROM interest_entries WHERE ledger_id = ? AND status = 'paid' ORDER BY paid_date DESC, id DESC LIMIT 1"
+    ).get(entry.ledger_id);
+    if (!latest || latest.id !== entry.id)
+      throw new AppError('Only the most recently paid entry can be reverted', 400);
+    return interestRepository.unmarkPaid(id);
   }
 
   // ── Date utility helpers ─────────────────────────────────────────────────

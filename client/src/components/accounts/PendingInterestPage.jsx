@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ledgerApi, ledgerTypeApi } from '../../api';
+import { ledgerApi } from '../../api';
 import { formatCurrency, formatDate } from '../../utils/helpers';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
@@ -13,20 +13,15 @@ import {
 export default function PendingInterestPage() {
   const navigate = useNavigate();
   const [ledgers, setLedgers] = useState([]);
-  const [ledgerTypes, setLedgerTypes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('incoming');
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [res, typesRes] = await Promise.all([
-        ledgerApi.getPendingInterest(),
-        ledgerTypeApi.getAll(),
-      ]);
+      const res = await ledgerApi.getPendingInterest();
       setLedgers(res.data);
-      setLedgerTypes(typesRes.data);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -36,14 +31,13 @@ export default function PendingInterestPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const filterOptions = [['all', 'All'], ...ledgerTypes.map((t) => [String(t.id), t.name])];
-
   const filtered = ledgers.filter((l) => {
     const matchesSearch =
       l.name.toLowerCase().includes(search.toLowerCase()) ||
       (l.phone || '').includes(search) ||
       (l.place || '').toLowerCase().includes(search.toLowerCase());
-    const matchesType = typeFilter === 'all' || String(l.ledger_type_id) === typeFilter;
+    const isIncoming = l.behaviour === 'customer';
+    const matchesType = typeFilter === 'incoming' ? isIncoming : !isIncoming;
     return matchesSearch && matchesType;
   });
 
@@ -67,13 +61,15 @@ export default function PendingInterestPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="card text-center bg-white border-amber-200">
-          <p className="text-xs font-medium text-amber-600">Total Pending Interest</p>
-          <p className="text-xl font-bold text-amber-700 mt-1">{formatCurrency(totalPending)}</p>
+        <div className={`card text-center bg-white ${typeFilter === 'incoming' ? 'border-green-200' : 'border-red-200'}`}>
+          <p className={`text-xs font-medium ${typeFilter === 'incoming' ? 'text-green-600' : 'text-red-600'}`}>
+            Total Pending Interest ({typeFilter === 'incoming' ? 'Incoming' : 'Outgoing'})
+          </p>
+          <p className={`text-xl font-bold mt-1 ${typeFilter === 'incoming' ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(totalPending)}</p>
         </div>
         <div className="card text-center">
           <p className="text-xs font-medium text-slate-500">Total Outstanding</p>
-          <p className="text-xl font-bold text-debit-red mt-1">{formatCurrency(totalOutstanding)}</p>
+          <p className={`text-xl font-bold mt-1 ${typeFilter === 'incoming' ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(totalOutstanding)}</p>
         </div>
         <div className="card text-center">
           <p className="text-xs font-medium text-slate-500">Ledgers</p>
@@ -93,20 +89,27 @@ export default function PendingInterestPage() {
             className="input-field pl-9"
           />
         </div>
-        <div className="flex gap-1 bg-slate-100 rounded-lg p-1 flex-wrap">
-          {filterOptions.map(([val, label]) => (
-            <button
-              key={val}
-              onClick={() => setTypeFilter(val)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                typeFilter === val
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+          <button
+            onClick={() => setTypeFilter('incoming')}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              typeFilter === 'incoming'
+                ? 'bg-green-500 text-white shadow-sm'
+                : 'text-slate-500 hover:text-green-600'
+            }`}
+          >
+            Incoming
+          </button>
+          <button
+            onClick={() => setTypeFilter('outgoing')}
+            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              typeFilter === 'outgoing'
+                ? 'bg-red-500 text-white shadow-sm'
+                : 'text-slate-500 hover:text-red-600'
+            }`}
+          >
+            Outgoing
+          </button>
         </div>
       </div>
 
@@ -146,8 +149,8 @@ export default function PendingInterestPage() {
                         {l.type_name || 'Unknown'}
                       </span>
                     </td>
-                    <td className="px-4 py-2.5 text-right font-medium text-slate-700">{formatCurrency(l.current_balance)}</td>
-                    <td className="px-4 py-2.5 text-right font-semibold text-amber-700">{formatCurrency(l.pending_interest)}</td>
+                    <td className={`px-4 py-2.5 text-right font-medium ${l.behaviour === 'customer' ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(l.current_balance)}</td>
+                    <td className={`px-4 py-2.5 text-right font-semibold ${l.behaviour === 'customer' ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(l.pending_interest)}</td>
                     <td className="px-4 py-2.5 text-center text-slate-600">{l.pending_count}</td>
                     <td className="px-4 py-2.5 text-slate-500">{l.interest_rate}% {l.interest_scheme}</td>
                   </tr>

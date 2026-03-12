@@ -193,11 +193,12 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
   const [generating, setGenerating] = useState(false);
   const [payingId, setPayingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
-  const [payModal, setPayModal] = useState({ open: false, entry: null, paidDate: todayISO(), amount: '' });
+  const [payModal, setPayModal] = useState({ open: false, entry: null, paidDate: todayISO(), amount: '', applyDiscount: false, discountAmount: '' });
   const [store, setStore] = useState({});
   const [logoDataUrl, setLogoDataUrl] = useState(null);
   const [receiptFormat, setReceiptFormat] = useState('a5');
   const [previewModal, setPreviewModal] = useState({ open: false, html: '' });
+  const [printReceiptsEnabled, setPrintReceiptsEnabled] = useState(false);
   const iframeRef = useRef(null);
   const pendingRefreshRef = useRef(false);
 
@@ -207,13 +208,16 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
 
   useEffect(() => {
     (async () => {
-      const [profileRes, configRes] = await Promise.all([
+      const [profileRes, configRes, printRes] = await Promise.all([
         settingsApi.getStoreProfile().catch(() => ({ data: {} })),
         settingsApi.getReceiptConfig().catch(() => ({ data: {} })),
+        settingsApi.get('print_receipts_interest_enabled').catch(() => ({ data: { value: 'false' } })),
       ]);
       const profile = profileRes.data || {};
       setStore(profile);
       setReceiptFormat((configRes.data && configRes.data.format) || 'a5');
+      const pv = printRes.data?.value;
+      setPrintReceiptsEnabled(pv === true || pv === 'true');
       if (profile.logo_path) {
         const dl = await fetchLogoDataUrl(profile.logo_path);
         setLogoDataUrl(dl);
@@ -250,7 +254,7 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
   };
 
   const openPayModal = (entry) => {
-    setPayModal({ open: true, entry, paidDate: todayISO(), amount: String(entry.amount) });
+    setPayModal({ open: true, entry, paidDate: todayISO(), amount: String(entry.amount), applyDiscount: false, discountAmount: '' });
   };
 
   const handlePrint = (entry) => {
@@ -268,15 +272,22 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
   };
 
   const handlePay = async () => {
-    const { entry, amount, paidDate } = payModal;
-    const snapshot = { ...entry, amount: parseFloat(amount), paid_date: paidDate };
+    const { entry, amount, paidDate, applyDiscount, discountAmount } = payModal;
+    const discount = applyDiscount ? parseFloat(discountAmount || 0) : 0;
+    const finalAmount = Math.max(0, parseFloat(amount) - discount);
+    const snapshot = { ...entry, amount: finalAmount, paid_date: paidDate };
     try {
       setPayingId(entry.id);
       setPayModal((p) => ({ ...p, open: false }));
-      await interestApi.markPaid(entry.id, paidDate, parseFloat(amount));
-      toast.success('Interest marked as paid');
-      handlePrint(snapshot);
-      pendingRefreshRef.current = true;
+      await interestApi.markPaid(entry.id, paidDate, finalAmount);
+      toast.success(discount > 0 ? `Interest paid with discount of ${formatCurrency(discount)}` : 'Interest marked as paid');
+      if (printReceiptsEnabled) {
+        handlePrint(snapshot);
+        pendingRefreshRef.current = true;
+      } else {
+        fetchInterest();
+        onRefresh();
+      }
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -322,7 +333,10 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
   };
 
   const pending = entries.filter((e) => e.status === 'pending');
-  const paid = entries.filter((e) => e.status === 'paid');
+  const paid = [...entries.filter((e) => e.status === 'paid')].sort((a, b) => {
+    if (b.paid_date !== a.paid_date) return b.paid_date > a.paid_date ? 1 : -1;
+    return b.id - a.id;
+  });
   const totalPending = pending.reduce((s, e) => s + e.amount, 0);
   const totalPaid = paid.reduce((s, e) => s + e.amount, 0);
 
@@ -405,13 +419,19 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
                           {formatCurrency(e.amount)}
                         </td>
                         <td className="px-3 py-2 text-right">
-                          <button
-                            onClick={() => openPayModal(e)}
-                            disabled={payingId === e.id}
-                            className="px-3 py-1 rounded text-xs font-semibold bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
-                          >
-                            {payingId === e.id ? '…' : 'Pay'}
-                          </button>
+                          {e.id === pending[0]?.id ? (
+                            <button
+                              onClick={() => openPayModal(e)}
+                              disabled={payingId === e.id}
+                              className="px-3 py-1 rounded text-xs font-semibold bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
+                            >
+                              {payingId === e.id ? '…' : 'Pay'}
+                            </button>
+                          ) : (
+                            <span className="px-3 py-1 rounded text-xs text-slate-300 cursor-not-allowed" title="Pay earlier entries first">
+                              Locked
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -464,21 +484,29 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
                         </td>
                         <td className="px-3 py-2 text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <button
-                              onClick={() => handlePrint(e)}
-                              className="p-1 rounded text-slate-400 hover:text-blue-600 transition-colors"
-                              title="Print receipt"
-                            >
-                              <PrinterIcon className="h-4 w-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteEntry(e.id)}
-                              disabled={deletingId === e.id}
-                              className="p-1 rounded text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50"
-                              title="Delete"
-                            >
-                              <TrashIcon className="h-4 w-4" />
-                            </button>
+                            {printReceiptsEnabled && (
+                              <button
+                                onClick={() => handlePrint(e)}
+                                className="p-1 rounded text-slate-400 hover:text-blue-600 transition-colors"
+                                title="Print receipt"
+                              >
+                                <PrinterIcon className="h-4 w-4" />
+                              </button>
+                            )}
+                            {e.id === paid[0]?.id ? (
+                              <button
+                                onClick={() => handleDeleteEntry(e.id)}
+                                disabled={deletingId === e.id}
+                                className="p-1 rounded text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                                title="Revert to pending"
+                              >
+                                <TrashIcon className="h-4 w-4" />
+                              </button>
+                            ) : (
+                              <span className="p-1 text-slate-200 cursor-not-allowed" title="Only the latest paid entry can be reverted">
+                                <TrashIcon className="h-4 w-4" />
+                              </span>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -622,7 +650,7 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
       >
         <div className="space-y-4">
           <div>
-            <label className="label">Amount Paid</label>
+            <label className="label">Amount Due</label>
             <input
               type="number"
               value={payModal.amount}
@@ -633,6 +661,40 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
               placeholder="0.00"
             />
           </div>
+
+          {/* Discount */}
+          <div className="rounded-lg border border-slate-200 p-3 space-y-3">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={payModal.applyDiscount}
+                onChange={(e) => setPayModal((p) => ({ ...p, applyDiscount: e.target.checked, discountAmount: '' }))}
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-400"
+              />
+              <span className="text-sm font-medium text-slate-700">Apply Discount</span>
+            </label>
+            {payModal.applyDiscount && (
+              <div>
+                <label className="label">Discount Amount</label>
+                <input
+                  type="number"
+                  value={payModal.discountAmount}
+                  onChange={(e) => setPayModal((p) => ({ ...p, discountAmount: e.target.value }))}
+                  className="input-field"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  autoFocus
+                />
+                {payModal.discountAmount && parseFloat(payModal.discountAmount) > 0 && (
+                  <p className="text-xs mt-1.5 text-green-700 font-medium">
+                    Net payable: {formatCurrency(Math.max(0, parseFloat(payModal.amount || 0) - parseFloat(payModal.discountAmount || 0)))}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
           <div>
             <label className="label">Paid On</label>
             <input
@@ -653,7 +715,7 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
             <button
               type="button"
               onClick={handlePay}
-              disabled={!payModal.amount || !payModal.paidDate}
+              disabled={!payModal.amount || !payModal.paidDate || (payModal.applyDiscount && !payModal.discountAmount)}
               className="btn-primary"
             >
               Confirm
@@ -721,6 +783,7 @@ export default function LedgerPage() {
   const [logoDataUrl, setLogoDataUrl] = useState(null);
   const [receiptFormat, setReceiptFormat] = useState('a5');
   const [txnPreviewModal, setTxnPreviewModal] = useState({ open: false, html: '' });
+  const [printReceiptsPaymentEnabled, setPrintReceiptsPaymentEnabled] = useState(false);
   const txnIframeRef = useRef(null);
   const txnPendingRefreshRef = useRef(false);
 
@@ -758,13 +821,16 @@ export default function LedgerPage() {
 
   useEffect(() => {
     (async () => {
-      const [profileRes, configRes] = await Promise.all([
+      const [profileRes, configRes, printRes] = await Promise.all([
         settingsApi.getStoreProfile().catch(() => ({ data: {} })),
         settingsApi.getReceiptConfig().catch(() => ({ data: {} })),
+        settingsApi.get('print_receipts_payment_enabled').catch(() => ({ data: { value: 'false' } })),
       ]);
       const profile = profileRes.data || {};
       setStore(profile);
       setReceiptFormat((configRes.data && configRes.data.format) || 'a5');
+      const pv = printRes.data?.value;
+      setPrintReceiptsPaymentEnabled(pv === true || pv === 'true');
       if (profile.logo_path) {
         const dl = await fetchLogoDataUrl(profile.logo_path);
         setLogoDataUrl(dl);
@@ -895,7 +961,7 @@ export default function LedgerPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-1">
           <button
-            onClick={() => navigate('/ledgers')}
+            onClick={() => navigate(-1)}
             className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
           >
             <ArrowLeftIcon className="h-5 w-5" />
@@ -970,8 +1036,8 @@ export default function LedgerPage() {
       {/* Transaction Entry Forms (only when active) */}
       {isActive && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-          <TransactionForm ledgerId={id} entryType="payment" onCreated={(txn) => { if (txn) openTxnPreview(txn, true); else fetchData(); }} currentBalance={ledger.current_balance} behaviour={ledger.behaviour} />
-          <TransactionForm ledgerId={id} entryType="receipt" onCreated={(txn) => { if (txn) openTxnPreview(txn, true); else fetchData(); }} currentBalance={ledger.current_balance} behaviour={ledger.behaviour} />
+          <TransactionForm ledgerId={id} entryType="payment" onCreated={(txn) => { if (txn && printReceiptsPaymentEnabled) openTxnPreview(txn, true); else fetchData(); }} currentBalance={ledger.current_balance} behaviour={ledger.behaviour} />
+          <TransactionForm ledgerId={id} entryType="receipt" onCreated={(txn) => { if (txn && printReceiptsPaymentEnabled) openTxnPreview(txn, true); else fetchData(); }} currentBalance={ledger.current_balance} behaviour={ledger.behaviour} />
         </div>
       )}
 
@@ -1025,13 +1091,15 @@ export default function LedgerPage() {
                       <td className="px-4 py-2.5 text-slate-400 text-xs">{formatDateTime(txn.created_at)}</td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => openTxnPreview(txn)}
-                            className="text-slate-400 hover:text-blue-600 transition-colors"
-                            title="Print receipt"
-                          >
-                            <PrinterIcon className="w-4 h-4" />
-                          </button>
+                          {printReceiptsPaymentEnabled && (
+                            <button
+                              onClick={() => openTxnPreview(txn)}
+                              className="text-slate-400 hover:text-blue-600 transition-colors"
+                              title="Print receipt"
+                            >
+                              <PrinterIcon className="w-4 h-4" />
+                            </button>
+                          )}
                           {isActive && (
                             <button
                               onClick={() => setDeleteTxnModal({ open: true, txn })}

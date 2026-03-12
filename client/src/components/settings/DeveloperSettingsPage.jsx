@@ -20,6 +20,7 @@ import {
   FolderOpenIcon,
   CircleStackIcon,
   CheckCircleIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 
 export default function DeveloperSettingsPage() {
@@ -54,11 +55,21 @@ export default function DeveloperSettingsPage() {
 
   // Active section tab
   const [activeTab, setActiveTab] = useState('profile');
+  const [receiptSubTab, setReceiptSubTab] = useState('print');
 
   // Interest module state
   const [interestModuleEnabled, setInterestModuleEnabled] = useState(false);
   // Expense module state
   const [expenseModuleEnabled, setExpenseModuleEnabled] = useState(false);
+  // Print receipt settings
+  const [printReceiptsPaymentEnabled, setPrintReceiptsPaymentEnabled] = useState(false);
+  const [printReceiptsInterestEnabled, setPrintReceiptsInterestEnabled] = useState(false);
+
+  // Data tab state
+  const [clearingData, setClearingData] = useState(false);
+  const [resettingSettings, setResettingSettings] = useState(false);
+  const [confirmClearData, setConfirmClearData] = useState(false);
+  const [confirmResetSettings, setConfirmResetSettings] = useState(false);
 
   // Backup state
   const [backupEnabled, setBackupEnabled] = useState(false);
@@ -104,6 +115,9 @@ export default function DeveloperSettingsPage() {
       setInterestModuleEnabled(data.interest_module_enabled === true || data.interest_module_enabled === 'true');
       // Load expense module setting
       setExpenseModuleEnabled(data.expense_module_enabled === true || data.expense_module_enabled === 'true');
+      // Load print receipt settings
+      setPrintReceiptsPaymentEnabled(data.print_receipts_payment_enabled === true || data.print_receipts_payment_enabled === 'true');
+      setPrintReceiptsInterestEnabled(data.print_receipts_interest_enabled === true || data.print_receipts_interest_enabled === 'true');
       // Load backup settings
       try {
         const bRes = await settingsApi.getBackupStatus();
@@ -394,9 +408,8 @@ export default function DeveloperSettingsPage() {
     { id: 'profile', label: 'Store Profile' },
     { id: 'ledgerTypes', label: 'Ledger Types' },
     { id: 'modules', label: 'Modules' },
-    { id: 'backup', label: 'Backup' },
-    { id: 'layout', label: 'Receipt Layout' },
-    { id: 'style', label: 'Receipt Style' },
+    { id: 'receipt', label: 'Receipt' },
+    { id: 'data', label: 'Data' },
   ];
 
   return (
@@ -712,14 +725,349 @@ export default function DeveloperSettingsPage() {
                   <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
                 </label>
               </div>
+
             </div>
           </div>
         </div>
       )}
 
-      {/* Backup Tab */}
-      {activeTab === 'backup' && (
+      {/* Receipt Tab */}
+      {activeTab === 'receipt' && (
         <div className="space-y-4">
+          {/* Inner sub-tabs */}
+          <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
+            {[
+              { id: 'print', label: 'Print Settings' },
+              { id: 'layout', label: 'Layout' },
+              { id: 'style', label: 'Style' },
+            ].map((st) => (
+              <button
+                key={st.id}
+                onClick={() => setReceiptSubTab(st.id)}
+                className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-all ${
+                  receiptSubTab === st.id
+                    ? 'bg-white text-slate-900 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Print Settings */}
+          {receiptSubTab === 'print' && (
+            <div className="card">
+              <h2 className="text-base font-semibold text-slate-900 mb-1">Receipt Printing</h2>
+              <p className="text-xs text-slate-500 mb-6">Enable or disable automatic print-preview per module. Disabled by default.</p>
+              <div className="space-y-4">
+                {/* Receipt Printing — Payment/Receipt */}
+                <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-white">
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-slate-800">Payments &amp; Receipts</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      When enabled, a print-preview is automatically opened after recording a payment or
+                      receipt, and the print icon is shown in the transaction history.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer ml-4">
+                    <input
+                      type="checkbox"
+                      checked={printReceiptsPaymentEnabled}
+                      onChange={async (e) => {
+                        const newVal = e.target.checked;
+                        try {
+                          await settingsApi.update('print_receipts_payment_enabled', String(newVal));
+                          setPrintReceiptsPaymentEnabled(newVal);
+                          toast.success(`Payment receipt printing ${newVal ? 'enabled' : 'disabled'}`);
+                        } catch (err) {
+                          toast.error(err.message);
+                        }
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
+                  </label>
+                </div>
+
+                {/* Receipt Printing — Interest */}
+                <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-white">
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-slate-800">Interest</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      When enabled, a print-preview is automatically opened after marking interest as paid,
+                      and the print icon is shown for each paid interest entry.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer ml-4">
+                    <input
+                      type="checkbox"
+                      checked={printReceiptsInterestEnabled}
+                      onChange={async (e) => {
+                        const newVal = e.target.checked;
+                        try {
+                          await settingsApi.update('print_receipts_interest_enabled', String(newVal));
+                          setPrintReceiptsInterestEnabled(newVal);
+                          toast.success(`Interest receipt printing ${newVal ? 'enabled' : 'disabled'}`);
+                        } catch (err) {
+                          toast.error(err.message);
+                        }
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Layout */}
+          {receiptSubTab === 'layout' && (
+            <div className="card">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-base font-semibold text-slate-900">Receipt Layout</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">Drag to reorder, toggle to show/hide elements</p>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={handleResetLayout} className="btn-secondary text-xs gap-1">
+                    <ArrowPathIcon className="h-3.5 w-3.5" />
+                    Reset
+                  </button>
+                  <button onClick={handleSaveLayout} className="btn-primary text-xs">
+                    Save Layout
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                {sortedElements.map((el, idx) => (
+                  <div
+                    key={el.id}
+                    draggable
+                    onDragStart={() => handleDragStart(idx)}
+                    onDragEnter={() => handleDragEnter(idx)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={(e) => e.preventDefault()}
+                    className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-grab active:cursor-grabbing ${
+                      dragOverItem === idx
+                        ? 'border-trust-blue bg-blue-50'
+                        : el.enabled
+                        ? 'border-slate-200 bg-white hover:border-slate-300'
+                        : 'border-slate-100 bg-slate-50'
+                    }`}
+                  >
+                    {/* Drag handle */}
+                    <div className="flex flex-col gap-0.5 text-slate-300">
+                      <div className="w-4 flex flex-col gap-[2px]">
+                        <span className="block w-full h-[2px] bg-current rounded"></span>
+                        <span className="block w-full h-[2px] bg-current rounded"></span>
+                        <span className="block w-full h-[2px] bg-current rounded"></span>
+                      </div>
+                    </div>
+
+                    {/* Toggle */}
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={el.enabled}
+                        onChange={() => toggleElement(el.id)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-8 h-4 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+                    </label>
+
+                    {/* Label */}
+                    <span className={`flex-1 text-sm ${el.enabled ? 'text-slate-800 font-medium' : 'text-slate-400'}`}>
+                      {el.label}
+                    </span>
+
+                    {/* Type badge */}
+                    {el.type === 'divider' && (
+                      <span className="text-[10px] bg-slate-100 text-slate-400 px-2 py-0.5 rounded-full">DIVIDER</span>
+                    )}
+
+                    {/* Move buttons */}
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => moveElement(idx, -1)}
+                        disabled={idx === 0}
+                        className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 text-slate-400"
+                      >
+                        <ArrowUpIcon className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => moveElement(idx, 1)}
+                        disabled={idx === sortedElements.length - 1}
+                        className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 text-slate-400"
+                      >
+                        <ArrowDownIcon className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Style */}
+          {receiptSubTab === 'style' && (
+            <div className="card">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-semibold text-slate-900">Receipt Style</h2>
+                <button onClick={handleSaveLayout} className="btn-primary text-xs">
+                  Save Style
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Format */}
+                <div>
+                  <label className="label">Receipt Format</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="format"
+                        value="a4"
+                        checked={layout.style.format === 'a4'}
+                        onChange={() => handleStyleChange('format', 'a4')}
+                        className="h-4 w-4 text-trust-blue focus:ring-trust-blue"
+                      />
+                      <span className="text-sm text-slate-700">A4 Paper</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="format"
+                        value="thermal"
+                        checked={layout.style.format === 'thermal'}
+                        onChange={() => handleStyleChange('format', 'thermal')}
+                        className="h-4 w-4 text-trust-blue focus:ring-trust-blue"
+                      />
+                      <span className="text-sm text-slate-700">Thermal (80mm)</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* Colors */}
+                <div>
+                  <label className="label">Primary Color</label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="color"
+                      value={layout.style.primaryColor}
+                      onChange={(e) => handleStyleChange('primaryColor', e.target.value)}
+                      className="w-10 h-10 rounded border border-slate-200 cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={layout.style.primaryColor}
+                      onChange={(e) => handleStyleChange('primaryColor', e.target.value)}
+                      className="input-field w-32 font-mono text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Font Sizes */}
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="label">Header Font Size</label>
+                    <input
+                      type="number"
+                      value={layout.style.headerFontSize}
+                      onChange={(e) => handleStyleChange('headerFontSize', parseInt(e.target.value) || 20)}
+                      min="12"
+                      max="36"
+                      className="input-field"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Body Font Size</label>
+                    <input
+                      type="number"
+                      value={layout.style.bodyFontSize}
+                      onChange={(e) => handleStyleChange('bodyFontSize', parseInt(e.target.value) || 13)}
+                      min="9"
+                      max="20"
+                      className="input-field"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Footer Font Size</label>
+                    <input
+                      type="number"
+                      value={layout.style.footerFontSize}
+                      onChange={(e) => handleStyleChange('footerFontSize', parseInt(e.target.value) || 10)}
+                      min="8"
+                      max="16"
+                      className="input-field"
+                    />
+                  </div>
+                </div>
+
+                {/* Texts */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Receipt Title</label>
+                    <input
+                      type="text"
+                      value={layout.style.titleText}
+                      onChange={(e) => handleStyleChange('titleText', e.target.value)}
+                      className="input-field"
+                      placeholder="PAYMENT RECEIPT"
+                    />
+                  </div>
+                  <div>
+                    <label className="label">Footer Text</label>
+                    <input
+                      type="text"
+                      value={layout.style.footerText}
+                      onChange={(e) => handleStyleChange('footerText', e.target.value)}
+                      className="input-field"
+                      placeholder="Thank you for your business!"
+                    />
+                  </div>
+                </div>
+
+                {/* Border Toggle */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={layout.style.showBorder}
+                    onChange={(e) => handleStyleChange('showBorder', e.target.checked)}
+                    className="h-4 w-4 rounded text-trust-blue focus:ring-trust-blue"
+                  />
+                  <span className="text-sm text-slate-700">Show receipt border</span>
+                </label>
+
+                {/* Font Family */}
+                <div>
+                  <label className="label">Font Family</label>
+                  <select
+                    value={layout.style.fontFamily}
+                    onChange={(e) => handleStyleChange('fontFamily', e.target.value)}
+                    className="input-field"
+                  >
+                    <option value="'Segoe UI', system-ui, -apple-system, sans-serif">Segoe UI (Default)</option>
+                    <option value="'Arial', sans-serif">Arial</option>
+                    <option value="'Courier New', monospace">Courier New (Monospace)</option>
+                    <option value="'Georgia', serif">Georgia (Serif)</option>
+                    <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Data Tab */}
+      {activeTab === 'data' && (
+        <div className="space-y-4">
+
+          {/* Backup */}
           <div className="card">
             <div className="flex items-center gap-3 mb-1">
               <CircleStackIcon className="h-5 w-5 text-slate-500" />
@@ -804,246 +1152,114 @@ export default function DeveloperSettingsPage() {
               </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Receipt Layout Tab */}
-      {activeTab === 'layout' && (
-        <div className="space-y-4">
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h2 className="text-base font-semibold text-slate-900">Receipt Layout</h2>
-                <p className="text-xs text-slate-500 mt-0.5">Drag to reorder, toggle to show/hide elements</p>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={handleResetLayout} className="btn-secondary text-xs gap-1">
-                  <ArrowPathIcon className="h-3.5 w-3.5" />
-                  Reset
-                </button>
-                <button onClick={handleSaveLayout} className="btn-primary text-xs">
-                  Save Layout
-                </button>
-              </div>
+          {/* Danger Zone */}
+          <div className="card border-red-100">
+            <div className="flex items-center gap-3 mb-1">
+              <ExclamationTriangleIcon className="h-5 w-5 text-red-500" />
+              <h2 className="text-base font-semibold text-slate-900">Danger Zone</h2>
             </div>
-
-            <div className="space-y-1">
-              {sortedElements.map((el, idx) => (
-                <div
-                  key={el.id}
-                  draggable
-                  onDragStart={() => handleDragStart(idx)}
-                  onDragEnter={() => handleDragEnter(idx)}
-                  onDragEnd={handleDragEnd}
-                  onDragOver={(e) => e.preventDefault()}
-                  className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-grab active:cursor-grabbing ${
-                    dragOverItem === idx
-                      ? 'border-trust-blue bg-blue-50'
-                      : el.enabled
-                      ? 'border-slate-200 bg-white hover:border-slate-300'
-                      : 'border-slate-100 bg-slate-50'
-                  }`}
-                >
-                  {/* Drag handle */}
-                  <div className="flex flex-col gap-0.5 text-slate-300">
-                    <div className="w-4 flex flex-col gap-[2px]">
-                      <span className="block w-full h-[2px] bg-current rounded"></span>
-                      <span className="block w-full h-[2px] bg-current rounded"></span>
-                      <span className="block w-full h-[2px] bg-current rounded"></span>
-                    </div>
-                  </div>
-
-                  {/* Toggle */}
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={el.enabled}
-                      onChange={() => toggleElement(el.id)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-8 h-4 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
-                  </label>
-
-                  {/* Label */}
-                  <span className={`flex-1 text-sm ${el.enabled ? 'text-slate-800 font-medium' : 'text-slate-400'}`}>
-                    {el.label}
-                  </span>
-
-                  {/* Type badge */}
-                  {el.type === 'divider' && (
-                    <span className="text-[10px] bg-slate-100 text-slate-400 px-2 py-0.5 rounded-full">DIVIDER</span>
-                  )}
-
-                  {/* Move buttons */}
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => moveElement(idx, -1)}
-                      disabled={idx === 0}
-                      className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 text-slate-400"
-                    >
-                      <ArrowUpIcon className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      onClick={() => moveElement(idx, 1)}
-                      disabled={idx === sortedElements.length - 1}
-                      className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 text-slate-400"
-                    >
-                      <ArrowDownIcon className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Receipt Style Tab */}
-      {activeTab === 'style' && (
-        <div className="space-y-4">
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base font-semibold text-slate-900">Receipt Style</h2>
-              <button onClick={handleSaveLayout} className="btn-primary text-xs">
-                Save Style
-              </button>
-            </div>
+            <p className="text-xs text-slate-500 mb-6">
+              These actions are irreversible. Make a backup before proceeding.
+            </p>
 
             <div className="space-y-4">
-              {/* Format */}
-              <div>
-                <label className="label">Receipt Format</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="format"
-                      value="a4"
-                      checked={layout.style.format === 'a4'}
-                      onChange={() => handleStyleChange('format', 'a4')}
-                      className="h-4 w-4 text-trust-blue focus:ring-trust-blue"
-                    />
-                    <span className="text-sm text-slate-700">A4 Paper</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="format"
-                      value="thermal"
-                      checked={layout.style.format === 'thermal'}
-                      onChange={() => handleStyleChange('format', 'thermal')}
-                      className="h-4 w-4 text-trust-blue focus:ring-trust-blue"
-                    />
-                    <span className="text-sm text-slate-700">Thermal (80mm)</span>
-                  </label>
+              {/* Clear Data */}
+              <div className="flex items-start justify-between p-4 rounded-lg border border-red-200 bg-red-50">
+                <div className="flex-1 pr-4">
+                  <h3 className="text-sm font-semibold text-slate-800">Clear All Data</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Permanently deletes all ledgers, transactions, interest entries, and expenses.
+                    Settings and store profile are kept intact.
+                  </p>
                 </div>
+                {!confirmClearData ? (
+                  <button
+                    onClick={() => setConfirmClearData(true)}
+                    className="flex-shrink-0 px-4 py-2 rounded-lg text-sm font-semibold bg-white border border-red-300 text-red-600 hover:bg-red-100 transition-colors"
+                  >
+                    Clear Data
+                  </button>
+                ) : (
+                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                    <p className="text-xs font-semibold text-red-600">Are you sure?</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setConfirmClearData(false)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium btn-secondary"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        disabled={clearingData}
+                        onClick={async () => {
+                          try {
+                            setClearingData(true);
+                            await settingsApi.clearData();
+                            toast.success('All data cleared');
+                          } catch (err) {
+                            toast.error(err.message);
+                          } finally {
+                            setClearingData(false);
+                            setConfirmClearData(false);
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50"
+                      >
+                        {clearingData ? 'Clearing…' : 'Yes, Clear'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Colors */}
-              <div>
-                <label className="label">Primary Color</label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="color"
-                    value={layout.style.primaryColor}
-                    onChange={(e) => handleStyleChange('primaryColor', e.target.value)}
-                    className="w-10 h-10 rounded border border-slate-200 cursor-pointer"
-                  />
-                  <input
-                    type="text"
-                    value={layout.style.primaryColor}
-                    onChange={(e) => handleStyleChange('primaryColor', e.target.value)}
-                    className="input-field w-32 font-mono text-sm"
-                  />
+              {/* Reset Settings */}
+              <div className="flex items-start justify-between p-4 rounded-lg border border-amber-200 bg-amber-50">
+                <div className="flex-1 pr-4">
+                  <h3 className="text-sm font-semibold text-slate-800">Reset Settings</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Resets all settings (store profile, modules, receipt config, backup config) back to
+                    factory defaults. Ledger data is not affected.
+                  </p>
                 </div>
-              </div>
-
-              {/* Font Sizes */}
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="label">Header Font Size</label>
-                  <input
-                    type="number"
-                    value={layout.style.headerFontSize}
-                    onChange={(e) => handleStyleChange('headerFontSize', parseInt(e.target.value) || 20)}
-                    min="12"
-                    max="36"
-                    className="input-field"
-                  />
-                </div>
-                <div>
-                  <label className="label">Body Font Size</label>
-                  <input
-                    type="number"
-                    value={layout.style.bodyFontSize}
-                    onChange={(e) => handleStyleChange('bodyFontSize', parseInt(e.target.value) || 13)}
-                    min="9"
-                    max="20"
-                    className="input-field"
-                  />
-                </div>
-                <div>
-                  <label className="label">Footer Font Size</label>
-                  <input
-                    type="number"
-                    value={layout.style.footerFontSize}
-                    onChange={(e) => handleStyleChange('footerFontSize', parseInt(e.target.value) || 10)}
-                    min="8"
-                    max="16"
-                    className="input-field"
-                  />
-                </div>
-              </div>
-
-              {/* Texts */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="label">Receipt Title</label>
-                  <input
-                    type="text"
-                    value={layout.style.titleText}
-                    onChange={(e) => handleStyleChange('titleText', e.target.value)}
-                    className="input-field"
-                    placeholder="PAYMENT RECEIPT"
-                  />
-                </div>
-                <div>
-                  <label className="label">Footer Text</label>
-                  <input
-                    type="text"
-                    value={layout.style.footerText}
-                    onChange={(e) => handleStyleChange('footerText', e.target.value)}
-                    className="input-field"
-                    placeholder="Thank you for your business!"
-                  />
-                </div>
-              </div>
-
-              {/* Border Toggle */}
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={layout.style.showBorder}
-                  onChange={(e) => handleStyleChange('showBorder', e.target.checked)}
-                  className="h-4 w-4 rounded text-trust-blue focus:ring-trust-blue"
-                />
-                <span className="text-sm text-slate-700">Show receipt border</span>
-              </label>
-
-              {/* Font Family */}
-              <div>
-                <label className="label">Font Family</label>
-                <select
-                  value={layout.style.fontFamily}
-                  onChange={(e) => handleStyleChange('fontFamily', e.target.value)}
-                  className="input-field"
-                >
-                  <option value="'Segoe UI', system-ui, -apple-system, sans-serif">Segoe UI (Default)</option>
-                  <option value="'Arial', sans-serif">Arial</option>
-                  <option value="'Courier New', monospace">Courier New (Monospace)</option>
-                  <option value="'Georgia', serif">Georgia (Serif)</option>
-                  <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
-                </select>
+                {!confirmResetSettings ? (
+                  <button
+                    onClick={() => setConfirmResetSettings(true)}
+                    className="flex-shrink-0 px-4 py-2 rounded-lg text-sm font-semibold bg-white border border-amber-300 text-amber-700 hover:bg-amber-100 transition-colors"
+                  >
+                    Reset Settings
+                  </button>
+                ) : (
+                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                    <p className="text-xs font-semibold text-amber-700">Are you sure?</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setConfirmResetSettings(false)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium btn-secondary"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        disabled={resettingSettings}
+                        onClick={async () => {
+                          try {
+                            setResettingSettings(true);
+                            await settingsApi.resetSettings();
+                            toast.success('Settings reset to defaults');
+                          } catch (err) {
+                            toast.error(err.message);
+                          } finally {
+                            setResettingSettings(false);
+                            setConfirmResetSettings(false);
+                          }
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:opacity-50"
+                      >
+                        {resettingSettings ? 'Resetting…' : 'Yes, Reset'}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

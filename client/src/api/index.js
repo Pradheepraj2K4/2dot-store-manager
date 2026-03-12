@@ -49,6 +49,8 @@ export const settingsApi = {
   deleteLogo: () => api.delete('/settings/logo'),
   getBackupStatus: () => api.get('/settings/backup/status'),
   backupNow: () => api.post('/settings/backup/now'),
+  clearData: () => api.post('/settings/data/clear'),
+  resetSettings: () => api.post('/settings/reset'),
 };
 
 export const dashboardApi = {

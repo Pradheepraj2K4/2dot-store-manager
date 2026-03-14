@@ -35,7 +35,6 @@ class TransactionService {
     } else {
       projectedBalance = entry_type === 'payment' ? projectedBalance - amt : projectedBalance + amt;
     }
-    if (projectedBalance < 0) throw new AppError('This entry would make the balance negative', 400);
 
     const run = db.transaction(() => {
       const tx = transactionRepository.create({
@@ -56,7 +55,6 @@ class TransactionService {
       } else {
         newBalance = entry_type === 'payment' ? newBalance - amt : newBalance + amt;
       }
-      if (newBalance < 0) throw new AppError('This entry would make the balance negative', 400);
       ledgerRepository.updateBalance(ledger_id, newBalance);
 
       // If paying interest, mark it paid

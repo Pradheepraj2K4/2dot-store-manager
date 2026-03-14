@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ledgerApi, ledgerTypeApi } from '../../api';
-import { formatCurrency } from '../../utils/helpers';
+import { formatCurrency, todayISO } from '../../utils/helpers';
 import Modal from '../ui/Modal';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
@@ -76,6 +76,7 @@ export default function LedgerListPage() {
       gst_no: ledger.gst_no || '',
       state_code: ledger.state_code || '',
       igst_status: ledger.igst_status || 'NO',
+      ledger_date: ledger.ledger_date || todayISO(),
     });
     setEditErrors({});
     setEditTouched({});
@@ -108,6 +109,7 @@ export default function LedgerListPage() {
         name: editForm.name.trim(),
         gst_no: editForm.gst_no.trim().toUpperCase(),
         state_code: editForm.state_code.trim(),
+        ledger_date: editForm.ledger_date || '',
       });
       toast.success('Ledger updated successfully');
       setEditModal({ open: false, ledger: null });
@@ -339,6 +341,16 @@ export default function LedgerListPage() {
                 </label>
               ))}
             </div>
+          </div>
+          <div>
+            <label className="label">Ledger Date</label>
+            <input
+              type="date"
+              name="ledger_date"
+              value={editForm.ledger_date || ''}
+              onChange={handleEditChange}
+              className="input-field"
+            />
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setEditModal({ open: false, ledger: null })} className="btn-secondary">Cancel</button>

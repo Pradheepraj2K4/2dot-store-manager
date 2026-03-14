@@ -53,7 +53,7 @@ export default function PendingInterestPage() {
   if (loading) return <LoadingSpinner className="py-20" size="lg" />;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-2">
       {/* Header */}
       <div>
         <h1 className="page-title flex items-center gap-2">

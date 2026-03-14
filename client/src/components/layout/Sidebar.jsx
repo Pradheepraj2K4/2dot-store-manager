@@ -13,6 +13,7 @@ import {
   CurrencyDollarIcon,
   DocumentTextIcon,
   BanknotesIcon,
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import { logout } from '../../utils/auth';
 import { interestApi, expenseApi } from '../../api';
@@ -46,10 +47,14 @@ export default function Sidebar() {
   const navigation = (() => {
     let nav = [...baseNavigation];
     if (interestEnabled) {
+      // Insert after Statement of Account
+      const soaIdx = nav.findIndex((n) => n.href === '/statement-of-account');
+      const insertAt = soaIdx >= 0 ? soaIdx + 1 : nav.length;
       nav = [
-        ...nav.slice(0, 3),
+        ...nav.slice(0, insertAt),
         { name: 'Pending Interest', href: '/pending-interest', icon: ClockIcon },
-        ...nav.slice(3),
+        { name: 'Paid Interest', href: '/paid-interest', icon: CheckCircleIcon },
+        ...nav.slice(insertAt),
       ];
     }
     if (expenseEnabled) {

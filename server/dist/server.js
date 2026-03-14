@@ -23549,6 +23549,50 @@ var require_v5 = __commonJS({
   }
 });
 
+// src/db/migrations/v6.js
+var require_v6 = __commonJS({
+  "src/db/migrations/v6.js"(exports2, module2) {
+    var VERSION = 6;
+    function up(db) {
+      db.exec(`
+    ALTER TABLE ledgers ADD COLUMN interest_start_date TEXT NOT NULL DEFAULT '';
+  `);
+    }
+    module2.exports = { VERSION, up };
+  }
+});
+
+// src/db/migrations/v7.js
+var require_v7 = __commonJS({
+  "src/db/migrations/v7.js"(exports2, module2) {
+    var VERSION = 7;
+    function up(db) {
+      db.exec(`
+    ALTER TABLE ledgers ADD COLUMN ledger_date TEXT NOT NULL DEFAULT '';
+  `);
+    }
+    module2.exports = { VERSION, up };
+  }
+});
+
+// src/db/migrations/v8.js
+var require_v8 = __commonJS({
+  "src/db/migrations/v8.js"(exports2, module2) {
+    var VERSION = 8;
+    function up(db) {
+      db.exec(`ALTER TABLE interest_entries ADD COLUMN interest_number TEXT NOT NULL DEFAULT '';`);
+      const entries = db.prepare("SELECT id FROM interest_entries ORDER BY id ASC").all();
+      const update = db.prepare("UPDATE interest_entries SET interest_number = ? WHERE id = ?");
+      entries.forEach((e, i) => {
+        update.run(`INT-${String(i + 1).padStart(5, "0")}`, e.id);
+      });
+    }
+    function down() {
+    }
+    module2.exports = { VERSION, up, down };
+  }
+});
+
 // src/db/migrations/index.js
 var require_migrations = __commonJS({
   "src/db/migrations/index.js"(exports2, module2) {
@@ -23557,13 +23601,19 @@ var require_migrations = __commonJS({
     var v3 = require_v3();
     var v4 = require_v4();
     var v5 = require_v5();
+    var v6 = require_v6();
+    var v7 = require_v7();
+    var v8 = require_v8();
     var MIGRATIONS = [
       v1,
       v2,
       v3,
       v4,
-      v5
-      // v6, v7, … add future migrations here
+      v5,
+      v6,
+      v7,
+      v8
+      // v9, v10, … add future migrations here
     ];
     function bootstrapVersionTable(db) {
       db.exec(`
@@ -23734,8 +23784,8 @@ var require_ledgerRepository = __commonJS({
         const db = getDb();
         const stmt = db.prepare(`
       INSERT INTO ledgers (ledger_type_id, name, address, phone, place, gst_no, state_code, igst_status,
-                           opening_balance, current_balance, interest_rate, interest_scheme, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                           opening_balance, current_balance, interest_rate, interest_scheme, ledger_date, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
         const result = stmt.run(
           data.ledger_type_id,
@@ -23750,6 +23800,7 @@ var require_ledgerRepository = __commonJS({
           data.opening_balance || 0,
           data.interest_rate || 0,
           data.interest_scheme || "NONE",
+          data.ledger_date || "",
           data.notes || ""
         );
         return this.findById(result.lastInsertRowid);
@@ -23760,7 +23811,7 @@ var require_ledgerRepository = __commonJS({
       UPDATE ledgers
       SET ledger_type_id = ?, name = ?, address = ?, phone = ?, place = ?,
           gst_no = ?, state_code = ?, igst_status = ?,
-          interest_rate = ?, interest_scheme = ?, notes = ?,
+          interest_rate = ?, interest_scheme = ?, ledger_date = ?, notes = ?,
           status = ?,
           updated_at = datetime('now', 'localtime')
       WHERE id = ?
@@ -23775,6 +23826,7 @@ var require_ledgerRepository = __commonJS({
           data.igst_status || "NO",
           data.interest_rate || 0,
           data.interest_scheme || "NONE",
+          data.ledger_date || "",
           data.notes || "",
           data.status || "active",
           id
@@ -24475,36 +24527,60 @@ var require_interestRepository = __commonJS({
         const row = db.prepare("SELECT COUNT(*) AS cnt FROM interest_entries WHERE ledger_id = ? AND from_date = ? AND to_date = ?").get(ledgerId, fromDate, toDate);
         return row.cnt > 0;
       }
+      getNextInterestNumber() {
+        const db = getDb();
+        const row = db.prepare(`
+      SELECT interest_number FROM interest_entries
+      WHERE interest_number LIKE 'INT-%'
+      ORDER BY id DESC LIMIT 1
+    `).get();
+        if (!row || !row.interest_number) return "INT-00001";
+        const match = row.interest_number.match(/(\d+)$/);
+        if (!match) return "INT-00001";
+        return `INT-${String(parseInt(match[1]) + 1).padStart(5, "0")}`;
+      }
       create({ ledger_id, amount, from_date, to_date, days, rate, principal_at_time }) {
         const db = getDb();
+        const interest_number = this.getNextInterestNumber();
         const stmt = db.prepare(`
-      INSERT INTO interest_entries (ledger_id, amount, from_date, to_date, days, rate, principal_at_time)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO interest_entries (ledger_id, amount, from_date, to_date, days, rate, principal_at_time, interest_number)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
-        const result = stmt.run(ledger_id, amount, from_date, to_date, days, rate, principal_at_time);
+        const result = stmt.run(ledger_id, amount, from_date, to_date, days, rate, principal_at_time, interest_number);
         return this.findById(result.lastInsertRowid);
       }
       createMany(entries) {
         const db = getDb();
+        const firstNum = this.getNextInterestNumber();
+        const firstIdx = parseInt(firstNum.match(/(\d+)$/)[1]);
         const stmt = db.prepare(`
-      INSERT INTO interest_entries (ledger_id, amount, from_date, to_date, days, rate, principal_at_time)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO interest_entries (ledger_id, amount, from_date, to_date, days, rate, principal_at_time, interest_number)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
         const insertAll = db.transaction((items) => {
-          for (const e of items) {
-            stmt.run(e.ledger_id, e.amount, e.from_date, e.to_date, e.days, e.rate, e.principal_at_time);
-          }
+          items.forEach((e, i) => {
+            const interest_number = `INT-${String(firstIdx + i).padStart(5, "0")}`;
+            stmt.run(e.ledger_id, e.amount, e.from_date, e.to_date, e.days, e.rate, e.principal_at_time, interest_number);
+          });
         });
         insertAll(entries);
       }
-      markPaid(id, paidDate) {
+      markPaid(id, paidDate, amount) {
         const db = getDb();
-        db.prepare("UPDATE interest_entries SET status = 'paid', paid_date = ? WHERE id = ?").run(paidDate, id);
+        if (amount != null) {
+          db.prepare("UPDATE interest_entries SET status = 'paid', paid_date = ?, amount = ? WHERE id = ?").run(paidDate, amount, id);
+        } else {
+          db.prepare("UPDATE interest_entries SET status = 'paid', paid_date = ? WHERE id = ?").run(paidDate, id);
+        }
         return this.findById(id);
       }
       deleteByLedgerId(ledgerId) {
         const db = getDb();
         return db.prepare("DELETE FROM interest_entries WHERE ledger_id = ?").run(ledgerId);
+      }
+      deleteById(id) {
+        const db = getDb();
+        return db.prepare("DELETE FROM interest_entries WHERE id = ?").run(id);
       }
     };
     module2.exports = new InterestRepository();
@@ -24544,7 +24620,6 @@ var require_paymentService = __commonJS({
         } else {
           projectedBalance = entry_type === "payment" ? projectedBalance - amt : projectedBalance + amt;
         }
-        if (projectedBalance < 0) throw new AppError("This entry would make the balance negative", 400);
         const run = db.transaction(() => {
           const tx = transactionRepository.create({
             ledger_id,
@@ -24562,7 +24637,6 @@ var require_paymentService = __commonJS({
           } else {
             newBalance = entry_type === "payment" ? newBalance - amt : newBalance + amt;
           }
-          if (newBalance < 0) throw new AppError("This entry would make the balance negative", 400);
           ledgerRepository.updateBalance(ledger_id, newBalance);
           if (interest_entry_id) {
             interestRepository.markPaid(interest_entry_id, txDate);
@@ -25203,8 +25277,8 @@ var require_interestService = __commonJS({
       }
       /**
        * Generate interest entries for a single ledger up to a given date (or today).
-       * DAILY:   current_balance × rate / 100          per month (rate = monthly %)
-       * MONTHLY: current_balance × rate / 100 / 12     per month (rate = annual %)
+       * DAILY:   current_balance × rate/100  per day   (rate = daily %)
+       * MONTHLY: current_balance × rate/100  per month (rate = monthly %)
        */
       generateForLedger(ledgerId, upToDate = null) {
         if (!this.isModuleEnabled()) return [];
@@ -25217,6 +25291,8 @@ var require_interestService = __commonJS({
         let startDate;
         if (lastToDate) {
           startDate = this._nextDay(lastToDate);
+        } else if (ledger.ledger_date) {
+          startDate = ledger.ledger_date;
         } else {
           startDate = ledger.created_at ? ledger.created_at.split(" ")[0].split("T")[0] : today;
         }
@@ -25227,23 +25303,19 @@ var require_interestService = __commonJS({
         if (ledger.interest_scheme === "DAILY") {
           let current = startDate;
           while (current <= today) {
-            const monthEnd = this._endOfMonth(current);
-            const periodEnd = monthEnd <= today ? monthEnd : today;
-            const periodDays = this._dayDiff(current, periodEnd) + 1;
-            if (periodDays > 0 && !interestRepository.existsForPeriod(ledgerId, current, periodEnd)) {
+            if (!interestRepository.existsForPeriod(ledgerId, current, current)) {
               const amount = Math.round(principal * rate / 100 * 100) / 100;
               entries.push({
                 ledger_id: ledgerId,
                 amount,
                 from_date: current,
-                to_date: periodEnd,
-                days: periodDays,
+                to_date: current,
+                days: 1,
                 rate,
                 principal_at_time: principal
               });
             }
-            current = this._firstOfNextMonth(current);
-            if (current > today) break;
+            current = this._nextDay(current);
           }
         } else if (ledger.interest_scheme === "MONTHLY") {
           let current = startDate;
@@ -25252,7 +25324,7 @@ var require_interestService = __commonJS({
             const periodEnd = monthEnd <= today ? monthEnd : today;
             const periodDays = this._dayDiff(current, periodEnd) + 1;
             if (periodDays > 0 && !interestRepository.existsForPeriod(ledgerId, current, periodEnd)) {
-              const amount = Math.round(principal * rate / 100 / 12 * 100) / 100;
+              const amount = Math.round(principal * rate / 100 * 100) / 100;
               entries.push({
                 ledger_id: ledgerId,
                 amount,
@@ -25304,6 +25376,19 @@ var require_interestService = __commonJS({
       getTotalPendingByLedger(ledgerId) {
         return interestRepository.getTotalPendingByLedger(ledgerId);
       }
+      markPaid(id, paidDate = null, amount = null) {
+        if (!this.isModuleEnabled()) throw new AppError("Interest module is not enabled", 400);
+        const entry = interestRepository.findById(id);
+        if (!entry) throw new AppError("Interest entry not found", 404);
+        const parsedAmount = amount != null ? parseFloat(amount) : null;
+        return interestRepository.markPaid(id, paidDate || this._todayISO(), isNaN(parsedAmount) ? null : parsedAmount);
+      }
+      deleteEntry(id) {
+        if (!this.isModuleEnabled()) throw new AppError("Interest module is not enabled", 400);
+        const entry = interestRepository.findById(id);
+        if (!entry) throw new AppError("Interest entry not found", 404);
+        interestRepository.deleteById(id);
+      }
       // ── Date utility helpers ─────────────────────────────────────────────────
       _todayISO() {
         const d = /* @__PURE__ */ new Date();
@@ -25328,6 +25413,10 @@ var require_interestService = __commonJS({
         const d1 = /* @__PURE__ */ new Date(dateStr1 + "T00:00:00");
         const d2 = /* @__PURE__ */ new Date(dateStr2 + "T00:00:00");
         return Math.round((d2 - d1) / (1e3 * 60 * 60 * 24));
+      }
+      _daysInMonth(dateStr) {
+        const [y, m] = dateStr.split("-").map(Number);
+        return new Date(y, m, 0).getDate();
       }
     };
     module2.exports = new InterestService();
@@ -25392,6 +25481,26 @@ var require_interestController = __commonJS({
           next(err);
         }
       }
+      markPaid(req, res, next) {
+        try {
+          const entry = interestService.markPaid(
+            parseInt(req.params.id),
+            req.body.paidDate || null,
+            req.body.amount != null ? req.body.amount : null
+          );
+          res.json({ success: true, data: entry });
+        } catch (err) {
+          next(err);
+        }
+      }
+      deleteEntry(req, res, next) {
+        try {
+          interestService.deleteEntry(parseInt(req.params.id));
+          res.json({ success: true });
+        } catch (err) {
+          next(err);
+        }
+      }
       isEnabled(req, res, next) {
         try {
           const enabled = interestService.isModuleEnabled();
@@ -25417,6 +25526,8 @@ var require_interestRoutes = __commonJS({
     router.get("/ledger/:ledgerId/total", (req, res, next) => interestController.getTotalPending(req, res, next));
     router.get("/", (req, res, next) => interestController.getAll(req, res, next));
     router.post("/generate", (req, res, next) => interestController.generate(req, res, next));
+    router.post("/:id/pay", (req, res, next) => interestController.markPaid(req, res, next));
+    router.delete("/:id", (req, res, next) => interestController.deleteEntry(req, res, next));
     module2.exports = router;
   }
 });

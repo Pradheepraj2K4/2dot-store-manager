@@ -59,6 +59,28 @@ class InterestController {
     }
   }
 
+  markPaid(req, res, next) {
+    try {
+      const entry = interestService.markPaid(
+        parseInt(req.params.id),
+        req.body.paidDate || null,
+        req.body.amount != null ? req.body.amount : null
+      );
+      res.json({ success: true, data: entry });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  deleteEntry(req, res, next) {
+    try {
+      interestService.deleteEntry(parseInt(req.params.id));
+      res.json({ success: true });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   isEnabled(req, res, next) {
     try {
       const enabled = interestService.isModuleEnabled();

@@ -64,39 +64,65 @@ class InterestRepository {
     return row.cnt > 0;
   }
 
+  getNextInterestNumber() {
+    const db = getDb();
+    const row = db.prepare(`
+      SELECT interest_number FROM interest_entries
+      WHERE interest_number LIKE 'INT-%'
+      ORDER BY id DESC LIMIT 1
+    `).get();
+    if (!row || !row.interest_number) return 'INT-00001';
+    const match = row.interest_number.match(/(\d+)$/);
+    if (!match) return 'INT-00001';
+    return `INT-${String(parseInt(match[1]) + 1).padStart(5, '0')}`;
+  }
+
   create({ ledger_id, amount, from_date, to_date, days, rate, principal_at_time }) {
     const db = getDb();
+    const interest_number = this.getNextInterestNumber();
     const stmt = db.prepare(`
-      INSERT INTO interest_entries (ledger_id, amount, from_date, to_date, days, rate, principal_at_time)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO interest_entries (ledger_id, amount, from_date, to_date, days, rate, principal_at_time, interest_number)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
-    const result = stmt.run(ledger_id, amount, from_date, to_date, days, rate, principal_at_time);
+    const result = stmt.run(ledger_id, amount, from_date, to_date, days, rate, principal_at_time, interest_number);
     return this.findById(result.lastInsertRowid);
   }
 
   createMany(entries) {
     const db = getDb();
+    const firstNum = this.getNextInterestNumber();
+    const firstIdx = parseInt(firstNum.match(/(\d+)$/)[1]);
     const stmt = db.prepare(`
-      INSERT INTO interest_entries (ledger_id, amount, from_date, to_date, days, rate, principal_at_time)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO interest_entries (ledger_id, amount, from_date, to_date, days, rate, principal_at_time, interest_number)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const insertAll = db.transaction((items) => {
-      for (const e of items) {
-        stmt.run(e.ledger_id, e.amount, e.from_date, e.to_date, e.days, e.rate, e.principal_at_time);
-      }
+      items.forEach((e, i) => {
+        const interest_number = `INT-${String(firstIdx + i).padStart(5, '0')}`;
+        stmt.run(e.ledger_id, e.amount, e.from_date, e.to_date, e.days, e.rate, e.principal_at_time, interest_number);
+      });
     });
     insertAll(entries);
   }
 
-  markPaid(id, paidDate) {
+  markPaid(id, paidDate, amount) {
     const db = getDb();
-    db.prepare("UPDATE interest_entries SET status = 'paid', paid_date = ? WHERE id = ?").run(paidDate, id);
+    if (amount != null) {
+      db.prepare("UPDATE interest_entries SET status = 'paid', paid_date = ?, amount = ? WHERE id = ?").run(paidDate, amount, id);
+    } else {
+      db.prepare("UPDATE interest_entries SET status = 'paid', paid_date = ? WHERE id = ?").run(paidDate, id);
+    }
     return this.findById(id);
   }
 
   deleteByLedgerId(ledgerId) {
     const db = getDb();
     return db.prepare('DELETE FROM interest_entries WHERE ledger_id = ?').run(ledgerId);
+  }
+
+  deleteById(id) {
+    const db = getDb();
+    return db.prepare('DELETE FROM interest_entries WHERE id = ?').run(id);
   }
 }
 

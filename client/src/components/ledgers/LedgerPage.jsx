@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ledgerApi, transactionApi, interestApi, settingsApi } from '../../api';
 import { formatCurrency, formatDate, formatDateTime, todayISO } from '../../utils/helpers';
+import { buildInterestReceiptHtml, fetchLogoDataUrl } from '../../utils/interestReceipt';
+import { buildTransactionReceiptHtml } from '../../utils/transactionReceipt';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
 import Modal from '../ui/Modal';
@@ -13,6 +15,7 @@ import {
   ArrowDownCircleIcon,
   CalculatorIcon,
   TrashIcon,
+  PrinterIcon,
 } from '@heroicons/react/24/outline';
 
 /* ─── Transaction Entry Form ──────────────────────────────────────── */
@@ -45,10 +48,9 @@ function TransactionForm({ ledgerId, entryType, onCreated, currentBalance, behav
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.amount || Number(form.amount) <= 0) { toast.error('Enter a valid amount'); return; }
-    if (wouldGoNegative) { toast.error('This entry would make the balance negative'); return; }
     try {
       setSubmitting(true);
-      await transactionApi.create({
+      const created = await transactionApi.create({
         ledger_id: parseInt(ledgerId),
         entry_type: entryType,
         amount: parseFloat(form.amount),
@@ -58,8 +60,8 @@ function TransactionForm({ ledgerId, entryType, onCreated, currentBalance, behav
       toast.success(`${entryType === 'payment' ? 'Payment' : 'Receipt'} recorded`);
       setForm({ amount: '', date: todayISO(), notes: '' });
       // refresh next number
-      transactionApi.getNextRunningNumber(entryType).then((res) => setNextNum(res.data.runningNumber)).catch(() => {});
-      onCreated();
+      transactionApi.getNextRunningNumber(entryType).then((r) => setNextNum(r.data.runningNumber)).catch(() => {});
+      onCreated(created.data);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -95,9 +97,6 @@ function TransactionForm({ ledgerId, entryType, onCreated, currentBalance, behav
             placeholder="0.00"
             autoFocus
           />
-          {wouldGoNegative && (
-            <p className="text-xs text-red-600 mt-1">⚠ Balance would go negative</p>
-          )}
         </div>
         <div>
           <label className="label">Date</label>
@@ -127,7 +126,7 @@ function TransactionForm({ ledgerId, entryType, onCreated, currentBalance, behav
         <button
           ref={submitRef}
           type="submit"
-          disabled={submitting || wouldGoNegative}
+          disabled={submitting}
           className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${
             isPayment
               ? 'bg-red-600 hover:bg-red-700 disabled:bg-red-300'
@@ -144,19 +143,39 @@ function TransactionForm({ ledgerId, entryType, onCreated, currentBalance, behav
 /* ─── Interest Section ────────────────────────────────────────────── */
 function InterestSection({ ledgerId, ledger, onRefresh }) {
   const [entries, setEntries] = useState([]);
-  const [totalPending, setTotalPending] = useState(0);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [payingId, setPayingId] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
+  const [payModal, setPayModal] = useState({ open: false, entry: null, paidDate: todayISO(), amount: '' });
+  const [store, setStore] = useState({});
+  const [logoDataUrl, setLogoDataUrl] = useState(null);
+  const [receiptFormat, setReceiptFormat] = useState('a5');
+  const [previewModal, setPreviewModal] = useState({ open: false, html: '' });
+  const iframeRef = useRef(null);
+  const pendingRefreshRef = useRef(false);
+
+  useEffect(() => {
+    (async () => {
+      const [profileRes, configRes] = await Promise.all([
+        settingsApi.getStoreProfile().catch(() => ({ data: {} })),
+        settingsApi.getReceiptConfig().catch(() => ({ data: {} })),
+      ]);
+      const profile = profileRes.data || {};
+      setStore(profile);
+      setReceiptFormat((configRes.data && configRes.data.format) || 'a5');
+      if (profile.logo_path) {
+        const dl = await fetchLogoDataUrl(profile.logo_path);
+        setLogoDataUrl(dl);
+      }
+    })();
+  }, []);
 
   const fetchInterest = useCallback(async () => {
     try {
       setLoading(true);
-      const [entriesRes, totalRes] = await Promise.all([
-        interestApi.getByLedger(ledgerId),
-        interestApi.getTotalPending(ledgerId),
-      ]);
-      setEntries(entriesRes.data);
-      setTotalPending(totalRes.data.total_pending || 0);
+      const res = await interestApi.getByLedger(ledgerId);
+      setEntries(res.data);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -169,7 +188,7 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
   const handleGenerate = async () => {
     try {
       setGenerating(true);
-      await interestApi.generate({ ledger_id: parseInt(ledgerId) });
+      await interestApi.generate({ ledgerId: parseInt(ledgerId) });
       toast.success('Interest generated');
       fetchInterest();
       onRefresh();
@@ -179,6 +198,60 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
       setGenerating(false);
     }
   };
+
+  const openPayModal = (entry) => {
+    setPayModal({ open: true, entry, paidDate: todayISO(), amount: String(entry.amount) });
+  };
+
+  const handlePrint = (entry) => {
+    const html = buildInterestReceiptHtml({ entry, ledgerName: ledger.name, store, logoDataUrl, format: receiptFormat });
+    setPreviewModal({ open: true, html });
+  };
+
+  const closePreview = () => {
+    setPreviewModal({ open: false, html: '' });
+    if (pendingRefreshRef.current) {
+      pendingRefreshRef.current = false;
+      fetchInterest();
+      onRefresh();
+    }
+  };
+
+  const handlePay = async () => {
+    const { entry, amount, paidDate } = payModal;
+    const snapshot = { ...entry, amount: parseFloat(amount), paid_date: paidDate };
+    try {
+      setPayingId(entry.id);
+      setPayModal((p) => ({ ...p, open: false }));
+      await interestApi.markPaid(entry.id, paidDate, parseFloat(amount));
+      toast.success('Interest marked as paid');
+      handlePrint(snapshot);
+      pendingRefreshRef.current = true;
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setPayingId(null);
+    }
+  };
+
+  const handleDeleteEntry = async (entryId) => {
+    try {
+      setDeletingId(entryId);
+      await interestApi.deleteEntry(entryId);
+      toast.success('Interest entry deleted');
+      fetchInterest();
+      onRefresh();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const pending = entries.filter((e) => e.status === 'pending');
+  const paid = entries.filter((e) => e.status === 'paid');
+  const totalPending = pending.reduce((s, e) => s + e.amount, 0);
+  const totalPaid = paid.reduce((s, e) => s + e.amount, 0);
 
   if (loading) return <LoadingSpinner size="sm" />;
 
@@ -193,6 +266,11 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
           </span>
         </div>
         <div className="flex items-center gap-3">
+          {totalPaid > 0 && (
+            <span className="text-sm font-semibold text-green-700">
+              Paid: {formatCurrency(totalPaid)}
+            </span>
+          )}
           {totalPending > 0 && (
             <span className="text-sm font-semibold text-amber-700">
               Pending: {formatCurrency(totalPending)}
@@ -207,42 +285,217 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
           </button>
         </div>
       </div>
-      {entries.length === 0 ? (
-        <p className="text-sm text-slate-400 text-center py-4">No interest entries yet</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-200 text-slate-500">
-                <th className="px-3 py-2 text-left text-xs font-medium">Period</th>
-                <th className="px-3 py-2 text-right text-xs font-medium">Principal</th>
-                <th className="px-3 py-2 text-right text-xs font-medium">Amount</th>
-                <th className="px-3 py-2 text-center text-xs font-medium">Status</th>
-                <th className="px-3 py-2 text-left text-xs font-medium">Generated</th>
-              </tr>
-            </thead>
-            <tbody>
-              {entries.slice(0, 20).map((e) => (
-                <tr key={e.id} className="border-b border-slate-50">
-                  <td className="px-3 py-2 text-xs text-slate-600">
-                    {formatDate(e.from_date)} — {formatDate(e.to_date)}
-                  </td>
-                  <td className="px-3 py-2 text-right text-xs">{formatCurrency(e.principal_used)}</td>
-                  <td className="px-3 py-2 text-right text-xs font-medium text-amber-700">{formatCurrency(e.amount)}</td>
-                  <td className="px-3 py-2 text-center">
-                    <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                      e.status === 'paid' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
-                    }`}>
-                      {e.status}
-                    </span>
-                  </td>
-                  <td className="px-3 py-2 text-xs text-slate-400">{formatDate(e.created_at)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* ── Pending ── */}
+        <div>
+          <p className="text-sm font-semibold text-amber-700 mb-2">Pending ({pending.length})</p>
+          {pending.length === 0 ? (
+            <p className="text-sm text-slate-400 py-3 text-center">No pending interest</p>
+          ) : (
+            <div className="rounded-lg border border-amber-100 overflow-hidden">
+              <div className="max-h-60 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-amber-50 text-amber-800 z-10">
+                    <tr>
+                      <th className="px-2 py-2 text-left font-medium w-24">#</th>
+                      <th className="px-3 py-2 text-left font-medium">Date / Period</th>
+                      <th className="px-3 py-2 text-right font-medium">Amount</th>
+                      <th className="px-3 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pending.map((e) => (
+                      <tr key={e.id} className="border-t border-amber-50">
+                        <td className="px-2 py-2">
+                          <span className="font-mono text-xs text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
+                            {e.interest_number || '—'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-slate-600">
+                          {e.from_date === e.to_date
+                            ? formatDate(e.from_date)
+                            : `${formatDate(e.from_date)} – ${formatDate(e.to_date)}`}
+                        </td>
+                        <td className="px-3 py-2 text-right font-medium text-amber-700">
+                          {formatCurrency(e.amount)}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <button
+                            onClick={() => openPayModal(e)}
+                            disabled={payingId === e.id}
+                            className="px-3 py-1 rounded text-xs font-semibold bg-green-100 text-green-700 hover:bg-green-200 transition-colors disabled:opacity-50"
+                          >
+                            {payingId === e.id ? '…' : 'Pay'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
-      )}
+
+        {/* ── Paid ── */}
+        <div>
+          <p className="text-sm font-semibold text-green-700 mb-2">
+            Paid ({paid.length})
+            {totalPaid > 0 && <span className="ml-2 text-xs font-normal text-green-600"> · {formatCurrency(totalPaid)}</span>}
+          </p>
+          {paid.length === 0 ? (
+            <p className="text-sm text-slate-400 py-3 text-center">No paid interest yet</p>
+          ) : (
+            <div className="rounded-lg border border-green-100 overflow-hidden">
+              <div className="max-h-60 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-green-50 text-green-800 z-10">
+                    <tr>
+                      <th className="px-2 py-2 text-left font-medium w-24">#</th>
+                      <th className="px-3 py-2 text-left font-medium">Date / Period</th>
+                      <th className="px-3 py-2 text-right font-medium">Amount</th>
+                      <th className="px-3 py-2 text-left font-medium">Paid On</th>
+                      <th className="px-3 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paid.map((e) => (
+                      <tr key={e.id} className="border-t border-green-50">
+                        <td className="px-2 py-2">
+                          <span className="font-mono text-xs text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">
+                            {e.interest_number || '—'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-slate-600">
+                          {e.from_date === e.to_date
+                            ? formatDate(e.from_date)
+                            : `${formatDate(e.from_date)} – ${formatDate(e.to_date)}`}
+                        </td>
+                        <td className="px-3 py-2 text-right font-medium text-green-700">
+                          {formatCurrency(e.amount)}
+                        </td>
+                        <td className="px-3 py-2 text-slate-400">
+                          {e.paid_date ? formatDate(e.paid_date) : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => handlePrint(e)}
+                              className="p-1 rounded text-slate-400 hover:text-blue-600 transition-colors"
+                              title="Print receipt"
+                            >
+                              <PrinterIcon className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteEntry(e.id)}
+                              disabled={deletingId === e.id}
+                              className="p-1 rounded text-slate-400 hover:text-red-500 transition-colors disabled:opacity-50"
+                              title="Delete"
+                            >
+                              <TrashIcon className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Pay Modal */}
+      <Modal
+        open={payModal.open}
+        onClose={() => setPayModal((p) => ({ ...p, open: false }))}
+        title="Mark Interest as Paid"
+        size="sm"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="label">Amount Paid</label>
+            <input
+              type="number"
+              value={payModal.amount}
+              onChange={(e) => setPayModal((p) => ({ ...p, amount: e.target.value }))}
+              className="input-field"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+            />
+          </div>
+          <div>
+            <label className="label">Paid On</label>
+            <input
+              type="date"
+              value={payModal.paidDate}
+              onChange={(e) => setPayModal((p) => ({ ...p, paidDate: e.target.value }))}
+              className="input-field"
+            />
+          </div>
+          <div className="flex justify-end gap-3 pt-1">
+            <button
+              type="button"
+              onClick={() => setPayModal((p) => ({ ...p, open: false }))}
+              className="btn-secondary"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handlePay}
+              disabled={!payModal.amount || !payModal.paidDate}
+              className="btn-primary"
+            >
+              Confirm
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Receipt Preview Modal */}
+      <Modal
+        open={previewModal.open}
+        onClose={closePreview}
+        title="Receipt Preview"
+        size="lg"
+      >
+        <div className="space-y-3">
+          <iframe
+            ref={iframeRef}
+            srcDoc={previewModal.html}
+            title="Receipt Preview"
+            className="w-full border border-slate-200 rounded"
+            style={{ minHeight: 300, maxHeight: 600, overflowX: 'hidden' }}
+            onLoad={(e) => {
+              const doc = e.target.contentDocument;
+              if (doc) {
+                e.target.style.height = Math.min(doc.body.scrollHeight + 4, 600) + 'px';
+              }
+            }}
+          />
+          <div className="flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={closePreview}
+              className="btn-secondary"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={() => iframeRef.current?.contentWindow?.print()}
+              className="btn-primary flex items-center gap-1.5"
+            >
+              <PrinterIcon className="h-4 w-4" />
+              Print
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -258,6 +511,12 @@ export default function LedgerPage() {
   const [closeLedgerModal, setCloseLedgerModal] = useState(false);
   const [reopenLedgerModal, setReopenLedgerModal] = useState(false);
   const [deleteTxnModal, setDeleteTxnModal] = useState({ open: false, txn: null });
+  const [store, setStore] = useState({});
+  const [logoDataUrl, setLogoDataUrl] = useState(null);
+  const [receiptFormat, setReceiptFormat] = useState('a5');
+  const [txnPreviewModal, setTxnPreviewModal] = useState({ open: false, html: '' });
+  const txnIframeRef = useRef(null);
+  const txnPendingRefreshRef = useRef(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -278,6 +537,42 @@ export default function LedgerPage() {
   }, [id]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  useEffect(() => {
+    (async () => {
+      const [profileRes, configRes] = await Promise.all([
+        settingsApi.getStoreProfile().catch(() => ({ data: {} })),
+        settingsApi.getReceiptConfig().catch(() => ({ data: {} })),
+      ]);
+      const profile = profileRes.data || {};
+      setStore(profile);
+      setReceiptFormat((configRes.data && configRes.data.format) || 'a5');
+      if (profile.logo_path) {
+        const dl = await fetchLogoDataUrl(profile.logo_path);
+        setLogoDataUrl(dl);
+      }
+    })();
+  }, []);
+
+  const openTxnPreview = (txn, needsRefresh = false) => {
+    const html = buildTransactionReceiptHtml({
+      txn,
+      ledgerName: ledger?.name,
+      store,
+      logoDataUrl,
+      format: receiptFormat,
+    });
+    if (needsRefresh) txnPendingRefreshRef.current = true;
+    setTxnPreviewModal({ open: true, html });
+  };
+
+  const closeTxnPreview = () => {
+    setTxnPreviewModal({ open: false, html: '' });
+    if (txnPendingRefreshRef.current) {
+      txnPendingRefreshRef.current = false;
+      fetchData();
+    }
+  };
 
   const handleCloseLedger = async () => {
     try {
@@ -364,7 +659,7 @@ export default function LedgerPage() {
           </p>
         </div>
         {hasInterest && (
-          <div className="card text-center border-amber-200 bg-amber-50/30">
+          <div className="card text-center border-amber-200 bg-white">
             <p className="text-xs font-medium text-amber-600">Interest Rate</p>
             <p className="text-lg font-bold text-amber-700 mt-1">
               {ledger.interest_rate}% <span className="text-xs font-normal">({ledger.interest_scheme})</span>
@@ -393,8 +688,8 @@ export default function LedgerPage() {
       {/* Transaction Entry Forms (only when active) */}
       {isActive && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <TransactionForm ledgerId={id} entryType="payment" onCreated={fetchData} currentBalance={ledger.current_balance} behaviour={ledger.behaviour} />
-          <TransactionForm ledgerId={id} entryType="receipt" onCreated={fetchData} currentBalance={ledger.current_balance} behaviour={ledger.behaviour} />
+          <TransactionForm ledgerId={id} entryType="payment" onCreated={(txn) => { if (txn) openTxnPreview(txn, true); else fetchData(); }} currentBalance={ledger.current_balance} behaviour={ledger.behaviour} />
+          <TransactionForm ledgerId={id} entryType="receipt" onCreated={(txn) => { if (txn) openTxnPreview(txn, true); else fetchData(); }} currentBalance={ledger.current_balance} behaviour={ledger.behaviour} />
         </div>
       )}
 
@@ -425,7 +720,7 @@ export default function LedgerPage() {
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Date</th>
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Notes</th>
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Recorded</th>
-                  {isActive && <th className="px-4 py-2.5"></th>}
+                  <th className="px-4 py-2.5"></th>
                 </tr>
               </thead>
               <tbody>
@@ -447,17 +742,26 @@ export default function LedgerPage() {
                       <td className="px-4 py-2.5 text-slate-600">{formatDate(txn.date)}</td>
                       <td className="px-4 py-2.5 text-slate-500 text-xs max-w-[200px] truncate">{txn.notes || '—'}</td>
                       <td className="px-4 py-2.5 text-slate-400 text-xs">{formatDateTime(txn.created_at)}</td>
-                      {isActive && (
-                        <td className="px-4 py-2.5">
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-1">
                           <button
-                            onClick={() => setDeleteTxnModal({ open: true, txn })}
-                            className="text-slate-400 hover:text-red-600 transition-colors"
-                            title="Delete transaction"
+                            onClick={() => openTxnPreview(txn)}
+                            className="text-slate-400 hover:text-blue-600 transition-colors"
+                            title="Print receipt"
                           >
-                            <TrashIcon className="w-4 h-4" />
+                            <PrinterIcon className="w-4 h-4" />
                           </button>
-                        </td>
-                      )}
+                          {isActive && (
+                            <button
+                              onClick={() => setDeleteTxnModal({ open: true, txn })}
+                              className="text-slate-400 hover:text-red-600 transition-colors"
+                              title="Delete transaction"
+                            >
+                              <TrashIcon className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   );
                 })}
@@ -466,6 +770,39 @@ export default function LedgerPage() {
           </div>
         </div>
       )}
+
+      {/* Transaction Receipt Preview */}
+      <Modal
+        open={txnPreviewModal.open}
+        onClose={closeTxnPreview}
+        title="Receipt Preview"
+        size="lg"
+      >
+        <div className="space-y-3">
+          <iframe
+            ref={txnIframeRef}
+            srcDoc={txnPreviewModal.html}
+            title="Receipt Preview"
+            className="w-full border border-slate-200 rounded"
+            style={{ minHeight: 300, maxHeight: 600, overflowX: 'hidden' }}
+            onLoad={(e) => {
+              const doc = e.target.contentDocument;
+              if (doc) e.target.style.height = Math.min(doc.body.scrollHeight + 4, 600) + 'px';
+            }}
+          />
+          <div className="flex justify-end gap-3">
+            <button type="button" onClick={closeTxnPreview} className="btn-secondary">Close</button>
+            <button
+              type="button"
+              onClick={() => txnIframeRef.current?.contentWindow?.print()}
+              className="btn-primary flex items-center gap-1.5"
+            >
+              <PrinterIcon className="h-4 w-4" />
+              Print
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Close Ledger Confirmation */}
       <Modal open={closeLedgerModal} onClose={() => setCloseLedgerModal(false)} title="Close Ledger" size="sm">

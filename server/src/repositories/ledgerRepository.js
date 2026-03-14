@@ -31,8 +31,8 @@ class LedgerRepository {
     const db = getDb();
     const stmt = db.prepare(`
       INSERT INTO ledgers (ledger_type_id, name, address, phone, place, gst_no, state_code, igst_status,
-                           opening_balance, current_balance, interest_rate, interest_scheme, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                           opening_balance, current_balance, interest_rate, interest_scheme, ledger_date, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const result = stmt.run(
       data.ledger_type_id,
@@ -47,6 +47,7 @@ class LedgerRepository {
       data.opening_balance || 0,
       data.interest_rate || 0,
       data.interest_scheme || 'NONE',
+      data.ledger_date || '',
       data.notes || ''
     );
     return this.findById(result.lastInsertRowid);
@@ -58,14 +59,14 @@ class LedgerRepository {
       UPDATE ledgers
       SET ledger_type_id = ?, name = ?, address = ?, phone = ?, place = ?,
           gst_no = ?, state_code = ?, igst_status = ?,
-          interest_rate = ?, interest_scheme = ?, notes = ?,
+          interest_rate = ?, interest_scheme = ?, ledger_date = ?, notes = ?,
           status = ?,
           updated_at = datetime('now', 'localtime')
       WHERE id = ?
     `).run(
       data.ledger_type_id, data.name, data.address || '', data.phone || '', data.place || '',
       data.gst_no || '', data.state_code || '', data.igst_status || 'NO',
-      data.interest_rate || 0, data.interest_scheme || 'NONE', data.notes || '',
+      data.interest_rate || 0, data.interest_scheme || 'NONE', data.ledger_date || '', data.notes || '',
       data.status || 'active', id
     );
     return this.findById(id);

@@ -11,8 +11,8 @@ class InterestService {
 
   /**
    * Generate interest entries for a single ledger up to a given date (or today).
-   * DAILY:   current_balance × rate / 100          per month (rate = monthly %)
-   * MONTHLY: current_balance × rate / 100 / 12     per month (rate = annual %)
+   * DAILY:   current_balance × rate/100  per day   (rate = daily %)
+   * MONTHLY: current_balance × rate/100  per month (rate = monthly %)
    */
   generateForLedger(ledgerId, upToDate = null) {
     if (!this.isModuleEnabled()) return [];
@@ -28,6 +28,8 @@ class InterestService {
     let startDate;
     if (lastToDate) {
       startDate = this._nextDay(lastToDate);
+    } else if (ledger.ledger_date) {
+      startDate = ledger.ledger_date;
     } else {
       startDate = ledger.created_at
         ? ledger.created_at.split(' ')[0].split('T')[0]
@@ -41,27 +43,22 @@ class InterestService {
     const rate = ledger.interest_rate;
 
     if (ledger.interest_scheme === 'DAILY') {
+      // One entry per calendar day: daily_amount = principal × rate/100
       let current = startDate;
       while (current <= today) {
-        const monthEnd = this._endOfMonth(current);
-        const periodEnd = monthEnd <= today ? monthEnd : today;
-        const periodDays = this._dayDiff(current, periodEnd) + 1;
-
-        if (periodDays > 0 && !interestRepository.existsForPeriod(ledgerId, current, periodEnd)) {
+        if (!interestRepository.existsForPeriod(ledgerId, current, current)) {
           const amount = Math.round((principal * rate / 100) * 100) / 100;
           entries.push({
             ledger_id: ledgerId,
             amount,
             from_date: current,
-            to_date: periodEnd,
-            days: periodDays,
+            to_date: current,
+            days: 1,
             rate,
             principal_at_time: principal,
           });
         }
-
-        current = this._firstOfNextMonth(current);
-        if (current > today) break;
+        current = this._nextDay(current);
       }
     } else if (ledger.interest_scheme === 'MONTHLY') {
       let current = startDate;
@@ -71,7 +68,7 @@ class InterestService {
         const periodDays = this._dayDiff(current, periodEnd) + 1;
 
         if (periodDays > 0 && !interestRepository.existsForPeriod(ledgerId, current, periodEnd)) {
-          const amount = Math.round((principal * rate / 100 / 12) * 100) / 100;
+          const amount = Math.round((principal * rate / 100) * 100) / 100;
           entries.push({
             ledger_id: ledgerId,
             amount,
@@ -138,6 +135,21 @@ class InterestService {
     return interestRepository.getTotalPendingByLedger(ledgerId);
   }
 
+  markPaid(id, paidDate = null, amount = null) {
+    if (!this.isModuleEnabled()) throw new AppError('Interest module is not enabled', 400);
+    const entry = interestRepository.findById(id);
+    if (!entry) throw new AppError('Interest entry not found', 404);
+    const parsedAmount = amount != null ? parseFloat(amount) : null;
+    return interestRepository.markPaid(id, paidDate || this._todayISO(), isNaN(parsedAmount) ? null : parsedAmount);
+  }
+
+  deleteEntry(id) {
+    if (!this.isModuleEnabled()) throw new AppError('Interest module is not enabled', 400);
+    const entry = interestRepository.findById(id);
+    if (!entry) throw new AppError('Interest entry not found', 404);
+    interestRepository.deleteById(id);
+  }
+
   // ── Date utility helpers ─────────────────────────────────────────────────
 
   _todayISO() {
@@ -167,6 +179,11 @@ class InterestService {
     const d1 = new Date(dateStr1 + 'T00:00:00');
     const d2 = new Date(dateStr2 + 'T00:00:00');
     return Math.round((d2 - d1) / (1000 * 60 * 60 * 24));
+  }
+
+  _daysInMonth(dateStr) {
+    const [y, m] = dateStr.split('-').map(Number);
+    return new Date(y, m, 0).getDate();
   }
 }
 

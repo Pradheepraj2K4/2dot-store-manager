@@ -7,6 +7,7 @@ import LedgerCreationPage from './components/ledgers/LedgerCreationPage';
 import LedgerListPage from './components/ledgers/LedgerListPage';
 import LedgerPage from './components/ledgers/LedgerPage';
 import PendingInterestPage from './components/accounts/PendingInterestPage';
+import PaidInterestPage from './components/accounts/PaidInterestPage';
 import ReportsPage from './components/reports/ReportsPage';
 import OutstandingBalanceReportPage from './components/reports/OutstandingBalanceReportPage';
 import StatementOfAccountPage from './components/reports/StatementOfAccountPage';
@@ -30,6 +31,7 @@ export default function App() {
                 <Route path="/ledgers" element={<LedgerListPage />} />
                 <Route path="/ledger/:id" element={<LedgerPage />} />
                 <Route path="/pending-interest" element={<PendingInterestPage />} />
+                <Route path="/paid-interest" element={<PaidInterestPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/outstanding-balances" element={<OutstandingBalanceReportPage />} />
                 <Route path="/statement-of-account" element={<StatementOfAccountPage />} />

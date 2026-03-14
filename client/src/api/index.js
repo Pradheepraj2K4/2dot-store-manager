@@ -63,6 +63,8 @@ export const interestApi = {
     return api.get(`/interest${qs ? `?${qs}` : ''}`);
   },
   generate: (data = {}) => api.post('/interest/generate', data),
+  markPaid: (id, paidDate, amount) => api.post(`/interest/${id}/pay`, { paidDate: paidDate || null, amount: amount ?? null }),
+  deleteEntry: (id) => api.delete(`/interest/${id}`),
 };
 
 export const reportApi = {

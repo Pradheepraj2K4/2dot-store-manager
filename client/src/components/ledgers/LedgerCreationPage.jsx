@@ -1,13 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ledgerApi, ledgerTypeApi, interestApi } from '../../api';
+import { todayISO } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 import { BookOpenIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 
 // Prevent mouse-wheel from changing number input values
 const noWheel = (e) => e.target.blur();
 
-const GST_REGEX   = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z0-9]{1}Z[A-Z0-9]{1}$/;
+const GST_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z0-9]{1}Z[A-Z0-9]{1}$/;
 const PHONE_REGEX = /^\d{10}$/;
 const STATE_REGEX = /^\d{2}$/;
 
@@ -42,6 +43,7 @@ const EMPTY_FORM = {
   opening_balance: '',
   interest_rate: '',
   interest_scheme: 'NONE',
+  ledger_date: todayISO(),
   notes: '',
 };
 
@@ -55,21 +57,22 @@ export default function LedgerCreationPage() {
   const [interestEnabled, setInterestEnabled] = useState(false);
 
   // Refs — order matches Enter-key chain
-  const ledgerTypeRef    = useRef(null);
-  const nameRef          = useRef(null);
-  const phoneRef         = useRef(null);
-  const placeRef         = useRef(null);
-  const gstNoRef         = useRef(null);
-  const stateCodeRef     = useRef(null);
-  const openingBalRef    = useRef(null);
-  const addressRef       = useRef(null);
-  const interestRateRef  = useRef(null);
-  const notesRef         = useRef(null);
-  const submitRef        = useRef(null);
+  const ledgerTypeRef = useRef(null);
+  const nameRef = useRef(null);
+  const phoneRef = useRef(null);
+  const placeRef = useRef(null);
+  const gstNoRef = useRef(null);
+  const stateCodeRef = useRef(null);
+  const openingBalRef = useRef(null);
+  const addressRef = useRef(null);
+  const ledgerDateRef = useRef(null);
+  const interestRateRef = useRef(null);
+  const notesRef = useRef(null);
+  const submitRef = useRef(null);
 
   useEffect(() => {
-    ledgerTypeApi.getAll().then((res) => setLedgerTypes(res.data)).catch(() => {});
-    interestApi.isEnabled().then((res) => setInterestEnabled(res.data.enabled)).catch(() => {});
+    ledgerTypeApi.getAll().then((res) => setLedgerTypes(res.data)).catch(() => { });
+    interestApi.isEnabled().then((res) => setInterestEnabled(res.data.enabled)).catch(() => { });
   }, []);
 
   const handleChange = (e) => {
@@ -143,8 +146,8 @@ export default function LedgerCreationPage() {
       <form onSubmit={handleSubmit} noValidate>
         <div className="card space-y-5">
 
-          {/* Row 1: Ledger Type | Name */}
-          <div className="grid grid-cols-2 gap-5">
+          {/* Row 1: Ledger Type | Name | Ledger Date */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             <div>
               <label className="label">Ledger Type *</label>
               <select
@@ -173,11 +176,23 @@ export default function LedgerCreationPage() {
                 value={form.name}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                onKeyDown={(e) => focusNext(e, phoneRef)}
+                onKeyDown={(e) => focusNext(e, ledgerDateRef)}
                 className={`input-field ${errors.name ? 'border-red-400 focus:ring-red-400' : ''}`}
                 placeholder="Full name"
               />
               <FieldError msg={errors.name} />
+            </div>
+            <div>
+              <label className="label">Ledger Date</label>
+              <input
+                ref={ledgerDateRef}
+                type="date"
+                name="ledger_date"
+                value={form.ledger_date}
+                onChange={handleChange}
+                onKeyDown={(e) => focusNext(e, phoneRef)}
+                className="input-field"
+              />
             </div>
           </div>
 
@@ -338,14 +353,14 @@ export default function LedgerCreationPage() {
                   >
                     <option value="NONE">None</option>
                     <option value="DAILY">Daily (monthly rate)</option>
-                    <option value="MONTHLY">Monthly (annual rate)</option>
+                    <option value="MONTHLY">Monthly (monthly rate)</option>
                   </select>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Row 7: Notes (full width) */}
+          {/* Notes (full width) */}
           <div>
             <label className="label">Notes</label>
             <input

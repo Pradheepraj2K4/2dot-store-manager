@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { reportApi, ledgerTypeApi } from '../../api';
+import { reportApi, ledgerTypeApi, interestSchemeApi } from '../../api';
 import { formatCurrency, formatDate, todayISO } from '../../utils/helpers';
 import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -58,12 +58,14 @@ export default function ReportsPage() {
   // ── State ──────────────────────────────────────────────────────────────
   const [transactions, setTransactions] = useState([]);
   const [ledgerTypes, setLedgerTypes]   = useState([]);
+  const [interestSchemes, setInterestSchemes] = useState([]);
   const [loading, setLoading]           = useState(false);
   const [initDone, setInitDone]         = useState(false);
 
   // ── Filters ────────────────────────────────────────────────────────────
   const [entryTypeFilter, setEntryTypeFilter] = useState(searchParams.get('entryType') || 'all');
   const [ledgerTypeFilter, setLedgerTypeFilter] = useState('all');
+  const [interestSchemeFilter, setInterestSchemeFilter] = useState('all');
   const [search, setSearch]         = useState('');
   const [activePreset, setActivePreset] = useState('this_month');
   const today = new Date();
@@ -78,6 +80,7 @@ export default function ReportsPage() {
   // ── Fetch ledger types once ────────────────────────────────────────────
   useEffect(() => {
     ledgerTypeApi.getAll().then((res) => setLedgerTypes(res.data)).catch(() => {});
+    interestSchemeApi.getAll().then((res) => setInterestSchemes(res.data || [])).catch(() => {});
   }, []);
 
   // ── Fetch ──────────────────────────────────────────────────────────────
@@ -88,6 +91,7 @@ export default function ReportsPage() {
       const params = {};
       if (entryTypeFilter !== 'all') params.entryType = entryTypeFilter;
       if (ledgerTypeFilter !== 'all') params.ledgerTypeId = ledgerTypeFilter;
+      if (interestSchemeFilter !== 'all') params.interestSchemeId = interestSchemeFilter;
       if (range) {
         params.fromDate = range.from;
         params.toDate = range.to;
@@ -101,7 +105,7 @@ export default function ReportsPage() {
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entryTypeFilter, ledgerTypeFilter, activePreset, customFrom, customTo]);
+  }, [entryTypeFilter, ledgerTypeFilter, interestSchemeFilter, activePreset, customFrom, customTo]);
 
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
@@ -215,6 +219,25 @@ export default function ReportsPage() {
               </button>
             ))}
           </div>
+
+          {/* Interest scheme */}
+          {interestSchemes.length > 0 && (
+            <div className="flex gap-1 p-1 bg-slate-100 rounded-lg flex-wrap">
+              {[['all', 'All Schemes'], ...interestSchemes.map((s) => [String(s.id), s.name])].map(([val, label]) => (
+                <button
+                  key={val}
+                  onClick={() => setInterestSchemeFilter(val)}
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                    interestSchemeFilter === val
+                      ? 'bg-white text-slate-800 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Search */}
           <div className="relative w-52">

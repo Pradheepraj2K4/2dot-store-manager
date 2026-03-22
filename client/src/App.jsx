@@ -15,6 +15,7 @@ import SettingsPage from './components/settings/SettingsPage';
 import DeveloperSettingsPage from './components/settings/DeveloperSettingsPage';
 import ExpensePage from './components/expenses/ExpensePage';
 import ExpenseReportsPage from './components/expenses/ExpenseReportsPage';
+import PaymentEntryPage from './components/payments/PaymentEntryPage';
 
 export default function App() {
   return (
@@ -39,6 +40,7 @@ export default function App() {
                 <Route path="/developer-settings" element={<DeveloperSettingsPage />} />
                 <Route path="/expenses" element={<ExpensePage />} />
                 <Route path="/expense-reports" element={<ExpenseReportsPage />} />
+                <Route path="/payment-entry" element={<PaymentEntryPage />} />
               </Routes>
             </AppLayout>
           </ProtectedRoute>

@@ -4,9 +4,11 @@ class LedgerRepository {
   findAll({ ledgerTypeId, status, behaviour } = {}) {
     const db = getDb();
     let query = `
-      SELECT l.*, lt.name AS type_name, lt.behaviour
+      SELECT l.*, lt.name AS type_name, lt.behaviour,
+             isc.name AS scheme_name, isc.nature AS scheme_nature
       FROM ledgers l
       JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      LEFT JOIN interest_schemes isc ON l.interest_scheme_id = isc.id
       WHERE 1=1
     `;
     const params = [];
@@ -20,18 +22,27 @@ class LedgerRepository {
   findById(id) {
     const db = getDb();
     return db.prepare(`
-      SELECT l.*, lt.name AS type_name, lt.behaviour
+      SELECT l.*, lt.name AS type_name, lt.behaviour,
+             isc.name AS scheme_name, isc.nature AS scheme_nature
       FROM ledgers l
       JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      LEFT JOIN interest_schemes isc ON l.interest_scheme_id = isc.id
       WHERE l.id = ?
     `).get(id);
   }
 
   create(data) {
     const db = getDb();
+    // Resolve interest_scheme nature from interest_scheme_id if provided
+    let interest_scheme = data.interest_scheme || 'NONE';
+    const interest_scheme_id = data.interest_scheme_id ? parseInt(data.interest_scheme_id) : null;
+    if (interest_scheme_id) {
+      const scheme = db.prepare('SELECT nature FROM interest_schemes WHERE id = ?').get(interest_scheme_id);
+      if (scheme) interest_scheme = scheme.nature;
+    }
     const stmt = db.prepare(`
       INSERT INTO ledgers (ledger_type_id, name, address, phone, place, gst_no, state_code, igst_status,
-                           opening_balance, current_balance, interest_rate, interest_scheme, ledger_date, notes)
+                           current_balance, interest_rate, interest_scheme, interest_scheme_id, ledger_date, notes)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const result = stmt.run(
@@ -43,10 +54,10 @@ class LedgerRepository {
       data.gst_no || '',
       data.state_code || '',
       data.igst_status || 'NO',
-      data.opening_balance || 0,
-      data.opening_balance || 0,
+      0,
       data.interest_rate || 0,
-      data.interest_scheme || 'NONE',
+      interest_scheme,
+      interest_scheme_id,
       data.ledger_date || '',
       data.notes || ''
     );
@@ -55,18 +66,26 @@ class LedgerRepository {
 
   update(id, data) {
     const db = getDb();
+    // Resolve interest_scheme nature from interest_scheme_id if provided
+    let interest_scheme = data.interest_scheme || 'NONE';
+    const interest_scheme_id = data.interest_scheme_id ? parseInt(data.interest_scheme_id) : null;
+    if (interest_scheme_id) {
+      const scheme = db.prepare('SELECT nature FROM interest_schemes WHERE id = ?').get(interest_scheme_id);
+      if (scheme) interest_scheme = scheme.nature;
+    }
     db.prepare(`
       UPDATE ledgers
       SET ledger_type_id = ?, name = ?, address = ?, phone = ?, place = ?,
           gst_no = ?, state_code = ?, igst_status = ?,
-          interest_rate = ?, interest_scheme = ?, ledger_date = ?, notes = ?,
-          status = ?,
+          interest_rate = ?, interest_scheme = ?, interest_scheme_id = ?,
+          ledger_date = ?, notes = ?, status = ?,
           updated_at = datetime('now', 'localtime')
       WHERE id = ?
     `).run(
       data.ledger_type_id, data.name, data.address || '', data.phone || '', data.place || '',
       data.gst_no || '', data.state_code || '', data.igst_status || 'NO',
-      data.interest_rate || 0, data.interest_scheme || 'NONE', data.ledger_date || '', data.notes || '',
+      data.interest_rate || 0, interest_scheme, interest_scheme_id,
+      data.ledger_date || '', data.notes || '',
       data.status || 'active', id
     );
     return this.findById(id);

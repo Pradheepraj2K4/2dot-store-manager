@@ -15,6 +15,7 @@ const DEFAULT_SETTINGS = [
   ['email',      ''],
   ['interest_module_enabled', 'false'],
   ['expense_module_enabled', 'false'],
+  ['gst_fields_enabled', 'false'],
   ['print_receipts_payment_enabled', 'false'],
   ['print_receipts_interest_enabled', 'false'],
   [

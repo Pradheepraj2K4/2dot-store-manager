@@ -14,6 +14,7 @@ import {
   DocumentTextIcon,
   BanknotesIcon,
   CheckCircleIcon,
+  ArrowsRightLeftIcon,
 } from '@heroicons/react/24/outline';
 import { logout } from '../../utils/auth';
 import { interestApi, expenseApi } from '../../api';
@@ -23,6 +24,7 @@ const baseNavigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
   { name: 'Ledger Creation', href: '/ledger-creation', icon: PlusCircleIcon },
   { name: 'Ledgers', href: '/ledgers', icon: BookOpenIcon },
+  { name: 'Payment/Receipt Entry', href: '/payment-entry', icon: ArrowsRightLeftIcon },
   { name: 'Reports', href: '/reports', icon: DocumentChartBarIcon },
   { name: 'Outstanding Balances', href: '/outstanding-balances', icon: CurrencyRupeeIcon },
   { name: 'Statement of Account', href: '/statement-of-account', icon: DocumentTextIcon },

@@ -23593,6 +23593,42 @@ var require_v8 = __commonJS({
   }
 });
 
+// src/db/migrations/v9.js
+var require_v9 = __commonJS({
+  "src/db/migrations/v9.js"(exports2, module2) {
+    var VERSION = 9;
+    function up(db) {
+      db.exec(`
+    CREATE TABLE IF NOT EXISTS interest_schemes (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT    NOT NULL UNIQUE,
+      nature     TEXT    NOT NULL DEFAULT 'MONTHLY' CHECK(nature IN ('DAILY', 'MONTHLY')),
+      is_system  INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    -- Seed the two built-in schemes
+    INSERT OR IGNORE INTO interest_schemes (name, nature, is_system) VALUES ('Daily',   'DAILY',   1);
+    INSERT OR IGNORE INTO interest_schemes (name, nature, is_system) VALUES ('Monthly', 'MONTHLY', 1);
+  `);
+      try {
+        db.exec(`ALTER TABLE ledgers ADD COLUMN interest_scheme_id INTEGER REFERENCES interest_schemes(id);`);
+      } catch (_) {
+      }
+      db.exec(`
+    UPDATE ledgers
+    SET interest_scheme_id = (
+      SELECT id FROM interest_schemes WHERE nature = ledgers.interest_scheme
+    )
+    WHERE interest_scheme IN ('DAILY', 'MONTHLY') AND interest_scheme_id IS NULL;
+  `);
+    }
+    function down() {
+    }
+    module2.exports = { VERSION, up, down };
+  }
+});
+
 // src/db/migrations/index.js
 var require_migrations = __commonJS({
   "src/db/migrations/index.js"(exports2, module2) {
@@ -23604,6 +23640,7 @@ var require_migrations = __commonJS({
     var v6 = require_v6();
     var v7 = require_v7();
     var v8 = require_v8();
+    var v9 = require_v9();
     var MIGRATIONS = [
       v1,
       v2,
@@ -23612,8 +23649,9 @@ var require_migrations = __commonJS({
       v5,
       v6,
       v7,
-      v8
-      // v9, v10, … add future migrations here
+      v8,
+      v9
+      // v10, … add future migrations here
     ];
     function bootstrapVersionTable(db) {
       db.exec(`
@@ -23671,6 +23709,7 @@ var require_settings = __commonJS({
       ["email", ""],
       ["interest_module_enabled", "false"],
       ["expense_module_enabled", "false"],
+      ["gst_fields_enabled", "false"],
       ["print_receipts_payment_enabled", "false"],
       ["print_receipts_interest_enabled", "false"],
       [
@@ -23871,9 +23910,11 @@ var require_ledgerRepository = __commonJS({
       findAll({ ledgerTypeId, status, behaviour } = {}) {
         const db = getDb();
         let query = `
-      SELECT l.*, lt.name AS type_name, lt.behaviour
+      SELECT l.*, lt.name AS type_name, lt.behaviour,
+             isc.name AS scheme_name, isc.nature AS scheme_nature
       FROM ledgers l
       JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      LEFT JOIN interest_schemes isc ON l.interest_scheme_id = isc.id
       WHERE 1=1
     `;
         const params = [];
@@ -23895,17 +23936,25 @@ var require_ledgerRepository = __commonJS({
       findById(id) {
         const db = getDb();
         return db.prepare(`
-      SELECT l.*, lt.name AS type_name, lt.behaviour
+      SELECT l.*, lt.name AS type_name, lt.behaviour,
+             isc.name AS scheme_name, isc.nature AS scheme_nature
       FROM ledgers l
       JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      LEFT JOIN interest_schemes isc ON l.interest_scheme_id = isc.id
       WHERE l.id = ?
     `).get(id);
       }
       create(data) {
         const db = getDb();
+        let interest_scheme = data.interest_scheme || "NONE";
+        const interest_scheme_id = data.interest_scheme_id ? parseInt(data.interest_scheme_id) : null;
+        if (interest_scheme_id) {
+          const scheme = db.prepare("SELECT nature FROM interest_schemes WHERE id = ?").get(interest_scheme_id);
+          if (scheme) interest_scheme = scheme.nature;
+        }
         const stmt = db.prepare(`
       INSERT INTO ledgers (ledger_type_id, name, address, phone, place, gst_no, state_code, igst_status,
-                           opening_balance, current_balance, interest_rate, interest_scheme, ledger_date, notes)
+                           current_balance, interest_rate, interest_scheme, interest_scheme_id, ledger_date, notes)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
         const result = stmt.run(
@@ -23917,10 +23966,10 @@ var require_ledgerRepository = __commonJS({
           data.gst_no || "",
           data.state_code || "",
           data.igst_status || "NO",
-          data.opening_balance || 0,
-          data.opening_balance || 0,
+          0,
           data.interest_rate || 0,
-          data.interest_scheme || "NONE",
+          interest_scheme,
+          interest_scheme_id,
           data.ledger_date || "",
           data.notes || ""
         );
@@ -23928,12 +23977,18 @@ var require_ledgerRepository = __commonJS({
       }
       update(id, data) {
         const db = getDb();
+        let interest_scheme = data.interest_scheme || "NONE";
+        const interest_scheme_id = data.interest_scheme_id ? parseInt(data.interest_scheme_id) : null;
+        if (interest_scheme_id) {
+          const scheme = db.prepare("SELECT nature FROM interest_schemes WHERE id = ?").get(interest_scheme_id);
+          if (scheme) interest_scheme = scheme.nature;
+        }
         db.prepare(`
       UPDATE ledgers
       SET ledger_type_id = ?, name = ?, address = ?, phone = ?, place = ?,
           gst_no = ?, state_code = ?, igst_status = ?,
-          interest_rate = ?, interest_scheme = ?, ledger_date = ?, notes = ?,
-          status = ?,
+          interest_rate = ?, interest_scheme = ?, interest_scheme_id = ?,
+          ledger_date = ?, notes = ?, status = ?,
           updated_at = datetime('now', 'localtime')
       WHERE id = ?
     `).run(
@@ -23946,7 +24001,8 @@ var require_ledgerRepository = __commonJS({
           data.state_code || "",
           data.igst_status || "NO",
           data.interest_rate || 0,
-          data.interest_scheme || "NONE",
+          interest_scheme,
+          interest_scheme_id,
           data.ledger_date || "",
           data.notes || "",
           data.status || "active",
@@ -24394,7 +24450,7 @@ var require_paymentRepository = __commonJS({
   "src/repositories/paymentRepository.js"(exports2, module2) {
     var { getDb } = require_database();
     var TransactionRepository = class {
-      findAll({ ledgerId, entryType, fromDate, toDate, ledgerTypeId, behaviour } = {}) {
+      findAll({ ledgerId, entryType, fromDate, toDate, ledgerTypeId, behaviour, interestSchemeId } = {}) {
         const db = getDb();
         let query = `
       SELECT t.*, l.name AS ledger_name, lt.name AS type_name, lt.behaviour,
@@ -24428,6 +24484,10 @@ var require_paymentRepository = __commonJS({
         if (behaviour) {
           query += " AND lt.behaviour = ?";
           params.push(behaviour);
+        }
+        if (interestSchemeId) {
+          query += " AND l.interest_scheme_id = ?";
+          params.push(interestSchemeId);
         }
         query += " ORDER BY t.date DESC, t.id DESC";
         return db.prepare(query).all(...params);
@@ -24586,6 +24646,17 @@ var require_interestRepository = __commonJS({
         const row = db.prepare(`
       SELECT COALESCE(SUM(amount), 0) AS total_pending FROM interest_entries WHERE status = 'pending'
     `).get();
+        return row ? row.total_pending : 0;
+      }
+      getTotalPendingByBehaviour(behaviour) {
+        const db = getDb();
+        const row = db.prepare(`
+      SELECT COALESCE(SUM(ie.amount), 0) AS total_pending
+      FROM interest_entries ie
+      JOIN ledgers l ON ie.ledger_id = l.id
+      JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      WHERE ie.status = 'pending' AND lt.behaviour = ?
+    `).get(behaviour);
         return row ? row.total_pending : 0;
       }
       getLastEntryToDate(ledgerId) {
@@ -24773,14 +24844,15 @@ var require_paymentController = __commonJS({
     var TransactionController = class {
       getAll(req, res, next) {
         try {
-          const { ledgerId, entryType, fromDate, toDate, ledgerTypeId, behaviour } = req.query;
+          const { ledgerId, entryType, fromDate, toDate, ledgerTypeId, behaviour, interestSchemeId } = req.query;
           const transactions = transactionService.getTransactions({
             ledgerId: ledgerId ? parseInt(ledgerId) : void 0,
             entryType: entryType || void 0,
             fromDate: fromDate || void 0,
             toDate: toDate || void 0,
             ledgerTypeId: ledgerTypeId ? parseInt(ledgerTypeId) : void 0,
-            behaviour: behaviour || void 0
+            behaviour: behaviour || void 0,
+            interestSchemeId: interestSchemeId ? parseInt(interestSchemeId) : void 0
           });
           res.json({ success: true, data: transactions });
         } catch (err) {
@@ -25384,6 +25456,11 @@ var require_dashboardController = __commonJS({
           const interestModuleEnabled = settingsRepository.get("interest_module_enabled");
           const interestEnabled = interestModuleEnabled === true || interestModuleEnabled === "true";
           const pendingInterest = interestEnabled ? interestRepository.getTotalPendingAll() : void 0;
+          const customerPendingInterest = interestEnabled ? interestRepository.getTotalPendingByBehaviour("customer") : 0;
+          const supplierPendingInterest = interestEnabled ? interestRepository.getTotalPendingByBehaviour("supplier") : 0;
+          const customerOutstanding = totalReceivable + customerPendingInterest;
+          const supplierOutstanding = totalPayable + supplierPendingInterest;
+          const interestProfit = interestEnabled ? customerPendingInterest - supplierPendingInterest : 0;
           res.json({
             success: true,
             data: {
@@ -25393,6 +25470,14 @@ var require_dashboardController = __commonJS({
               recentTransactions,
               totalReceivable,
               totalPayable,
+              customerPrincipal: totalReceivable,
+              customerPendingInterest,
+              customerOutstanding,
+              supplierPrincipal: totalPayable,
+              supplierPendingInterest,
+              supplierOutstanding,
+              interestProfit,
+              interestEnabled,
               topOutstanding,
               outstandingByType: Object.values(outstandingByType),
               expenseSummary,
@@ -25877,6 +25962,140 @@ var require_expenseRoutes = __commonJS({
   }
 });
 
+// src/repositories/interestSchemeRepository.js
+var require_interestSchemeRepository = __commonJS({
+  "src/repositories/interestSchemeRepository.js"(exports2, module2) {
+    var { getDb } = require_database();
+    var InterestSchemeRepository = class {
+      findAll() {
+        return getDb().prepare("SELECT * FROM interest_schemes ORDER BY is_system DESC, name ASC").all();
+      }
+      findById(id) {
+        return getDb().prepare("SELECT * FROM interest_schemes WHERE id = ?").get(id);
+      }
+      findByName(name) {
+        return getDb().prepare("SELECT * FROM interest_schemes WHERE LOWER(name) = LOWER(?)").get(name);
+      }
+      create({ name, nature }) {
+        const db = getDb();
+        const result = db.prepare("INSERT INTO interest_schemes (name, nature, is_system) VALUES (?, ?, 0)").run(name, nature);
+        return this.findById(result.lastInsertRowid);
+      }
+      updateName(id, name) {
+        getDb().prepare("UPDATE interest_schemes SET name = ? WHERE id = ?").run(name, id);
+        return this.findById(id);
+      }
+      update(id, { name, nature }) {
+        const db = getDb();
+        db.prepare(
+          "UPDATE interest_schemes SET name = ?, nature = ? WHERE id = ? AND is_system = 0"
+        ).run(name, nature, id);
+        return this.findById(id);
+      }
+      countLedgers(id) {
+        return getDb().prepare("SELECT COUNT(*) AS count FROM ledgers WHERE interest_scheme_id = ?").get(id).count;
+      }
+      delete(id) {
+        return getDb().prepare("DELETE FROM interest_schemes WHERE id = ? AND is_system = 0").run(id);
+      }
+    };
+    module2.exports = new InterestSchemeRepository();
+  }
+});
+
+// src/controllers/interestSchemeController.js
+var require_interestSchemeController = __commonJS({
+  "src/controllers/interestSchemeController.js"(exports2, module2) {
+    var interestSchemeRepository = require_interestSchemeRepository();
+    var { AppError } = require_errorHandler();
+    var InterestSchemeController = class {
+      getAll(req, res, next) {
+        try {
+          const schemes = interestSchemeRepository.findAll();
+          res.json({ success: true, data: schemes });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getById(req, res, next) {
+        try {
+          const scheme = interestSchemeRepository.findById(parseInt(req.params.id));
+          if (!scheme) throw new AppError("Interest scheme not found", 404);
+          res.json({ success: true, data: scheme });
+        } catch (err) {
+          next(err);
+        }
+      }
+      create(req, res, next) {
+        try {
+          const { name, nature } = req.body;
+          if (!name || !name.trim()) throw new AppError("Name is required", 400);
+          if (!["DAILY", "MONTHLY"].includes(nature))
+            throw new AppError("Nature must be DAILY or MONTHLY", 400);
+          const existing = interestSchemeRepository.findByName(name.trim());
+          if (existing) throw new AppError("A scheme with this name already exists", 409);
+          const scheme = interestSchemeRepository.create({ name: name.trim(), nature });
+          res.status(201).json({ success: true, data: scheme });
+        } catch (err) {
+          next(err);
+        }
+      }
+      update(req, res, next) {
+        try {
+          const id = parseInt(req.params.id);
+          const { name, nature } = req.body;
+          if (!name || !name.trim()) throw new AppError("Name is required", 400);
+          const scheme = interestSchemeRepository.findById(id);
+          if (!scheme) throw new AppError("Interest scheme not found", 404);
+          if (scheme.is_system) {
+            const updated2 = interestSchemeRepository.updateName(id, name.trim());
+            return res.json({ success: true, data: updated2 });
+          }
+          if (!["DAILY", "MONTHLY"].includes(nature))
+            throw new AppError("Nature must be DAILY or MONTHLY", 400);
+          const existing = interestSchemeRepository.findByName(name.trim());
+          if (existing && existing.id !== id) throw new AppError("A scheme with this name already exists", 409);
+          const updated = interestSchemeRepository.update(id, { name: name.trim(), nature });
+          res.json({ success: true, data: updated });
+        } catch (err) {
+          next(err);
+        }
+      }
+      delete(req, res, next) {
+        try {
+          const id = parseInt(req.params.id);
+          const scheme = interestSchemeRepository.findById(id);
+          if (!scheme) throw new AppError("Interest scheme not found", 404);
+          if (scheme.is_system) throw new AppError("Cannot delete system schemes", 403);
+          const count = interestSchemeRepository.countLedgers(id);
+          if (count > 0)
+            throw new AppError(`Cannot delete: ${count} ledger(s) use this scheme`, 409);
+          interestSchemeRepository.delete(id);
+          res.json({ success: true, data: { deleted: true } });
+        } catch (err) {
+          next(err);
+        }
+      }
+    };
+    module2.exports = new InterestSchemeController();
+  }
+});
+
+// src/routes/interestSchemeRoutes.js
+var require_interestSchemeRoutes = __commonJS({
+  "src/routes/interestSchemeRoutes.js"(exports2, module2) {
+    var express2 = require_express2();
+    var router = express2.Router();
+    var interestSchemeController = require_interestSchemeController();
+    router.get("/", (req, res, next) => interestSchemeController.getAll(req, res, next));
+    router.get("/:id", (req, res, next) => interestSchemeController.getById(req, res, next));
+    router.post("/", (req, res, next) => interestSchemeController.create(req, res, next));
+    router.put("/:id", (req, res, next) => interestSchemeController.update(req, res, next));
+    router.delete("/:id", (req, res, next) => interestSchemeController.delete(req, res, next));
+    module2.exports = router;
+  }
+});
+
 // src/index.js
 var express = require_express2();
 var path = require("path");
@@ -25893,6 +26112,7 @@ var reportRoutes = require_reportRoutes();
 var dashboardRoutes = require_dashboardRoutes();
 var interestRoutes = require_interestRoutes();
 var expenseRoutes = require_expenseRoutes();
+var interestSchemeRoutes = require_interestSchemeRoutes();
 var app = express();
 var PORT = process.env.PORT || 3456;
 app.use(cors());
@@ -25918,6 +26138,7 @@ app.use("/api/reports", reportRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/interest", interestRoutes);
 app.use("/api/expenses", expenseRoutes);
+app.use("/api/interest-schemes", interestSchemeRoutes);
 var clientBuildPath = process.env.CLIENT_DIST_PATH || path.join(__dirname, "..", "..", "client", "dist");
 app.use(express.static(clientBuildPath));
 app.get("*", (req, res) => {

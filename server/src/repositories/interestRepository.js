@@ -60,6 +60,18 @@ class InterestRepository {
     return row ? row.total_pending : 0;
   }
 
+  getTotalPendingByBehaviour(behaviour) {
+    const db = getDb();
+    const row = db.prepare(`
+      SELECT COALESCE(SUM(ie.amount), 0) AS total_pending
+      FROM interest_entries ie
+      JOIN ledgers l ON ie.ledger_id = l.id
+      JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      WHERE ie.status = 'pending' AND lt.behaviour = ?
+    `).get(behaviour);
+    return row ? row.total_pending : 0;
+  }
+
   getLastEntryToDate(ledgerId) {
     const db = getDb();
     const row = db.prepare('SELECT MAX(to_date) AS last_to_date FROM interest_entries WHERE ledger_id = ?').get(ledgerId);

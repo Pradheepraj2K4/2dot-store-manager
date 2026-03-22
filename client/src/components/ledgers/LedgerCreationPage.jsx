@@ -1,12 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ledgerApi, ledgerTypeApi, interestApi } from '../../api';
-import { todayISO } from '../../utils/helpers';
+import { ledgerApi, ledgerTypeApi, settingsApi } from '../../api';
 import toast from 'react-hot-toast';
 import { BookOpenIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
-
-// Prevent mouse-wheel from changing number input values
-const noWheel = (e) => e.target.blur();
 
 const GST_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z0-9]{1}Z[A-Z0-9]{1}$/;
 const PHONE_REGEX = /^\d{10}$/;
@@ -21,8 +17,6 @@ function validate(form) {
   if (form.gst_no && !GST_REGEX.test(form.gst_no.trim().toUpperCase())) errors.gst_no = 'Invalid GST number. Expected format: 27AAAAA0000A1Z5';
   if (form.state_code && !STATE_REGEX.test(form.state_code.trim())) errors.state_code = 'State code must be a 2-digit number (e.g. 27).';
   if (form.gst_no && !form.state_code) errors.state_code = 'State code is required when GST number is provided.';
-  const bal = parseFloat(form.opening_balance);
-  if (form.opening_balance !== '' && (isNaN(bal) || bal < 0)) errors.opening_balance = 'Must be a non-negative number.';
   return errors;
 }
 
@@ -40,10 +34,6 @@ const EMPTY_FORM = {
   gst_no: '',
   state_code: '',
   igst_status: 'NO',
-  opening_balance: '',
-  interest_rate: '',
-  interest_scheme: 'NONE',
-  ledger_date: todayISO(),
   notes: '',
 };
 
@@ -54,7 +44,7 @@ export default function LedgerCreationPage() {
   const [touched, setTouched] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [ledgerTypes, setLedgerTypes] = useState([]);
-  const [interestEnabled, setInterestEnabled] = useState(false);
+  const [gstFieldsEnabled, setGstFieldsEnabled] = useState(false);
 
   // Refs — order matches Enter-key chain
   const ledgerTypeRef = useRef(null);
@@ -63,16 +53,16 @@ export default function LedgerCreationPage() {
   const placeRef = useRef(null);
   const gstNoRef = useRef(null);
   const stateCodeRef = useRef(null);
-  const openingBalRef = useRef(null);
   const addressRef = useRef(null);
-  const ledgerDateRef = useRef(null);
-  const interestRateRef = useRef(null);
   const notesRef = useRef(null);
   const submitRef = useRef(null);
 
   useEffect(() => {
     ledgerTypeApi.getAll().then((res) => setLedgerTypes(res.data)).catch(() => { });
-    interestApi.isEnabled().then((res) => setInterestEnabled(res.data.enabled)).catch(() => { });
+    settingsApi.get('gst_fields_enabled').then((res) => {
+      const v = res.data?.value;
+      setGstFieldsEnabled(v === true || v === 'true');
+    }).catch(() => { });
   }, []);
 
   const handleChange = (e) => {
@@ -111,8 +101,6 @@ export default function LedgerCreationPage() {
         name: form.name.trim(),
         gst_no: form.gst_no.trim().toUpperCase(),
         state_code: form.state_code.trim(),
-        opening_balance: form.opening_balance ? parseFloat(form.opening_balance) : 0,
-        interest_rate: form.interest_rate ? parseFloat(form.interest_rate) : 0,
       });
       toast.success('Ledger created successfully');
       const newId = res.data?.id || res.data?.ledger?.id;
@@ -146,8 +134,8 @@ export default function LedgerCreationPage() {
       <form onSubmit={handleSubmit} noValidate>
         <div className="card space-y-5">
 
-          {/* Row 1: Ledger Type | Name | Ledger Date */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          {/* Row 1: Ledger Type | Name */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <label className="label">Ledger Type *</label>
               <select
@@ -176,23 +164,11 @@ export default function LedgerCreationPage() {
                 value={form.name}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                onKeyDown={(e) => focusNext(e, ledgerDateRef)}
+                onKeyDown={(e) => focusNext(e, phoneRef)}
                 className={`input-field ${errors.name ? 'border-red-400 focus:ring-red-400' : ''}`}
                 placeholder="Full name"
               />
               <FieldError msg={errors.name} />
-            </div>
-            <div>
-              <label className="label">Ledger Date</label>
-              <input
-                ref={ledgerDateRef}
-                type="date"
-                name="ledger_date"
-                value={form.ledger_date}
-                onChange={handleChange}
-                onKeyDown={(e) => focusNext(e, phoneRef)}
-                className="input-field"
-              />
             </div>
           </div>
 
@@ -223,14 +199,15 @@ export default function LedgerCreationPage() {
                 name="place"
                 value={form.place}
                 onChange={handleChange}
-                onKeyDown={(e) => focusNext(e, gstNoRef)}
+                onKeyDown={(e) => focusNext(e, gstFieldsEnabled ? gstNoRef : addressRef)}
                 className="input-field"
                 placeholder="City / Town"
               />
             </div>
           </div>
 
-          {/* Row 3: GST | State Code */}
+          {/* Row 3: GST fields — shown only when enabled in dev settings */}
+          {gstFieldsEnabled && (
           <div className="grid grid-cols-2 gap-5">
             <div>
               <label className="label">GST Number</label>
@@ -257,35 +234,13 @@ export default function LedgerCreationPage() {
                 value={form.state_code}
                 onChange={handleChange}
                 onBlur={handleBlur}
-                onKeyDown={(e) => focusNext(e, openingBalRef)}
+                onKeyDown={(e) => focusNext(e, addressRef)}
                 className={`input-field ${errors.state_code ? 'border-red-400 focus:ring-red-400' : ''}`}
                 placeholder="e.g. 27"
                 maxLength={2}
                 inputMode="numeric"
               />
               <FieldError msg={errors.state_code} />
-            </div>
-          </div>
-
-          {/* Row 4: Opening Balance | IGST Applicable */}
-          <div className="grid grid-cols-2 gap-5">
-            <div>
-              <label className="label">Opening Balance</label>
-              <input
-                ref={openingBalRef}
-                type="number"
-                name="opening_balance"
-                value={form.opening_balance}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                onKeyDown={(e) => focusNext(e, addressRef)}
-                onWheel={noWheel}
-                className={`input-field ${errors.opening_balance ? 'border-red-400 focus:ring-red-400' : ''}`}
-                placeholder="0.00"
-                min="0"
-                step="0.01"
-              />
-              <FieldError msg={errors.opening_balance} />
             </div>
             <div>
               <label className="label">IGST Applicable</label>
@@ -306,8 +261,9 @@ export default function LedgerCreationPage() {
               </div>
             </div>
           </div>
+          )}
 
-          {/* Row 5: Address (full width) */}
+          {/* Row 4: Address (full width) */}
           <div>
             <label className="label">Address</label>
             <input
@@ -316,49 +272,11 @@ export default function LedgerCreationPage() {
               name="address"
               value={form.address}
               onChange={handleChange}
-              onKeyDown={(e) => focusNext(e, interestEnabled ? interestRateRef : notesRef)}
+              onKeyDown={(e) => focusNext(e, notesRef)}
               className="input-field"
               placeholder="Street address"
             />
           </div>
-
-          {/* Row 6: Interest Configuration (conditional) */}
-          {interestEnabled && (
-            <div className="border-t border-slate-200 pt-4">
-              <h3 className="text-sm font-semibold text-slate-700 mb-4">Interest Configuration</h3>
-              <div className="grid grid-cols-2 gap-5">
-                <div>
-                  <label className="label">Interest Rate (%)</label>
-                  <input
-                    ref={interestRateRef}
-                    type="number"
-                    name="interest_rate"
-                    value={form.interest_rate}
-                    onChange={handleChange}
-                    onKeyDown={(e) => focusNext(e, notesRef)}
-                    onWheel={noWheel}
-                    className="input-field"
-                    placeholder="0"
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-                <div>
-                  <label className="label">Interest Scheme</label>
-                  <select
-                    name="interest_scheme"
-                    value={form.interest_scheme}
-                    onChange={handleChange}
-                    className="input-field"
-                  >
-                    <option value="NONE">None</option>
-                    <option value="DAILY">Daily (monthly rate)</option>
-                    <option value="MONTHLY">Monthly (monthly rate)</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Notes (full width) */}
           <div>

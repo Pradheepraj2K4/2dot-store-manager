@@ -72,6 +72,13 @@ export const interestApi = {
   deleteEntry: (id) => api.delete(`/interest/${id}`),
 };
 
+export const interestSchemeApi = {
+  getAll: () => api.get('/interest-schemes'),
+  create: (data) => api.post('/interest-schemes', data),
+  update: (id, data) => api.put(`/interest-schemes/${id}`, data),
+  delete: (id) => api.delete(`/interest-schemes/${id}`),
+};
+
 export const reportApi = {
   getTransactions: (params = {}) => {
     const qs = new URLSearchParams(params).toString();

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { settingsApi, ledgerTypeApi } from '../../api';
+import { settingsApi, ledgerTypeApi, interestSchemeApi } from '../../api';
 import { isDevAuthenticated, devLogin, devLogout, getDevPassword } from '../../utils/auth';
 import { getReceiptLayout, saveReceiptLayout, DEFAULT_RECEIPT_LAYOUT } from '../../utils/receiptLayout';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -61,6 +61,8 @@ export default function DeveloperSettingsPage() {
   const [interestModuleEnabled, setInterestModuleEnabled] = useState(false);
   // Expense module state
   const [expenseModuleEnabled, setExpenseModuleEnabled] = useState(false);
+  // GST fields state
+  const [gstFieldsEnabled, setGstFieldsEnabled] = useState(false);
   // Print receipt settings
   const [printReceiptsPaymentEnabled, setPrintReceiptsPaymentEnabled] = useState(false);
   const [printReceiptsInterestEnabled, setPrintReceiptsInterestEnabled] = useState(false);
@@ -85,10 +87,17 @@ export default function DeveloperSettingsPage() {
   const [ltSaving, setLtSaving] = useState(false);
   const [editingType, setEditingType] = useState(null);
 
+  // Interest schemes state
+  const [schemes, setSchemes] = useState([]);
+  const [schForm, setSchForm] = useState({ name: '', nature: 'MONTHLY' });
+  const [schSaving, setSchSaving] = useState(false);
+  const [editingScheme, setEditingScheme] = useState(null);
+
   useEffect(() => {
     if (authenticated) {
       fetchSettings();
       fetchLedgerTypes();
+      fetchSchemes();
     } else {
       setLoading(false);
       setTimeout(() => passwordInputRef.current?.focus(), 100);
@@ -115,6 +124,8 @@ export default function DeveloperSettingsPage() {
       setInterestModuleEnabled(data.interest_module_enabled === true || data.interest_module_enabled === 'true');
       // Load expense module setting
       setExpenseModuleEnabled(data.expense_module_enabled === true || data.expense_module_enabled === 'true');
+      // Load GST fields setting
+      setGstFieldsEnabled(data.gst_fields_enabled === true || data.gst_fields_enabled === 'true');
       // Load print receipt settings
       setPrintReceiptsPaymentEnabled(data.print_receipts_payment_enabled === true || data.print_receipts_payment_enabled === 'true');
       setPrintReceiptsInterestEnabled(data.print_receipts_interest_enabled === true || data.print_receipts_interest_enabled === 'true');
@@ -140,6 +151,15 @@ export default function DeveloperSettingsPage() {
       setLedgerTypes(res.data || []);
     } catch (err) {
       toast.error('Failed to load ledger types');
+    }
+  };
+
+  const fetchSchemes = async () => {
+    try {
+      const res = await interestSchemeApi.getAll();
+      setSchemes(res.data || []);
+    } catch (err) {
+      toast.error('Failed to load interest schemes');
     }
   };
 
@@ -181,6 +201,49 @@ export default function DeveloperSettingsPage() {
       await ledgerTypeApi.delete(id);
       toast.success('Ledger type deleted');
       fetchLedgerTypes();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleCreateScheme = async (e) => {
+    e.preventDefault();
+    if (!schForm.name.trim()) return toast.error('Name is required');
+    try {
+      setSchSaving(true);
+      await interestSchemeApi.create({ name: schForm.name.trim(), nature: schForm.nature });
+      toast.success('Interest scheme created');
+      setSchForm({ name: '', nature: 'MONTHLY' });
+      fetchSchemes();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSchSaving(false);
+    }
+  };
+
+  const handleUpdateScheme = async (e) => {
+    e.preventDefault();
+    if (!editingScheme || !editingScheme.name.trim()) return;
+    try {
+      setSchSaving(true);
+      await interestSchemeApi.update(editingScheme.id, { name: editingScheme.name.trim(), nature: editingScheme.nature });
+      toast.success('Interest scheme updated');
+      setEditingScheme(null);
+      fetchSchemes();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSchSaving(false);
+    }
+  };
+
+  const handleDeleteScheme = async (id) => {
+    if (!window.confirm('Delete this interest scheme?')) return;
+    try {
+      await interestSchemeApi.delete(id);
+      toast.success('Interest scheme deleted');
+      fetchSchemes();
     } catch (err) {
       toast.error(err.message);
     }
@@ -405,11 +468,12 @@ export default function DeveloperSettingsPage() {
   };
 
   const tabs = [
-    { id: 'profile', label: 'Store Profile' },
-    { id: 'ledgerTypes', label: 'Ledger Types' },
-    { id: 'modules', label: 'Modules' },
-    { id: 'receipt', label: 'Receipt' },
-    { id: 'data', label: 'Data' },
+    { id: 'profile',        label: 'Store Profile'     },
+    { id: 'ledgerTypes',    label: 'Ledger Types'      },
+    { id: 'interestSchemes',label: 'Interest Schemes'  },
+    { id: 'modules',        label: 'Modules'           },
+    { id: 'receipt',        label: 'Receipt'           },
+    { id: 'data',           label: 'Data'              },
   ];
 
   return (
@@ -660,6 +724,114 @@ export default function DeveloperSettingsPage() {
         </div>
       )}
 
+      {/* Interest Schemes Tab */}
+      {activeTab === 'interestSchemes' && (
+        <div className="space-y-4">
+          {/* Create New Scheme */}
+          <div className="card">
+            <h2 className="text-base font-semibold text-slate-900 mb-4">Create Interest Scheme</h2>
+            <form onSubmit={handleCreateScheme} className="flex items-end gap-3">
+              <div className="flex-1">
+                <label className="label">Scheme Name</label>
+                <input
+                  type="text"
+                  value={schForm.name}
+                  onChange={(e) => setSchForm((f) => ({ ...f, name: e.target.value }))}
+                  className="input-field"
+                  placeholder="e.g. Gold Loan, Flat Rate"
+                />
+              </div>
+              <div className="w-44">
+                <label className="label">Nature</label>
+                <select
+                  value={schForm.nature}
+                  onChange={(e) => setSchForm((f) => ({ ...f, nature: e.target.value }))}
+                  className="input-field"
+                >
+                  <option value="DAILY">Daily</option>
+                  <option value="MONTHLY">Monthly</option>
+                </select>
+              </div>
+              <button type="submit" disabled={schSaving} className="btn-primary text-sm gap-1 whitespace-nowrap">
+                <PlusIcon className="h-4 w-4" />
+                Add Scheme
+              </button>
+            </form>
+            <p className="text-xs text-slate-500 mt-3">
+              <strong>Daily</strong> — interest is accrued once per calendar day.{' '}
+              <strong>Monthly</strong> — interest is accrued once per month at the end of each period.
+            </p>
+          </div>
+
+          {/* Existing Schemes */}
+          <div className="card">
+            <h2 className="text-base font-semibold text-slate-900 mb-4">Interest Schemes</h2>
+            <div className="space-y-2">
+              {schemes.map((sch) => (
+                <div key={sch.id} className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 bg-white">
+                  {editingScheme?.id === sch.id ? (
+                    <form onSubmit={handleUpdateScheme} className="flex items-center gap-3 flex-1">
+                      <input
+                        type="text"
+                        value={editingScheme.name}
+                        onChange={(e) => setEditingScheme((p) => ({ ...p, name: e.target.value }))}
+                        className="input-field flex-1"
+                        autoFocus
+                      />
+                      <select
+                        value={editingScheme.nature}
+                        onChange={(e) => setEditingScheme((p) => ({ ...p, nature: e.target.value }))}
+                        className="input-field w-36"
+                        disabled={!!schemes.find((s) => s.id === editingScheme.id)?.is_system}
+                        title={schemes.find((s) => s.id === editingScheme.id)?.is_system ? 'Nature is locked for system schemes' : undefined}
+                      >
+                        <option value="DAILY">Daily</option>
+                        <option value="MONTHLY">Monthly</option>
+                      </select>
+                      <button type="submit" disabled={schSaving} className="btn-primary text-xs">Save</button>
+                      <button type="button" onClick={() => setEditingScheme(null)} className="btn-secondary text-xs">Cancel</button>
+                    </form>
+                  ) : (
+                    <>
+                      <span className="flex-1 text-sm font-medium text-slate-800">{sch.name}</span>
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                        sch.nature === 'DAILY'
+                          ? 'bg-amber-50 text-amber-700'
+                          : 'bg-purple-50 text-purple-700'
+                      }`}>
+                        {sch.nature === 'DAILY' ? 'Daily' : 'Monthly'}
+                      </span>
+                      <div className="flex items-center gap-1">
+                        {sch.is_system && (
+                          <span className="text-[10px] bg-slate-100 text-slate-400 px-2 py-0.5 rounded-full">SYSTEM</span>
+                        )}
+                        <button
+                          onClick={() => setEditingScheme({ id: sch.id, name: sch.name, nature: sch.nature })}
+                          className="p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                        >
+                          <PencilIcon className="h-4 w-4" />
+                        </button>
+                        {!sch.is_system && (
+                          <button
+                            onClick={() => handleDeleteScheme(sch.id)}
+                            className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+              {schemes.length === 0 && (
+                <p className="text-sm text-slate-400 text-center py-6">No interest schemes found</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modules Tab */}
       {activeTab === 'modules' && (
         <div className="space-y-4">
@@ -716,6 +888,35 @@ export default function DeveloperSettingsPage() {
                         await settingsApi.update('expense_module_enabled', String(newVal));
                         setExpenseModuleEnabled(newVal);
                         toast.success(`Expense module ${newVal ? 'enabled' : 'disabled'}`);
+                      } catch (err) {
+                        toast.error(err.message);
+                      }
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
+                </label>
+              </div>
+
+              {/* GST Fields Toggle */}
+              <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-white">
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-slate-800">GST / Tax Fields</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Show GST Number, State Code and IGST fields in the Ledger Creation form.
+                    Disable to hide these fields for non-GST businesses.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer ml-4">
+                  <input
+                    type="checkbox"
+                    checked={gstFieldsEnabled}
+                    onChange={async (e) => {
+                      const newVal = e.target.checked;
+                      try {
+                        await settingsApi.update('gst_fields_enabled', String(newVal));
+                        setGstFieldsEnabled(newVal);
+                        toast.success(`GST fields ${newVal ? 'enabled' : 'disabled'}`);
                       } catch (err) {
                         toast.error(err.message);
                       }

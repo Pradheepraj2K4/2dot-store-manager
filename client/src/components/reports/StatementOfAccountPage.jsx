@@ -41,7 +41,7 @@ export default function StatementOfAccountPage() {
   // Compute running balance
   const statementRows = useMemo(() => {
     if (!ledger) return [];
-    let balance = ledger.opening_balance || 0;
+    let balance = 0;
     const isCustomer = ledger.behaviour === 'customer';
 
     // Transactions are from newest to oldest; reverse for running balance
@@ -114,15 +114,9 @@ export default function StatementOfAccountPage() {
                   {ledger.type_name} ({ledger.behaviour}) · {ledger.phone || 'No phone'} · {ledger.place || 'No place'}
                 </p>
               </div>
-              <div className="flex gap-4 text-center">
-                <div>
-                  <p className="text-xs text-slate-400">Opening</p>
-                  <p className="text-sm font-semibold text-slate-700">{formatCurrency(ledger.opening_balance || 0)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-400">Current</p>
-                  <p className="text-sm font-bold text-debit-red">{formatCurrency(ledger.current_balance || 0)}</p>
-                </div>
+              <div>
+                <p className="text-xs text-slate-400">Current Balance</p>
+                <p className="text-sm font-bold text-debit-red">{formatCurrency(ledger.current_balance || 0)}</p>
               </div>
             </div>
             <div className="flex gap-2 mt-4">
@@ -162,14 +156,6 @@ export default function StatementOfAccountPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {/* Opening balance row */}
-                    <tr className="border-b border-slate-200 bg-slate-50/60">
-                      <td className="px-4 py-2 text-slate-400 text-xs" colSpan={4}>Opening Balance</td>
-                      <td className="px-4 py-2 text-right font-semibold text-slate-700">
-                        {formatCurrency(ledger.opening_balance || 0)}
-                      </td>
-                      <td></td>
-                    </tr>
                     {statementRows.map((row) => {
                       const isPayment = row.entry_type === 'payment';
                       return (

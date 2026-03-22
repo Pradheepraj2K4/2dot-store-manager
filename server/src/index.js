@@ -13,6 +13,7 @@ const reportRoutes = require('./routes/reportRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const interestRoutes = require('./routes/interestRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
+const interestSchemeRoutes = require('./routes/interestSchemeRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3456;
@@ -47,6 +48,7 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/interest', interestRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/interest-schemes', interestSchemeRoutes);
 
 // Serve React build in production
 // CLIENT_DIST_PATH is injected by the Electron wrapper when running packaged,

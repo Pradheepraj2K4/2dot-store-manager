@@ -64,6 +64,12 @@ class DashboardController {
       const interestEnabled = interestModuleEnabled === true || interestModuleEnabled === 'true';
       const pendingInterest = interestEnabled ? interestRepository.getTotalPendingAll() : undefined;
 
+      const customerPendingInterest = interestEnabled ? interestRepository.getTotalPendingByBehaviour('customer') : 0;
+      const supplierPendingInterest = interestEnabled ? interestRepository.getTotalPendingByBehaviour('supplier') : 0;
+      const customerOutstanding = totalReceivable + customerPendingInterest;
+      const supplierOutstanding = totalPayable + supplierPendingInterest;
+      const interestProfit = interestEnabled ? customerPendingInterest - supplierPendingInterest : 0;
+
       res.json({
         success: true,
         data: {
@@ -73,6 +79,14 @@ class DashboardController {
           recentTransactions,
           totalReceivable,
           totalPayable,
+          customerPrincipal: totalReceivable,
+          customerPendingInterest,
+          customerOutstanding,
+          supplierPrincipal: totalPayable,
+          supplierPendingInterest,
+          supplierOutstanding,
+          interestProfit,
+          interestEnabled,
           topOutstanding,
           outstandingByType: Object.values(outstandingByType),
           expenseSummary,

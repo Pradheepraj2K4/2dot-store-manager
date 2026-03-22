@@ -11,6 +11,8 @@ import {
   ArrowPathIcon,
   BookOpenIcon,
   ClockIcon,
+  ChevronDownIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -18,6 +20,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [expandedCard, setExpandedCard] = useState(null); // 'customer' | 'supplier' | null
 
   const fetchDashboard = async () => {
     try {
@@ -52,40 +55,119 @@ export default function DashboardPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+      <div className={`grid grid-cols-1 gap-2 ${data.interestEnabled ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
         <StatCard
           title="Active Ledgers"
           value={data.activeLedgers}
           icon={BookOpenIcon}
           color="blue"
         />
-        <StatCard
-          title="Total Receivable"
-          value={formatCurrency(data.totalReceivable)}
-          subtitle="From customers · click to view"
-          icon={ArrowTrendingUpIcon}
-          color="green"
-          onClick={() => navigate('/outstanding-balances?behaviour=customer')}
-        />
-        <StatCard
-          title="Total Payable"
-          value={formatCurrency(data.totalPayable)}
-          subtitle="To suppliers · click to view"
-          icon={ArrowTrendingDownIcon}
-          color="red"
-          onClick={() => navigate('/outstanding-balances?behaviour=supplier')}
-        />
-        {data.pendingInterest !== undefined && (
-          <StatCard
-            title="Pending Interest"
-            value={formatCurrency(data.pendingInterest)}
-            subtitle="Across all ledgers"
-            icon={ClockIcon}
-            color="amber"
-            onClick={() => navigate('/pending-interest')}
-          />
+        {/* Customer outstanding card */}
+        <div
+          className={`card flex items-start gap-4 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 ${
+            expandedCard === 'customer' ? 'ring-2 ring-emerald-400' : ''
+          }`}
+          onClick={() => setExpandedCard(expandedCard === 'customer' ? null : 'customer')}
+        >
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-credit-green">
+            <ArrowTrendingUpIcon className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-slate-500 truncate">Customer Outstanding</p>
+            <p className="mt-1 text-xl font-bold text-slate-900">{formatCurrency(data.customerOutstanding)}</p>
+            {data.interestEnabled && (
+              <p className="mt-0.5 text-xs text-slate-400">Principal + pending interest</p>
+            )}
+          </div>
+          <ChevronDownIcon className={`h-4 w-4 text-slate-400 mt-1 shrink-0 transition-transform ${expandedCard === 'customer' ? 'rotate-180' : ''}`} />
+        </div>
+        {/* Supplier outstanding card */}
+        <div
+          className={`card flex items-start gap-4 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all duration-150 ${
+            expandedCard === 'supplier' ? 'ring-2 ring-rose-400' : ''
+          }`}
+          onClick={() => setExpandedCard(expandedCard === 'supplier' ? null : 'supplier')}
+        >
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-rose-50 text-debit-red">
+            <ArrowTrendingDownIcon className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-slate-500 truncate">Supplier Outstanding</p>
+            <p className="mt-1 text-xl font-bold text-slate-900">{formatCurrency(data.supplierOutstanding)}</p>
+            {data.interestEnabled && (
+              <p className="mt-0.5 text-xs text-slate-400">Principal + pending interest</p>
+            )}
+          </div>
+          <ChevronDownIcon className={`h-4 w-4 text-slate-400 mt-1 shrink-0 transition-transform ${expandedCard === 'supplier' ? 'rotate-180' : ''}`} />
+        </div>
+        {/* Profit card — interest module only */}
+        {data.interestEnabled && (
+          <div className="card flex items-start gap-4">
+            <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${
+              data.interestProfit >= 0 ? 'bg-violet-50' : 'bg-orange-50'
+            }`}>
+              <SparklesIcon className={`h-5 w-5 ${
+                data.interestProfit >= 0 ? 'text-violet-500' : 'text-orange-500'
+              }`} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-slate-500 truncate">Interest Profit</p>
+              <p className={`mt-1 text-xl font-bold ${
+                data.interestProfit >= 0 ? 'text-violet-700' : 'text-orange-600'
+              }`}>
+                {formatCurrency(Math.abs(data.interestProfit))}
+              </p>
+              <p className="mt-0.5 text-xs text-slate-400">
+                {data.interestProfit >= 0 ? 'Customer − Supplier interest' : 'Supplier exceeds customer interest'}
+              </p>
+            </div>
+          </div>
         )}
       </div>
+
+      {/* Expandable breakdown */}
+      {expandedCard && (() => {
+        const isCustomer = expandedCard === 'customer';
+        const principal = isCustomer ? data.customerPrincipal : data.supplierPrincipal;
+        const interest = isCustomer ? data.customerPendingInterest : data.supplierPendingInterest;
+        const colour = isCustomer ? 'emerald' : 'rose';
+        const textColour = isCustomer ? 'text-emerald-700' : 'text-rose-700';
+        const bgColour = isCustomer ? 'bg-emerald-50' : 'bg-rose-50';
+        const borderColour = isCustomer ? 'border-emerald-200' : 'border-rose-200';
+        const behaviourLabel = isCustomer ? 'Customer' : 'Supplier';
+        return (
+          <div className={`grid grid-cols-1 sm:grid-cols-2 gap-2 border rounded-xl p-3 ${bgColour} ${borderColour}`}>
+            <div
+              className="card cursor-pointer hover:shadow-md transition-shadow flex items-start gap-4"
+              onClick={() => navigate(`/outstanding-balances?behaviour=${expandedCard}`)}
+            >
+              <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${bgColour}`}>
+                <BanknotesIcon className={`h-5 w-5 ${textColour}`} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-slate-500">Principal Amount</p>
+                <p className={`text-xl font-bold mt-1 ${textColour}`}>{formatCurrency(principal)}</p>
+                <p className="text-xs text-slate-400 mt-0.5">Click to view {behaviourLabel} outstanding balances</p>
+              </div>
+            </div>
+            {data.interestEnabled && (
+              <div
+                className="card cursor-pointer hover:shadow-md transition-shadow flex items-start gap-4"
+                onClick={() => navigate(`/pending-interest?type=${isCustomer ? 'incoming' : 'outgoing'}`)}
+              >
+                <div className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${bgColour}`}>
+                  <ClockIcon className={`h-5 w-5 ${textColour}`} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-500">Pending Interest</p>
+                  <p className={`text-xl font-bold mt-1 ${textColour}`}>{formatCurrency(interest)}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Click to view {behaviourLabel} pending interest</p>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Expense Summary (shown when expense module is enabled) */}
       {data.expenseSummary && (
@@ -166,7 +248,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
         {/* Top Outstanding */}
-        <div className="card flex flex-col" style={{ height: '22rem' }}>
+        {/* <div className="card flex flex-col" style={{ height: '22rem' }}>
           <h2 className="text-base font-semibold text-slate-900 mb-3 shrink-0">Top Outstanding Ledgers</h2>
           {data.topOutstanding.length === 0 ? (
             <p className="text-sm text-slate-400 py-4 text-center">No outstanding balances</p>
@@ -189,10 +271,10 @@ export default function DashboardPage() {
               ))}
             </div>
           )}
-        </div>
+        </div> */}
 
         {/* Recent Transactions */}
-        <div className="card flex flex-col" style={{ height: '22rem' }}>
+        {/* <div className="card flex flex-col" style={{ height: '22rem' }}>
           <h2 className="text-base font-semibold text-slate-900 mb-3 shrink-0">Recent Transactions</h2>
           {data.recentTransactions.length === 0 ? (
             <p className="text-sm text-slate-400 py-4 text-center">No transactions yet</p>
@@ -216,7 +298,7 @@ export default function DashboardPage() {
               ))}
             </div>
           )}
-        </div>
+        </div> */}
       </div>
     </div>
   );

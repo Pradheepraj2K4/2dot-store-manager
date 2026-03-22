@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ledgerApi } from '../../api';
 import { formatCurrency, formatDate } from '../../utils/helpers';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -12,10 +12,13 @@ import {
 
 export default function PendingInterestPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [ledgers, setLedgers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState('incoming');
+  const [typeFilter, setTypeFilter] = useState(
+    searchParams.get('type') === 'outgoing' ? 'outgoing' : 'incoming'
+  );
 
   const fetchData = useCallback(async () => {
     try {

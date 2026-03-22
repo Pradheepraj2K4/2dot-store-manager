@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ledgerApi, transactionApi, interestApi, settingsApi, ledgerTypeApi } from '../../api';
+import { ledgerApi, transactionApi, interestApi, settingsApi, ledgerTypeApi, interestSchemeApi } from '../../api';
 import { formatCurrency, formatDate, formatDateTime, todayISO } from '../../utils/helpers';
 import { buildInterestReceiptHtml, fetchLogoDataUrl } from '../../utils/interestReceipt';
 import { buildTransactionReceiptHtml } from '../../utils/transactionReceipt';
@@ -56,134 +56,6 @@ function computeBulkDistribution(pending, rawAmount) {
     remaining = 0;
     return { ...entry, willPay, leftover, rowStatus: 'partial' };
   });
-}
-
-/* ─── Transaction Entry Form ──────────────────────────────────────── */
-function TransactionForm({ ledgerId, entryType, onCreated, currentBalance, behaviour }) {
-  const [nextNum, setNextNum] = useState('');
-  const [form, setForm] = useState({ amount: '', date: todayISO(), notes: '' });
-  const [submitting, setSubmitting] = useState(false);
-  const amountRef = useRef(null);
-  const dateRef = useRef(null);
-  const notesRef = useRef(null);
-  const submitRef = useRef(null);
-
-  // Compute what balance would be after this entry
-  const amt = parseFloat(form.amount);
-  const projectedBalance = !isNaN(amt) && amt > 0 ? (() => {
-    let projected = currentBalance ?? 0;
-    const beh = behaviour || 'customer';
-    if (beh === 'customer') {
-      projected = entryType === 'payment' ? projected + amt : projected - amt;
-    } else {
-      projected = entryType === 'payment' ? projected - amt : projected + amt;
-    }
-    return projected;
-  })() : null;
-  const wouldGoNegative = projectedBalance !== null && projectedBalance < 0;
-
-  useEffect(() => {
-    transactionApi.getNextRunningNumber(entryType).then((res) => setNextNum(res.data.runningNumber)).catch(() => { });
-  }, [entryType]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!form.amount || Number(form.amount) <= 0) { toast.error('Enter a valid amount'); return; }
-    try {
-      setSubmitting(true);
-      const created = await transactionApi.create({
-        ledger_id: parseInt(ledgerId),
-        entry_type: entryType,
-        amount: parseFloat(form.amount),
-        date: form.date,
-        notes: form.notes.trim(),
-      });
-      toast.success(`${entryType === 'payment' ? 'Payment' : 'Receipt'} recorded`);
-      setForm({ amount: '', date: todayISO(), notes: '' });
-      // refresh next number
-      transactionApi.getNextRunningNumber(entryType).then((r) => setNextNum(r.data.runningNumber)).catch(() => { });
-      onCreated(created.data);
-    } catch (err) {
-      toast.error(err.message);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  const isPayment = entryType === 'payment';
-  const colorAccent = isPayment ? 'red' : 'green';
-  const Icon = isPayment ? ArrowUpCircleIcon : ArrowDownCircleIcon;
-
-  return (
-    <form onSubmit={handleSubmit} className="card">
-      <div className="flex items-center gap-2 mb-4">
-        <Icon className={`h-5 w-5 text-${colorAccent}-600`} />
-        <h3 className={`text-sm font-semibold text-${colorAccent}-700`}>
-          New {isPayment ? 'Payment' : 'Receipt'}
-        </h3>
-        {nextNum && <span className="ml-auto text-xs font-mono text-slate-400">{nextNum}</span>}
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div>
-          <label className="label">Amount *</label>
-          <input
-            ref={amountRef}
-            type="number"
-            min="0.01"
-            step="0.01"
-            value={form.amount}
-            onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); dateRef.current?.focus(); } }}
-            className={`input-field ${wouldGoNegative ? 'border-red-400 focus:ring-red-400' : ''}`}
-            placeholder="0.00"
-            autoFocus
-          />
-          {projectedBalance !== null && (
-            <p className={`text-xs mt-1 ${wouldGoNegative ? 'text-red-500' : 'text-slate-500'}`}>
-              Balance after {entryType === 'payment' ? 'payment' : 'receipt'}:{' '}
-              <span className="font-medium">{formatCurrency(projectedBalance)}</span>
-            </p>
-          )}
-        </div>
-        <div>
-          <label className="label">Date</label>
-          <input
-            ref={dateRef}
-            type="date"
-            value={form.date}
-            onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); notesRef.current?.focus(); } }}
-            className="input-field"
-          />
-        </div>
-        <div>
-          <label className="label">Notes</label>
-          <input
-            ref={notesRef}
-            type="text"
-            value={form.notes}
-            onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitRef.current?.focus(); } }}
-            className="input-field"
-            placeholder="Optional"
-          />
-        </div>
-      </div>
-      <div className="flex justify-end mt-3">
-        <button
-          ref={submitRef}
-          type="submit"
-          disabled={submitting}
-          className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${isPayment
-              ? 'bg-red-600 hover:bg-red-700 disabled:bg-red-300'
-              : 'bg-green-600 hover:bg-green-700 disabled:bg-green-300'
-            }`}
-        >
-          {submitting ? 'Saving…' : `Record ${isPayment ? 'Payment' : 'Receipt'}`}
-        </button>
-      </div>
-    </form>
-  );
 }
 
 /* ─── Interest Section ────────────────────────────────────────────── */
@@ -789,6 +661,7 @@ export default function LedgerPage() {
 
   // Edit ledger modal
   const [ledgerTypes, setLedgerTypes] = useState([]);
+  const [interestSchemes, setInterestSchemes] = useState([]);
   const [editModal, setEditModal] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [editErrors, setEditErrors] = useState({});
@@ -817,6 +690,7 @@ export default function LedgerPage() {
 
   useEffect(() => {
     ledgerTypeApi.getAll().then((res) => setLedgerTypes(res.data)).catch(() => { });
+    interestSchemeApi.getAll().then((res) => setInterestSchemes(res.data || [])).catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -881,7 +755,7 @@ export default function LedgerPage() {
       igst_status: ledger.igst_status || 'NO',
       ledger_date: ledger.ledger_date || '',
       interest_rate: ledger.interest_rate != null ? String(ledger.interest_rate) : '',
-      interest_scheme: ledger.interest_scheme || 'NONE',
+      interest_scheme_id: ledger.interest_scheme_id != null ? String(ledger.interest_scheme_id) : '',
       notes: ledger.notes || '',
     });
     setEditErrors({});
@@ -916,6 +790,8 @@ export default function LedgerPage() {
         name: editForm.name.trim(),
         gst_no: editForm.gst_no.trim().toUpperCase(),
         state_code: editForm.state_code.trim(),
+        interest_rate: parseFloat(editForm.interest_rate) || 0,
+        interest_scheme_id: editForm.interest_scheme_id ? parseInt(editForm.interest_scheme_id) : null,
       });
       toast.success('Ledger updated');
       setEditModal(false);
@@ -991,11 +867,7 @@ export default function LedgerPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className={`grid grid-cols-2 ${hasInterest ? 'sm:grid-cols-4' : 'sm:grid-cols-3'} gap-2`}>
-        <div className="card text-center">
-          <p className="text-xs font-medium text-slate-500">Opening Balance</p>
-          <p className="text-lg font-bold text-slate-800 mt-1">{formatCurrency(ledger.opening_balance || 0)}</p>
-        </div>
+      <div className={`grid grid-cols-2 ${hasInterest ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-2`}>
         <div className="card text-center">
           <p className="text-xs font-medium text-slate-500">Current Balance</p>
           <p className="text-lg font-bold text-debit-red mt-1">{formatCurrency(ledger.current_balance || 0)}</p>
@@ -1010,7 +882,7 @@ export default function LedgerPage() {
           <div className="card text-center border-amber-200 bg-white">
             <p className="text-xs font-medium text-amber-600">Interest Rate</p>
             <p className="text-lg font-bold text-amber-700 mt-1">
-              {ledger.interest_rate}% <span className="text-xs font-normal">({ledger.interest_scheme})</span>
+              {ledger.interest_rate}% <span className="text-xs font-normal">({ledger.scheme_name || ledger.interest_scheme})</span>
             </p>
           </div>
         )}
@@ -1033,11 +905,35 @@ export default function LedgerPage() {
         </div>
       </div>
 
-      {/* Transaction Entry Forms (only when active) */}
+      {/* Transaction Entry — redirect to dedicated page */}
       {isActive && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
-          <TransactionForm ledgerId={id} entryType="payment" onCreated={(txn) => { if (txn && printReceiptsPaymentEnabled) openTxnPreview(txn, true); else fetchData(); }} currentBalance={ledger.current_balance} behaviour={ledger.behaviour} />
-          <TransactionForm ledgerId={id} entryType="receipt" onCreated={(txn) => { if (txn && printReceiptsPaymentEnabled) openTxnPreview(txn, true); else fetchData(); }} currentBalance={ledger.current_balance} behaviour={ledger.behaviour} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => navigate(`/payment-entry?type=payment&ledgerId=${id}`)}
+            className="card flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-red-400 text-left"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50">
+              <ArrowUpCircleIcon className="h-6 w-6 text-red-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-red-700">Record Payment</p>
+              <p className="text-xs text-slate-400">Go to Payment &amp; Receipt Entry</p>
+            </div>
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(`/payment-entry?type=receipt&ledgerId=${id}`)}
+            className="card flex items-center gap-3 cursor-pointer hover:shadow-md transition-shadow border-l-4 border-l-green-400 text-left"
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-50">
+              <ArrowDownCircleIcon className="h-6 w-6 text-green-600" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-green-700">Record Receipt</p>
+              <p className="text-xs text-slate-400">Go to Payment &amp; Receipt Entry</p>
+            </div>
+          </button>
         </div>
       )}
 
@@ -1321,14 +1217,17 @@ export default function LedgerPage() {
                 <div>
                   <label className="label">Interest Scheme</label>
                   <select
-                    name="interest_scheme"
-                    value={editForm.interest_scheme || 'NONE'}
+                    name="interest_scheme_id"
+                    value={editForm.interest_scheme_id || ''}
                     onChange={handleEditChange}
                     className="input-field"
                   >
-                    <option value="NONE">None</option>
-                    <option value="DAILY">Daily (monthly rate)</option>
-                    <option value="MONTHLY">Monthly (monthly rate)</option>
+                    <option value="">— No Interest —</option>
+                    {interestSchemes.map((sch) => (
+                      <option key={sch.id} value={sch.id}>
+                        {sch.name} ({sch.nature === 'DAILY' ? 'Daily' : 'Monthly'})
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>

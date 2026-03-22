@@ -1,7 +1,7 @@
 const { getDb } = require('../db/database');
 
 class TransactionRepository {
-  findAll({ ledgerId, entryType, fromDate, toDate, ledgerTypeId, behaviour } = {}) {
+  findAll({ ledgerId, entryType, fromDate, toDate, ledgerTypeId, behaviour, interestSchemeId } = {}) {
     const db = getDb();
     let query = `
       SELECT t.*, l.name AS ledger_name, lt.name AS type_name, lt.behaviour,
@@ -18,6 +18,7 @@ class TransactionRepository {
     if (toDate) { query += ' AND t.date <= ?'; params.push(toDate); }
     if (ledgerTypeId) { query += ' AND l.ledger_type_id = ?'; params.push(ledgerTypeId); }
     if (behaviour) { query += ' AND lt.behaviour = ?'; params.push(behaviour); }
+    if (interestSchemeId) { query += ' AND l.interest_scheme_id = ?'; params.push(interestSchemeId); }
     query += ' ORDER BY t.date DESC, t.id DESC';
     return db.prepare(query).all(...params);
   }

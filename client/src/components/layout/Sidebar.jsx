@@ -22,7 +22,6 @@ import toast from 'react-hot-toast';
 
 const baseNavigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
-  { name: 'Ledger Creation', href: '/ledger-creation', icon: PlusCircleIcon },
   { name: 'Ledgers', href: '/ledgers', icon: BookOpenIcon },
   { name: 'Payment/Receipt Entry', href: '/payment-entry', icon: ArrowsRightLeftIcon },
   { name: 'Reports', href: '/reports', icon: DocumentChartBarIcon },

@@ -9,7 +9,10 @@
 const VERSION = 8;
 
 function up(db) {
-  db.exec(`ALTER TABLE interest_entries ADD COLUMN interest_number TEXT NOT NULL DEFAULT '';`);
+  const cols = db.pragma('table_info(interest_entries)').map(c => c.name);
+  if (!cols.includes('interest_number')) {
+    db.exec(`ALTER TABLE interest_entries ADD COLUMN interest_number TEXT NOT NULL DEFAULT '';`);
+  }
 
   // Back-fill all existing rows with sequential numbers
   const entries = db.prepare('SELECT id FROM interest_entries ORDER BY id ASC').all();

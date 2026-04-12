@@ -8,9 +8,12 @@
 const VERSION = 6;
 
 function up(db) {
-  db.exec(`
-    ALTER TABLE ledgers ADD COLUMN interest_start_date TEXT NOT NULL DEFAULT '';
-  `);
+  const cols = db.pragma('table_info(ledgers)').map(c => c.name);
+  if (!cols.includes('interest_start_date')) {
+    db.exec(`
+      ALTER TABLE ledgers ADD COLUMN interest_start_date TEXT NOT NULL DEFAULT '';
+    `);
+  }
 }
 
 module.exports = { VERSION, up };

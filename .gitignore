@@ -27,8 +27,8 @@ Thumbs.db
 /electron/dist/
 /electron/out/
 
-# Server uploads
-/server/data/uploads/
+# Server data (database files and uploads)
+/server/data/
 
 # Environment
 .env

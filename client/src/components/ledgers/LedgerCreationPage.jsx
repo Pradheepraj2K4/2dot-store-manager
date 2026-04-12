@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ledgerApi, ledgerTypeApi, settingsApi } from '../../api';
 import toast from 'react-hot-toast';
-import { BookOpenIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
+import { BookOpenIcon, CheckCircleIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 
 const GST_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z0-9]{1}Z[A-Z0-9]{1}$/;
 const PHONE_REGEX = /^\d{10}$/;
@@ -122,6 +122,14 @@ export default function LedgerCreationPage() {
   return (
     <div className="w-full max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors"
+          title="Go back"
+        >
+          <ArrowLeftIcon className="h-5 w-5 text-slate-600" />
+        </button>
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-trust-blue/10">
           <BookOpenIcon className="h-5 w-5 text-trust-blue" />
         </div>

@@ -370,11 +370,10 @@ export default function PaymentEntryPage() {
       </div>
 
       {/* Entry Form */}
-      {selectedLedger && (
-        <form
-          onSubmit={handleSubmit}
-          className={`card border-l-4 ${isPayment ? 'border-l-red-400' : 'border-l-green-400'}`}
-        >
+      <form
+        onSubmit={handleSubmit}
+        className={`card border-l-4 ${isPayment ? 'border-l-red-400' : 'border-l-green-400'} ${!selectedLedger ? 'opacity-60 pointer-events-none' : ''}`}
+      >
           <div className="flex items-center gap-2 mb-4">
             {isPayment
               ? <ArrowUpCircleIcon className="h-5 w-5 text-red-600" />
@@ -407,7 +406,7 @@ export default function PaymentEntryPage() {
                 onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
                 className={`input-field ${wouldGoNegative ? 'border-red-400 focus:ring-red-400' : ''}`}
                 placeholder="0.00"
-                disabled={isLedgerClosed}
+                disabled={isLedgerClosed || !selectedLedger}
                 autoFocus
               />
               {projectedBalance !== null && (
@@ -424,7 +423,7 @@ export default function PaymentEntryPage() {
                 value={form.date}
                 onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
                 className="input-field"
-                disabled={isLedgerClosed}
+                disabled={isLedgerClosed || !selectedLedger}
               />
             </div>
             <div>
@@ -435,7 +434,7 @@ export default function PaymentEntryPage() {
                 onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
                 className="input-field"
                 placeholder="Optional"
-                disabled={isLedgerClosed}
+                disabled={isLedgerClosed || !selectedLedger}
               />
             </div>
           </div>
@@ -494,7 +493,7 @@ export default function PaymentEntryPage() {
             )}
             <button
               type="submit"
-              disabled={submitting || isLedgerClosed || !form.amount || Number(form.amount) <= 0}
+              disabled={submitting || isLedgerClosed || !selectedLedger || !form.amount || Number(form.amount) <= 0}
               className={`px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors ${
                 isPayment
                   ? 'bg-red-600 hover:bg-red-700 disabled:bg-red-300'
@@ -505,18 +504,6 @@ export default function PaymentEntryPage() {
             </button>
           </div>
         </form>
-      )}
-
-      {/* Empty prompt when no ledger selected */}
-      {!selectedLedger && !loadingLedger && (
-        <div className="card py-16 flex flex-col items-center text-center">
-          <BanknotesIcon className="h-12 w-12 text-slate-300 mb-3" />
-          <p className="text-slate-600 font-medium">Select a ledger to get started</p>
-          <p className="text-slate-400 text-sm mt-1">
-            Search for a ledger above to record {isPayment ? 'payments' : 'receipts'}
-          </p>
-        </div>
-      )}
 
       {/* Transaction History */}
       {selectedLedger && (

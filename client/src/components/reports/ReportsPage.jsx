@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { reportApi, ledgerTypeApi, interestSchemeApi } from '../../api';
+import { reportApi, ledgerTypeApi, interestSchemeApi, interestApi } from '../../api';
 import { formatCurrency, formatDate, todayISO } from '../../utils/helpers';
 import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -59,6 +59,7 @@ export default function ReportsPage() {
   const [transactions, setTransactions] = useState([]);
   const [ledgerTypes, setLedgerTypes]   = useState([]);
   const [interestSchemes, setInterestSchemes] = useState([]);
+  const [interestEnabled, setInterestEnabled] = useState(false);
   const [loading, setLoading]           = useState(false);
   const [initDone, setInitDone]         = useState(false);
 
@@ -80,7 +81,11 @@ export default function ReportsPage() {
   // ── Fetch ledger types once ────────────────────────────────────────────
   useEffect(() => {
     ledgerTypeApi.getAll().then((res) => setLedgerTypes(res.data)).catch(() => {});
-    interestSchemeApi.getAll().then((res) => setInterestSchemes(res.data || [])).catch(() => {});
+    interestApi.isEnabled().then((res) => {
+      const enabled = res.data?.enabled === true;
+      setInterestEnabled(enabled);
+      if (enabled) interestSchemeApi.getAll().then((r) => setInterestSchemes(r.data || [])).catch(() => {});
+    }).catch(() => {});
   }, []);
 
   // ── Fetch ──────────────────────────────────────────────────────────────
@@ -134,13 +139,13 @@ export default function ReportsPage() {
       { header: 'Ledger',     key: 'ledger_name',     width: 25 },
       { header: 'Type',       key: 'entry_type',      width: 12 },
       { header: 'Amount',     key: 'amount',          width: 15 },
-      { header: 'Notes',      key: 'notes',           width: 25 },
+      { header: 'Remarks',   key: 'notes',           width: 25 },
     ];
     exportToExcel(visible, columns, 'Transaction_Report');
   };
 
   const handleExportPDF = () => {
-    const headers = ['Date', 'Ref #', 'Ledger', 'Type', 'Amount', 'Notes'];
+    const headers = ['Date', 'Ref #', 'Ledger', 'Type', 'Amount', 'Remarks'];
     const rows = visible.map((t) => [
       formatDate(t.date),
       t.running_number || '',
@@ -221,7 +226,7 @@ export default function ReportsPage() {
           </div>
 
           {/* Interest scheme */}
-          {interestSchemes.length > 0 && (
+          {interestEnabled && interestSchemes.length > 0 && (
             <div className="flex gap-1 p-1 bg-slate-100 rounded-lg flex-wrap">
               {[['all', 'All Schemes'], ...interestSchemes.map((s) => [String(s.id), s.name])].map(([val, label]) => (
                 <button
@@ -357,7 +362,7 @@ export default function ReportsPage() {
                   <th className="px-4 py-2.5 text-center font-semibold text-slate-600">Type</th>
                   <th className="px-4 py-2.5 text-center font-semibold text-slate-600">Entry Type</th>
                   <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Amount</th>
-                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Notes</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Remarks</th>
                 </tr>
               </thead>
               <tbody>

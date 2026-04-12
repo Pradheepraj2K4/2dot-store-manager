@@ -47,6 +47,11 @@ export default function OutstandingBalanceReportPage() {
 
   const totalOutstanding = useMemo(() => filtered.reduce((s, l) => s + (l.current_balance || 0), 0), [filtered]);
 
+  const allCustomers = behaviourFilter === 'customer' || (behaviourFilter === 'all' && filtered.length > 0 && filtered.every((l) => l.behaviour === 'customer'));
+  const allSuppliers = behaviourFilter === 'supplier' || (behaviourFilter === 'all' && filtered.length > 0 && filtered.every((l) => l.behaviour === 'supplier'));
+  const summaryColorClass = allCustomers ? 'text-green-600' : allSuppliers ? 'text-red-600' : totalOutstanding >= 0 ? 'text-green-600' : 'text-red-600';
+  const summaryBorderClass = allCustomers ? 'border-green-200' : allSuppliers ? 'border-red-200' : totalOutstanding >= 0 ? 'border-green-200' : 'border-red-200';
+
   const handleExportExcel = () => {
     const columns = [
       { header: 'Name',     key: 'name',            width: 25 },
@@ -96,9 +101,9 @@ export default function OutstandingBalanceReportPage() {
       </div>
 
       {/* Summary */}
-      <div className="card text-center py-4 border-red-200 bg-white">
-        <p className="text-xs font-medium text-red-600">Total Outstanding</p>
-        <p className="text-2xl font-bold text-red-700 mt-1">{formatCurrency(totalOutstanding)}</p>
+      <div className={`card text-center py-4 ${summaryBorderClass} bg-white`}>
+        <p className={`text-xs font-medium ${summaryColorClass}`}>Total Outstanding</p>
+        <p className={`text-2xl font-bold ${summaryColorClass} mt-1`}>{formatCurrency(Math.abs(totalOutstanding))}</p>
       </div>
 
       {/* Filters */}
@@ -167,8 +172,8 @@ export default function OutstandingBalanceReportPage() {
                     </td>
                     <td className="px-4 py-2.5 text-slate-600">{l.phone || '—'}</td>
                     <td className="px-4 py-2.5 text-slate-600">{l.place || '—'}</td>
-                    <td className={`px-4 py-2.5 text-right font-semibold ${(l.current_balance || 0) > 0 ? 'text-red-600' : 'text-slate-400'}`}>
-                      {formatCurrency(l.current_balance || 0)}
+                    <td className={`px-4 py-2.5 text-right font-semibold ${(l.current_balance || 0) !== 0 ? (l.behaviour === 'customer' ? 'text-green-600' : 'text-red-600') : 'text-slate-400'}`}>
+                      {formatCurrency(Math.abs(l.current_balance || 0))}
                     </td>
                   </tr>
                 ))}
@@ -178,8 +183,8 @@ export default function OutstandingBalanceReportPage() {
                   <td colSpan={4} className="px-4 py-2.5 text-xs font-bold text-slate-600 uppercase tracking-wide">
                     Total ({filtered.length} ledgers)
                   </td>
-                  <td className="px-4 py-2.5 text-right text-sm font-bold text-red-700">
-                    {formatCurrency(totalOutstanding)}
+                  <td className={`px-4 py-2.5 text-right text-sm font-bold ${summaryColorClass}`}>
+                    {formatCurrency(Math.abs(totalOutstanding))}
                   </td>
                 </tr>
               </tfoot>

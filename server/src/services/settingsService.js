@@ -35,7 +35,7 @@ class SettingsService {
   clearData() {
     const { getDb } = require('../db/database');
     const db = getDb();
-    const tables = ['interest_entries', 'transactions', 'expenses', 'ledgers'];
+    const tables = ['interest_entries', 'transactions', 'expenses', 'ledgers', 'transaction_categories'];
     db.transaction(() => {
       for (const table of tables) {
         try { db.prepare(`DELETE FROM ${table}`).run(); } catch (_) { /* table may not exist */ }

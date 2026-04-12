@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { getDefaultPassword, getCustomPassword, setCustomPassword } from '../../utils/auth';
-import { expenseApi } from '../../api';
+import { expenseApi, transactionCategoryApi } from '../../api';
 import toast from 'react-hot-toast';
 import Modal from '../ui/Modal';
-import { LockClosedIcon, EyeIcon, EyeSlashIcon, PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { LockClosedIcon, EyeIcon, EyeSlashIcon, PlusIcon, PencilIcon, TrashIcon, TagIcon } from '@heroicons/react/24/outline';
 
 export default function SettingsPage() {
   const [showDefaultPassword, setShowDefaultPassword] = useState(false);
@@ -18,6 +18,13 @@ export default function SettingsPage() {
   const [catSaving, setCatSaving] = useState(false);
   const [editingCat, setEditingCat] = useState(null);
   const [deleteCatModal, setDeleteCatModal] = useState({ open: false, cat: null });
+
+  // Transaction categories
+  const [txnCategories, setTxnCategories] = useState([]);
+  const [txnCatName, setTxnCatName] = useState('');
+  const [txnCatSaving, setTxnCatSaving] = useState(false);
+  const [editingTxnCat, setEditingTxnCat] = useState(null);
+  const [deleteTxnCatModal, setDeleteTxnCatModal] = useState({ open: false, cat: null });
 
   useEffect(() => {
     getCustomPassword().then((saved) => {
@@ -97,6 +104,65 @@ export default function SettingsPage() {
       toast.success('Custom password saved');
     } catch (err) {
       toast.error('Failed to save password');
+    }
+  };
+
+  // ── Transaction categories ───────────────────────────────────────────
+  useEffect(() => {
+    fetchTxnCategories();
+  }, []);
+
+  const fetchTxnCategories = async () => {
+    try {
+      const res = await transactionCategoryApi.getAll();
+      setTxnCategories(res.data || []);
+    } catch {
+      // silent — table may not exist yet on first run
+    }
+  };
+
+  const handleCreateTxnCategory = async (e) => {
+    e.preventDefault();
+    if (!txnCatName.trim()) return;
+    try {
+      setTxnCatSaving(true);
+      await transactionCategoryApi.create(txnCatName.trim());
+      setTxnCatName('');
+      toast.success('Category created');
+      await fetchTxnCategories();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setTxnCatSaving(false);
+    }
+  };
+
+  const handleUpdateTxnCategory = async (e) => {
+    e.preventDefault();
+    if (!editingTxnCat || !editingTxnCat.name.trim()) return;
+    try {
+      setTxnCatSaving(true);
+      await transactionCategoryApi.update(editingTxnCat.id, editingTxnCat.name.trim());
+      setEditingTxnCat(null);
+      toast.success('Category updated');
+      fetchTxnCategories();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setTxnCatSaving(false);
+    }
+  };
+
+  const handleDeleteTxnCategory = async () => {
+    const id = deleteTxnCatModal.cat?.id;
+    if (!id) return;
+    try {
+      await transactionCategoryApi.delete(id);
+      toast.success('Category deleted');
+      setDeleteTxnCatModal({ open: false, cat: null });
+      fetchTxnCategories();
+    } catch (err) {
+      toast.error(err.message);
     }
   };
 
@@ -191,6 +257,75 @@ export default function SettingsPage() {
         </div>
       )}
 
+      {/* Transaction Categories (always shown) */}
+      <div className="card">
+        <div className="flex items-center gap-2 mb-4">
+          <TagIcon className="h-5 w-5 text-trust-blue" />
+          <h2 className="text-base font-semibold text-slate-900">Transaction Categories</h2>
+        </div>
+        <p className="text-xs text-slate-500 mb-4">Create categories to organise payments and receipts (e.g. Cash, Cheque, Online Transfer, UPI).</p>
+
+        {/* Add Transaction Category */}
+        <form onSubmit={handleCreateTxnCategory} className="flex items-end gap-3 mb-4">
+          <div className="flex-1">
+            <label className="label">New Category Name</label>
+            <input
+              type="text"
+              value={txnCatName}
+              onChange={(e) => setTxnCatName(e.target.value)}
+              className="input-field"
+              placeholder="e.g. Cash, Cheque, UPI"
+            />
+          </div>
+          <button type="submit" disabled={txnCatSaving || !txnCatName.trim()} className="btn-primary text-sm gap-1 whitespace-nowrap">
+            <PlusIcon className="h-4 w-4" />
+            Add
+          </button>
+        </form>
+
+        {/* Transaction Category List */}
+        <div className="space-y-2">
+          {txnCategories.map((cat) => (
+            <div key={cat.id} className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 bg-white">
+              {editingTxnCat?.id === cat.id ? (
+                <form onSubmit={handleUpdateTxnCategory} className="flex items-center gap-3 flex-1">
+                  <input
+                    type="text"
+                    value={editingTxnCat.name}
+                    onChange={(e) => setEditingTxnCat((p) => ({ ...p, name: e.target.value }))}
+                    className="input-field flex-1"
+                    autoFocus
+                  />
+                  <button type="submit" disabled={txnCatSaving} className="btn-primary text-xs">Save</button>
+                  <button type="button" onClick={() => setEditingTxnCat(null)} className="btn-secondary text-xs">Cancel</button>
+                </form>
+              ) : (
+                <>
+                  <span className="flex-1 text-sm font-medium text-slate-800">{cat.name}</span>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => setEditingTxnCat({ id: cat.id, name: cat.name })}
+                      className="p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600"
+                    >
+                      <PencilIcon className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => setDeleteTxnCatModal({ open: true, cat })}
+                      className="p-1.5 rounded hover:bg-red-50 text-slate-400 hover:text-red-500"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+          {txnCategories.length === 0 && (
+            <p className="text-sm text-slate-400 text-center py-4">No transaction categories yet</p>
+          )}
+        </div>
+      </div>
+
       {/* Password Configurations */}
       <div className="card">
         <div className="flex items-center gap-2 mb-4">
@@ -257,6 +392,20 @@ export default function SettingsPage() {
         <div className="flex justify-end gap-3">
           <button onClick={() => setDeleteCatModal({ open: false, cat: null })} className="btn-secondary">Cancel</button>
           <button onClick={handleDeleteCategory} className="btn-danger">Delete</button>
+        </div>
+      </Modal>
+      <Modal
+        open={deleteTxnCatModal.open}
+        onClose={() => setDeleteTxnCatModal({ open: false, cat: null })}
+        title="Delete Transaction Category"
+        size="sm"
+      >
+        <p className="text-sm text-slate-600 mb-6">
+          Delete <strong>{deleteTxnCatModal.cat?.name}</strong>? Transactions using it will become uncategorised.
+        </p>
+        <div className="flex justify-end gap-3">
+          <button onClick={() => setDeleteTxnCatModal({ open: false, cat: null })} className="btn-secondary">Cancel</button>
+          <button onClick={handleDeleteTxnCategory} className="btn-danger">Delete</button>
         </div>
       </Modal>
     </div>

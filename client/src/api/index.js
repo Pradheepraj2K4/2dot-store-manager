@@ -87,6 +87,13 @@ export const reportApi = {
   getTransactionSummary: () => api.get('/reports/transactions/summary'),
 };
 
+export const transactionCategoryApi = {
+  getAll: () => api.get('/transaction-categories'),
+  create: (name) => api.post('/transaction-categories', { name }),
+  update: (id, name) => api.put(`/transaction-categories/${id}`, { name }),
+  delete: (id) => api.delete(`/transaction-categories/${id}`),
+};
+
 export const expenseApi = {
   // Categories
   getCategories: () => api.get('/expenses/categories'),

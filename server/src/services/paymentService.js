@@ -13,7 +13,7 @@ class TransactionService {
    *   customer behaviour: payment ADDS to balance, receipt SUBTRACTS
    *   supplier behaviour: payment SUBTRACTS from balance, receipt ADDS
    */
-  createTransaction({ ledger_id, entry_type, amount, date, reference, notes, interest_entry_id }) {
+  createTransaction({ ledger_id, entry_type, amount, date, reference, notes, interest_entry_id, category_id }) {
     const db = getDb();
     const ledger = ledgerRepository.findById(ledger_id);
     if (!ledger) throw new AppError('Ledger not found', 404);
@@ -46,6 +46,7 @@ class TransactionService {
         notes: notes || '',
         running_number: runningNumber,
         interest_entry_id: interest_entry_id || null,
+        category_id: category_id || null,
       });
 
       // Update ledger balance

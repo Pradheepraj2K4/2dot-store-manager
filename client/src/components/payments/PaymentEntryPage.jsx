@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { transactionApi, ledgerApi, settingsApi, interestApi, interestSchemeApi } from '../../api';
+import { transactionApi, ledgerApi, settingsApi, interestApi, interestSchemeApi, transactionCategoryApi } from '../../api';
 import { formatCurrency, formatDate, formatDateTime, todayISO } from '../../utils/helpers';
 import { buildTransactionReceiptHtml } from '../../utils/transactionReceipt';
 import { fetchLogoDataUrl } from '../../utils/interestReceipt';
@@ -15,6 +15,7 @@ import {
   BanknotesIcon,
   ArrowPathIcon,
   CalculatorIcon,
+  PlusIcon,
 } from '@heroicons/react/24/outline';
 
 export default function PaymentEntryPage() {
@@ -28,9 +29,15 @@ export default function PaymentEntryPage() {
   const [loadingLedger, setLoadingLedger] = useState(false);
 
   // Form
-  const [form, setForm] = useState({ amount: '', date: todayISO(), notes: '' });
+  const [form, setForm] = useState({ amount: '', date: todayISO(), notes: '', category_id: '' });
   const [submitting, setSubmitting] = useState(false);
   const [nextNum, setNextNum] = useState('');
+
+  // Transaction categories
+  const [txnCategories, setTxnCategories] = useState([]);
+  const [showNewCatInput, setShowNewCatInput] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
+  const [creatingCat, setCreatingCat] = useState(false);
 
   // Transaction list
   const [transactions, setTransactions] = useState([]);
@@ -38,6 +45,9 @@ export default function PaymentEntryPage() {
 
   // Delete modal
   const [deleteTxnModal, setDeleteTxnModal] = useState({ open: false, txn: null });
+
+  // Category filter
+  const [filterCategoryId, setFilterCategoryId] = useState('');
 
   // Interest config
   const [interestEnabled, setInterestEnabled] = useState(false);
@@ -59,6 +69,34 @@ export default function PaymentEntryPage() {
     interestApi.isEnabled().then((res) => setInterestEnabled(res.data.enabled)).catch(() => {});
     interestSchemeApi.getAll().then((res) => setInterestSchemes(res.data || [])).catch(() => {});
   }, []);
+
+  // ── Load transaction categories ──────────────────────────────────────
+  const fetchTxnCategories = async () => {
+    try {
+      const res = await transactionCategoryApi.getAll();
+      setTxnCategories(res.data || []);
+    } catch { /* silent */ }
+  };
+  useEffect(() => { fetchTxnCategories(); }, []);
+
+  const handleCreateInlineCategory = async () => {
+    if (!newCatName.trim()) return;
+    try {
+      setCreatingCat(true);
+      const res = await transactionCategoryApi.create(newCatName.trim());
+      setNewCatName('');
+      setShowNewCatInput(false);
+      toast.success('Category created');
+      await fetchTxnCategories();
+      if (res?.data?.id) {
+        setForm((p) => ({ ...p, category_id: String(res.data.id) }));
+      }
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setCreatingCat(false);
+    }
+  };
 
   // ── Sync interest form when ledger changes ───────────────────────────
   useEffect(() => {
@@ -153,7 +191,7 @@ export default function PaymentEntryPage() {
       p.set('type', type);
       return p;
     });
-    setForm({ amount: '', date: todayISO(), notes: '' });
+    setForm({ amount: '', date: todayISO(), notes: '', category_id: '' });
   };
 
   const handleLedgerSelect = (ledger) => {
@@ -167,7 +205,7 @@ export default function PaymentEntryPage() {
       }
       return p;
     });
-    setForm({ amount: '', date: todayISO(), notes: '' });
+    setForm({ amount: '', date: todayISO(), notes: '', category_id: '' });
   };
 
   const handleSubmit = async (e) => {
@@ -182,9 +220,10 @@ export default function PaymentEntryPage() {
         amount: parseFloat(form.amount),
         date: form.date,
         notes: form.notes.trim(),
+        category_id: form.category_id ? parseInt(form.category_id) : null,
       });
       toast.success(`${entryType === 'payment' ? 'Payment' : 'Receipt'} recorded`);
-      setForm({ amount: '', date: todayISO(), notes: '' });
+      setForm({ amount: '', date: todayISO(), notes: '', category_id: '' });
       if (created.data && printEnabled) {
         const html = buildTransactionReceiptHtml({
           txn: created.data,
@@ -256,7 +295,11 @@ export default function PaymentEntryPage() {
   const isPayment = entryType === 'payment';
   const isLedgerClosed = selectedLedger?.status === 'closed';
 
-  const filteredTransactions = transactions.filter((t) => t.entry_type === entryType);
+  const filteredTransactions = transactions.filter((t) => {
+    if (t.entry_type !== entryType) return false;
+    if (filterCategoryId && String(t.category_id) !== filterCategoryId) return false;
+    return true;
+  });
 
   const amt = parseFloat(form.amount);
   const projectedBalance = selectedLedger && !isNaN(amt) && amt > 0
@@ -395,7 +438,7 @@ export default function PaymentEntryPage() {
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div>
               <label className="label">Amount *</label>
               <input
@@ -427,7 +470,62 @@ export default function PaymentEntryPage() {
               />
             </div>
             <div>
-              <label className="label">Notes</label>
+              <label className="label">Category</label>
+              {showNewCatInput ? (
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    value={newCatName}
+                    onChange={(e) => setNewCatName(e.target.value)}
+                    className="input-field flex-1"
+                    placeholder="New category name"
+                    autoFocus
+                    onKeyDown={(e) => { if (e.key === 'Escape') { setShowNewCatInput(false); setNewCatName(''); } if (e.key === 'Enter') { e.preventDefault(); handleCreateInlineCategory(); } }}
+                    disabled={creatingCat}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateInlineCategory}
+                    disabled={creatingCat || !newCatName.trim()}
+                    className="px-2 py-1 rounded-lg text-xs font-medium text-white bg-trust-blue hover:bg-blue-700 disabled:bg-blue-300 transition-colors"
+                  >
+                    {creatingCat ? '…' : 'Add'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowNewCatInput(false); setNewCatName(''); }}
+                    className="px-2 py-1 rounded-lg text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-1">
+                  <select
+                    value={form.category_id}
+                    onChange={(e) => setForm((p) => ({ ...p, category_id: e.target.value }))}
+                    className="input-field flex-1"
+                    disabled={isLedgerClosed || !selectedLedger}
+                  >
+                    <option value="">— None —</option>
+                    {txnCategories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setShowNewCatInput(true)}
+                    className="p-2 rounded-lg text-slate-500 hover:text-trust-blue hover:bg-blue-50 transition-colors"
+                    title="Create new category"
+                    disabled={isLedgerClosed || !selectedLedger}
+                  >
+                    <PlusIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="label">Remarks</label>
               <input
                 type="text"
                 value={form.notes}
@@ -508,13 +606,25 @@ export default function PaymentEntryPage() {
       {/* Transaction History */}
       {selectedLedger && (
         <div className="card p-0 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+          <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between gap-3">
             <h2 className="text-sm font-semibold text-slate-700">
               {isPayment ? 'Payment' : 'Receipt'} History — {selectedLedger.name}
               {!loadingTxns && (
                 <span className="ml-1.5 text-slate-400 font-normal">({filteredTransactions.length})</span>
               )}
             </h2>
+            {txnCategories.length > 0 && (
+              <select
+                value={filterCategoryId}
+                onChange={(e) => setFilterCategoryId(e.target.value)}
+                className="input-field text-xs py-1 px-2 w-auto min-w-[140px]"
+              >
+                <option value="">All Categories</option>
+                {txnCategories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           {loadingTxns ? (
@@ -531,7 +641,8 @@ export default function PaymentEntryPage() {
                     <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Voucher #</th>
                     <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Amount</th>
                     <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Date</th>
-                    <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Notes</th>
+                    <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Category</th>
+                    <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Remarks</th>
                     <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Recorded At</th>
                     <th className="px-4 py-2.5"></th>
                   </tr>
@@ -544,6 +655,11 @@ export default function PaymentEntryPage() {
                         {formatCurrency(txn.amount)}
                       </td>
                       <td className="px-4 py-2.5 text-slate-600">{formatDate(txn.date)}</td>
+                      <td className="px-4 py-2.5 text-slate-500 text-xs">
+                        {txn.category_name ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium">{txn.category_name}</span>
+                        ) : '—'}
+                      </td>
                       <td className="px-4 py-2.5 text-slate-500 text-xs max-w-[200px] truncate">{txn.notes || '—'}</td>
                       <td className="px-4 py-2.5 text-slate-400 text-xs">{formatDateTime(txn.created_at)}</td>
                       <td className="px-4 py-2.5">

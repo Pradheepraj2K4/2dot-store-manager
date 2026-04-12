@@ -1,14 +1,16 @@
 const { getDb } = require('../db/database');
 
 class TransactionRepository {
-  findAll({ ledgerId, entryType, fromDate, toDate, ledgerTypeId, behaviour, interestSchemeId } = {}) {
+  findAll({ ledgerId, entryType, fromDate, toDate, ledgerTypeId, behaviour, interestSchemeId, categoryId } = {}) {
     const db = getDb();
     let query = `
       SELECT t.*, l.name AS ledger_name, lt.name AS type_name, lt.behaviour,
-             l.phone AS ledger_phone, l.place AS ledger_place
+             l.phone AS ledger_phone, l.place AS ledger_place,
+             tc.name AS category_name
       FROM transactions t
       JOIN ledgers l ON t.ledger_id = l.id
       JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      LEFT JOIN transaction_categories tc ON tc.id = t.category_id
       WHERE 1=1
     `;
     const params = [];
@@ -19,6 +21,7 @@ class TransactionRepository {
     if (ledgerTypeId) { query += ' AND l.ledger_type_id = ?'; params.push(ledgerTypeId); }
     if (behaviour) { query += ' AND lt.behaviour = ?'; params.push(behaviour); }
     if (interestSchemeId) { query += ' AND l.interest_scheme_id = ?'; params.push(interestSchemeId); }
+    if (categoryId) { query += ' AND t.category_id = ?'; params.push(categoryId); }
     query += ' ORDER BY t.date DESC, t.id DESC';
     return db.prepare(query).all(...params);
   }
@@ -26,10 +29,12 @@ class TransactionRepository {
   findById(id) {
     const db = getDb();
     return db.prepare(`
-      SELECT t.*, l.name AS ledger_name, lt.name AS type_name, lt.behaviour
+      SELECT t.*, l.name AS ledger_name, lt.name AS type_name, lt.behaviour,
+             tc.name AS category_name
       FROM transactions t
       JOIN ledgers l ON t.ledger_id = l.id
       JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      LEFT JOIN transaction_categories tc ON tc.id = t.category_id
       WHERE t.id = ?
     `).get(id);
   }
@@ -37,19 +42,22 @@ class TransactionRepository {
   findByLedgerId(ledgerId) {
     const db = getDb();
     return db.prepare(`
-      SELECT t.* FROM transactions t WHERE t.ledger_id = ? ORDER BY t.date DESC, t.id DESC
+      SELECT t.*, tc.name AS category_name
+      FROM transactions t
+      LEFT JOIN transaction_categories tc ON tc.id = t.category_id
+      WHERE t.ledger_id = ? ORDER BY t.date DESC, t.id DESC
     `).all(ledgerId);
   }
 
-  create({ ledger_id, entry_type, amount, date, reference, notes, running_number, interest_entry_id }) {
+  create({ ledger_id, entry_type, amount, date, reference, notes, running_number, interest_entry_id, category_id }) {
     const db = getDb();
     const stmt = db.prepare(`
-      INSERT INTO transactions (ledger_id, entry_type, amount, date, reference, notes, running_number, interest_entry_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO transactions (ledger_id, entry_type, amount, date, reference, notes, running_number, interest_entry_id, category_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     const result = stmt.run(
       ledger_id, entry_type, amount, date,
-      reference || '', notes || '', running_number, interest_entry_id || null
+      reference || '', notes || '', running_number, interest_entry_id || null, category_id || null
     );
     return this.findById(result.lastInsertRowid);
   }
@@ -85,10 +93,12 @@ class TransactionRepository {
   getRecentTransactions(limit = 10) {
     const db = getDb();
     return db.prepare(`
-      SELECT t.*, l.name AS ledger_name, lt.name AS type_name, lt.behaviour
+      SELECT t.*, l.name AS ledger_name, lt.name AS type_name, lt.behaviour,
+             tc.name AS category_name
       FROM transactions t
       JOIN ledgers l ON t.ledger_id = l.id
       JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      LEFT JOIN transaction_categories tc ON tc.id = t.category_id
       ORDER BY t.date DESC, t.id DESC
       LIMIT ?
     `).all(limit);

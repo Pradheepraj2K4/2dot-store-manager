@@ -4,7 +4,7 @@ const transactionService = require('../services/paymentService');
 class TransactionController {
   getAll(req, res, next) {
     try {
-      const { ledgerId, entryType, fromDate, toDate, ledgerTypeId, behaviour, interestSchemeId } = req.query;
+      const { ledgerId, entryType, fromDate, toDate, ledgerTypeId, behaviour, interestSchemeId, categoryId } = req.query;
       const transactions = transactionService.getTransactions({
         ledgerId: ledgerId ? parseInt(ledgerId) : undefined,
         entryType: entryType || undefined,
@@ -13,6 +13,7 @@ class TransactionController {
         ledgerTypeId: ledgerTypeId ? parseInt(ledgerTypeId) : undefined,
         behaviour: behaviour || undefined,
         interestSchemeId: interestSchemeId ? parseInt(interestSchemeId) : undefined,
+        categoryId: categoryId ? parseInt(categoryId) : undefined,
       });
       res.json({ success: true, data: transactions });
     } catch (err) {

@@ -962,7 +962,7 @@ export default function LedgerPage() {
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Type</th>
                   <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Amount</th>
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Date</th>
-                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Notes</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Remarks</th>
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Recorded</th>
                   <th className="px-4 py-2.5"></th>
                 </tr>

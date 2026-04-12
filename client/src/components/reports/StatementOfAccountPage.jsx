@@ -64,13 +64,13 @@ export default function StatementOfAccountPage() {
       { header: 'Type',       key: 'entry_type',      width: 12 },
       { header: 'Amount',     key: 'amount',          width: 15 },
       { header: 'Balance',    key: 'runningBalance',   width: 15 },
-      { header: 'Notes',      key: 'notes',           width: 25 },
+      { header: 'Remarks',   key: 'notes',           width: 25 },
     ];
     exportToExcel(statementRows, columns, `Statement_${ledger?.name || 'Account'}`);
   };
 
   const handleExportPDF = () => {
-    const headers = ['Date', 'Ref #', 'Type', 'Amount', 'Balance', 'Notes'];
+    const headers = ['Date', 'Ref #', 'Type', 'Amount', 'Balance', 'Remarks'];
     const rows = statementRows.map((r) => [
       formatDate(r.date),
       r.running_number || '',
@@ -152,7 +152,7 @@ export default function StatementOfAccountPage() {
                       <th className="px-4 py-2.5 text-center font-semibold text-slate-600">Type</th>
                       <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Amount</th>
                       <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Balance</th>
-                      <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Notes</th>
+                      <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Remarks</th>
                     </tr>
                   </thead>
                   <tbody>

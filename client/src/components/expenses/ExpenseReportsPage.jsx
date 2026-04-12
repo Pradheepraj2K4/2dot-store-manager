@@ -77,7 +77,7 @@ export default function ExpenseReportsPage() {
   return (
     <div className="space-y-1.5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="page-title">Expense Reports</h1>
         </div>
@@ -89,7 +89,7 @@ export default function ExpenseReportsPage() {
 
       {/* Filters */}
       <div className="card py-3">
-        <div className="flex items-end gap-2 overflow-x-auto pb-1">
+        <div className="flex flex-wrap items-end gap-2 pb-1">
           <div className="w-44 min-w-[160px] shrink-0">
             <label className="label">From Date</label>
             <input

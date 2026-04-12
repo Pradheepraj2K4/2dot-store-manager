@@ -388,7 +388,7 @@ function EditExpenseModal({ expense, categories, open, onClose, onSaved, onCateg
             }}
           />
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="label">Amount *</label>
             <input
@@ -490,7 +490,7 @@ export default function ExpensePage() {
   return (
     <div className="space-y-2">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="page-title">Expenses</h1>
           <p className="text-sm text-slate-500 mt-1">Record and track business expenses</p>

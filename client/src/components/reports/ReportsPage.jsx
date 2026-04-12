@@ -166,7 +166,7 @@ export default function ReportsPage() {
 
       {/* ── Summary Cards ────────────────────────────────────────────────── */}
       {initDone && (
-        <div className="grid grid-cols-3 gap-4 shrink-0">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 shrink-0">
           <div className="card text-center py-3 border-red-200">
             <p className="text-xs text-red-600">Payments</p>
             <p className="text-lg font-bold text-red-600">{formatCurrency(totals.payment)}</p>

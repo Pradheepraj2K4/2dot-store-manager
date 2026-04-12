@@ -15,6 +15,7 @@ import {
   BanknotesIcon,
   CheckCircleIcon,
   ArrowsRightLeftIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 import { logout } from '../../utils/auth';
 import { interestApi, expenseApi } from '../../api';
@@ -30,7 +31,7 @@ const baseNavigation = [
   { name: 'Settings', href: '/settings', icon: Cog6ToothIcon },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({ open, onClose }) {
   const navigate = useNavigate();
   const [interestEnabled, setInterestEnabled] = useState(false);
   const [expenseEnabled, setExpenseEnabled] = useState(false);
@@ -78,17 +79,32 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-30 flex w-64 flex-col bg-sidebar">
-      {/* Logo / Brand */}
-      <div className="flex h-16 items-center gap-2 px-6 border-b border-slate-700">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-trust-blue text-white font-bold text-sm">
-          2D
+    <>
+      {/* Mobile backdrop */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      <aside className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-sidebar transition-transform duration-300 md:translate-x-0 md:z-30 ${open ? 'translate-x-0' : '-translate-x-full'}`}>
+        {/* Logo / Brand */}
+        <div className="flex h-16 items-center gap-2 px-6 border-b border-slate-700">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-trust-blue text-white font-bold text-sm">
+            2D
+          </div>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-base font-bold text-white leading-tight">2Dot Store Manager</h1>
+            <p className="text-[10px] text-slate-400 leading-tight">Accounts Module</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="md:hidden rounded-lg p-1 text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
+          >
+            <XMarkIcon className="h-5 w-5" />
+          </button>
         </div>
-        <div>
-          <h1 className="text-base font-bold text-white leading-tight">2Dot Store Manager</h1>
-          <p className="text-[10px] text-slate-400 leading-tight">Accounts Module</p>
-        </div>
-      </div>
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
@@ -97,6 +113,7 @@ export default function Sidebar() {
             key={item.name}
             to={item.href}
             end={item.href === '/'}
+            onClick={onClose}
             className={({ isActive }) =>
               `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                 isActive
@@ -143,5 +160,6 @@ export default function Sidebar() {
         <p className="text-xs text-slate-500 text-center">v1.0.0 — Offline Ready</p>
       </div>
     </aside>
+    </>
   );
 }

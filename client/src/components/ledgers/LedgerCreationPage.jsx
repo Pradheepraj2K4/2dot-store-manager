@@ -181,7 +181,7 @@ export default function LedgerCreationPage() {
           </div>
 
           {/* Row 2: Phone | Place */}
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <label className="label">Phone</label>
               <input
@@ -216,7 +216,7 @@ export default function LedgerCreationPage() {
 
           {/* Row 3: GST fields — shown only when enabled in dev settings */}
           {gstFieldsEnabled && (
-          <div className="grid grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <label className="label">GST Number</label>
               <input

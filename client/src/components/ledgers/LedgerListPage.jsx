@@ -190,7 +190,7 @@ export default function LedgerListPage() {
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1 max-w-md">
+        <div className="relative flex-1 sm:max-w-md">
           <MagnifyingGlassIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
@@ -380,7 +380,7 @@ export default function LedgerListPage() {
             />
             <FieldError msg={editErrors.name} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="label">Phone</label>
               <input
@@ -415,7 +415,7 @@ export default function LedgerListPage() {
               className="input-field resize-none"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="label">GST Number</label>
               <input
@@ -479,7 +479,7 @@ export default function LedgerListPage() {
               <h3 className="text-sm font-semibold text-slate-700 mb-3">
                 Interest Configuration
               </h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="label">Interest Rate (%)</label>
                   <input

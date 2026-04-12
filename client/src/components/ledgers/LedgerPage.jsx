@@ -399,7 +399,7 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
         size="md"
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="label">Amount to Pay</label>
               <input
@@ -867,7 +867,7 @@ export default function LedgerPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className={`grid grid-cols-2 ${hasInterest ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-2`}>
+      <div className={`grid grid-cols-1 ${hasInterest ? 'sm:grid-cols-3' : 'sm:grid-cols-2'} gap-2`}>
         <div className="card text-center">
           <p className="text-xs font-medium text-slate-500">Current Balance</p>
           <p className="text-lg font-bold text-debit-red mt-1">{formatCurrency(ledger.current_balance || 0)}</p>
@@ -1103,7 +1103,7 @@ export default function LedgerPage() {
             />
             <FieldError msg={editErrors.name} />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="label">Phone</label>
               <input
@@ -1138,7 +1138,7 @@ export default function LedgerPage() {
               className="input-field resize-none"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="label">GST Number</label>
               <input
@@ -1166,7 +1166,7 @@ export default function LedgerPage() {
               <FieldError msg={editErrors.state_code} />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="label">IGST Applicable</label>
               <div className="flex gap-6 mt-1">
@@ -1199,7 +1199,7 @@ export default function LedgerPage() {
           {interestEnabled && (
             <div className="border-t border-slate-200 pt-4">
               <h3 className="text-sm font-semibold text-slate-700 mb-3">Interest Configuration</h3>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="label">Interest Rate (%)</label>
                   <input

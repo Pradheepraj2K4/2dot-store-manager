@@ -22,9 +22,8 @@ export default function LoginPage() {
 
     setLoading(true);
     
-    // Simulate a small delay for better UX
-    setTimeout(() => {
-      if (login(password)) {
+    try {
+      if (await login(password)) {
         toast.success('Login successful');
         navigate(from, { replace: true });
       } else {
@@ -32,8 +31,11 @@ export default function LoginPage() {
         setPassword('');
         passwordRef.current?.focus();
       }
+    } catch {
+      toast.error('Login failed. Please try again.');
+    } finally {
       setLoading(false);
-    }, 300);
+    }
   };
 
   return (

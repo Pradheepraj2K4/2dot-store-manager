@@ -1,6 +1,7 @@
 // Authentication utilities
+import { settingsApi } from '../api';
+
 const AUTH_KEY = 'inventory_auth';
-const CUSTOM_PASSWORD_KEY = 'inventory_custom_password';
 const DEV_AUTH_KEY = 'inventory_dev_auth';
 
 /**
@@ -74,33 +75,36 @@ export function devLogout() {
 }
 
 /**
- * Get the custom password from localStorage
+ * Get the custom password from server
  */
-export function getCustomPassword() {
-  return localStorage.getItem(CUSTOM_PASSWORD_KEY);
+export async function getCustomPassword() {
+  try {
+    const res = await settingsApi.get('custom_password');
+    const val = res.data?.value;
+    return val ? String(val) : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Set the custom password in localStorage
+ * Set the custom password on server
  */
-export function setCustomPassword(password) {
-  if (password && password.trim()) {
-    localStorage.setItem(CUSTOM_PASSWORD_KEY, password.trim());
-  } else {
-    localStorage.removeItem(CUSTOM_PASSWORD_KEY);
-  }
+export async function setCustomPassword(password) {
+  await settingsApi.update('custom_password', password && password.trim() ? password.trim() : '');
 }
 
 /**
  * Validate password against both default and custom passwords
  */
-export function validatePassword(password) {
+export async function validatePassword(password) {
   if (!password) return false;
   
   const defaultPassword = getDefaultPassword();
-  const customPassword = getCustomPassword();
+  if (password === defaultPassword) return true;
 
-  return password === defaultPassword || (customPassword && password === customPassword);
+  const customPassword = await getCustomPassword();
+  return customPassword && password === customPassword;
 }
 
 /**
@@ -113,8 +117,8 @@ export function isAuthenticated() {
 /**
  * Login user
  */
-export function login(password) {
-  if (validatePassword(password)) {
+export async function login(password) {
+  if (await validatePassword(password)) {
     localStorage.setItem(AUTH_KEY, 'true');
     return true;
   }

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { ledgerApi, ledgerTypeApi } from '../../api';
+import { ledgerApi } from '../../api';
 import { formatCurrency } from '../../utils/helpers';
 import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -16,21 +16,15 @@ export default function OutstandingBalanceReportPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [ledgers, setLedgers] = useState([]);
-  const [ledgerTypes, setLedgerTypes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [typeFilter, setTypeFilter] = useState(searchParams.get('typeId') || 'all');
   const [behaviourFilter, setBehaviourFilter] = useState(searchParams.get('behaviour') || 'all');
   const [search, setSearch] = useState('');
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [outRes, typesRes] = await Promise.all([
-        ledgerApi.getOutstanding(),
-        ledgerTypeApi.getAll(),
-      ]);
+      const outRes = await ledgerApi.getOutstanding();
       setLedgers(outRes.data);
-      setLedgerTypes(typesRes.data);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -40,19 +34,16 @@ export default function OutstandingBalanceReportPage() {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const filterOptions = [['all', 'All'], ...ledgerTypes.map((t) => [String(t.id), t.name])];
-
   const filtered = useMemo(() => {
     return ledgers.filter((l) => {
       const matchesSearch =
         l.name.toLowerCase().includes(search.toLowerCase()) ||
         (l.phone || '').includes(search) ||
         (l.place || '').toLowerCase().includes(search.toLowerCase());
-      const matchesType = typeFilter === 'all' || String(l.ledger_type_id) === typeFilter;
       const matchesBehaviour = behaviourFilter === 'all' || l.behaviour === behaviourFilter;
-      return matchesSearch && matchesType && matchesBehaviour;
+      return matchesSearch && matchesBehaviour;
     });
-  }, [ledgers, search, typeFilter, behaviourFilter]);
+  }, [ledgers, search, behaviourFilter]);
 
   const totalOutstanding = useMemo(() => filtered.reduce((s, l) => s + (l.current_balance || 0), 0), [filtered]);
 
@@ -126,24 +117,9 @@ export default function OutstandingBalanceReportPage() {
           {[['all', 'All'], ['customer', 'Customer'], ['supplier', 'Supplier']].map(([val, label]) => (
             <button
               key={val}
-              onClick={() => { setBehaviourFilter(val); setTypeFilter('all'); }}
+              onClick={() => setBehaviourFilter(val)}
               className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
                 behaviourFilter === val
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="flex gap-1 bg-slate-100 rounded-lg p-1 flex-wrap">
-          {filterOptions.map(([val, label]) => (
-            <button
-              key={val}
-              onClick={() => setTypeFilter(val)}
-              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-                typeFilter === val
                   ? 'bg-white text-slate-900 shadow-sm'
                   : 'text-slate-500 hover:text-slate-700'
               }`}

@@ -20,10 +20,9 @@ export default function SettingsPage() {
   const [deleteCatModal, setDeleteCatModal] = useState({ open: false, cat: null });
 
   useEffect(() => {
-    const savedPassword = getCustomPassword();
-    if (savedPassword) {
-      setCustomPasswordState(savedPassword);
-    }
+    getCustomPassword().then((saved) => {
+      if (saved) setCustomPasswordState(saved);
+    });
   }, []);
 
   useEffect(() => {
@@ -92,19 +91,23 @@ export default function SettingsPage() {
     }
   };
 
-  const handleSavePassword = () => {
+  const handleSavePassword = async () => {
     try {
-      setCustomPassword(customPassword);
+      await setCustomPassword(customPassword);
       toast.success('Custom password saved');
     } catch (err) {
       toast.error('Failed to save password');
     }
   };
 
-  const handleClearPassword = () => {
-    setCustomPasswordState('');
-    setCustomPassword('');
-    toast.success('Custom password cleared');
+  const handleClearPassword = async () => {
+    try {
+      setCustomPasswordState('');
+      await setCustomPassword('');
+      toast.success('Custom password cleared');
+    } catch (err) {
+      toast.error('Failed to clear password');
+    }
   };
 
   return (
@@ -201,46 +204,44 @@ export default function SettingsPage() {
               <h3 className="text-sm font-semibold text-slate-700">Custom Password (Additional)</h3>
               <p className="text-xs text-slate-500 mt-1">Set an additional password that works alongside the default admin password</p>
             </div>
-            <div className="flex items-center gap-2 mt-3">
-              <input
-                ref={passwordRef}
-                type={showCustomPassword ? "text" : "password"}
-                value={customPassword}
-                onChange={(e) => setCustomPasswordState(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleSavePassword();
-                  }
-                }}
-                className="input-field flex-1"
-                placeholder="Enter custom password"
-              />
-              <button
-                type="button"
-                onClick={() => setShowCustomPassword(!showCustomPassword)}
-                className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-500"
-              >
-                {showCustomPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
-              </button>
-            </div>
-            <div className="flex gap-2 mt-3">
-              <button
-                onClick={handleSavePassword}
-                disabled={!customPassword}
-                className="btn-primary text-sm"
-              >
-                Save Custom Password
-              </button>
-              {getCustomPassword() && (
+            <form onSubmit={(e) => { e.preventDefault(); handleSavePassword(); }}>
+              <div className="flex items-center gap-2 mt-3">
+                <input
+                  ref={passwordRef}
+                  type={showCustomPassword ? "text" : "password"}
+                  value={customPassword}
+                  onChange={(e) => setCustomPasswordState(e.target.value)}
+                  className="input-field flex-1"
+                  placeholder="Enter custom password"
+                  autoComplete="new-password"
+                />
                 <button
-                  onClick={handleClearPassword}
-                  className="btn-secondary text-sm"
+                  type="button"
+                  onClick={() => setShowCustomPassword(!showCustomPassword)}
+                  className="p-2 rounded-lg hover:bg-slate-100 transition-colors text-slate-500"
                 >
-                  Clear Password
+                  {showCustomPassword ? <EyeSlashIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                 </button>
-              )}
-            </div>
+              </div>
+              <div className="flex gap-2 mt-3">
+                <button
+                  type="submit"
+                  disabled={!customPassword}
+                  className="btn-primary text-sm"
+                >
+                  Save Custom Password
+                </button>
+                {customPassword && (
+                  <button
+                    type="button"
+                    onClick={handleClearPassword}
+                    className="btn-secondary text-sm"
+                  >
+                    Clear Password
+                  </button>
+                )}
+              </div>
+            </form>
           </div>
         </div>
       </div>

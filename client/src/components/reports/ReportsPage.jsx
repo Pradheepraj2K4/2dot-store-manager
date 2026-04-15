@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { reportApi, ledgerTypeApi, interestSchemeApi, interestApi } from '../../api';
+import { reportApi, ledgerTypeApi, interestSchemeApi, interestApi, transactionCategoryApi } from '../../api';
 import { formatCurrency, formatDate, todayISO } from '../../utils/helpers';
 import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -60,6 +60,7 @@ export default function ReportsPage() {
   const [ledgerTypes, setLedgerTypes]   = useState([]);
   const [interestSchemes, setInterestSchemes] = useState([]);
   const [interestEnabled, setInterestEnabled] = useState(false);
+  const [categories, setCategories]     = useState([]);
   const [loading, setLoading]           = useState(false);
   const [initDone, setInitDone]         = useState(false);
 
@@ -67,6 +68,7 @@ export default function ReportsPage() {
   const [entryTypeFilter, setEntryTypeFilter] = useState(searchParams.get('entryType') || 'all');
   const [ledgerTypeFilter, setLedgerTypeFilter] = useState('all');
   const [interestSchemeFilter, setInterestSchemeFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
   const [search, setSearch]         = useState('');
   const [activePreset, setActivePreset] = useState('this_month');
   const today = new Date();
@@ -81,6 +83,7 @@ export default function ReportsPage() {
   // ── Fetch ledger types once ────────────────────────────────────────────
   useEffect(() => {
     ledgerTypeApi.getAll().then((res) => setLedgerTypes(res.data)).catch(() => {});
+    transactionCategoryApi.getAll().then((res) => setCategories(res.data || [])).catch(() => {});
     interestApi.isEnabled().then((res) => {
       const enabled = res.data?.enabled === true;
       setInterestEnabled(enabled);
@@ -97,6 +100,7 @@ export default function ReportsPage() {
       if (entryTypeFilter !== 'all') params.entryType = entryTypeFilter;
       if (ledgerTypeFilter !== 'all') params.ledgerTypeId = ledgerTypeFilter;
       if (interestSchemeFilter !== 'all') params.interestSchemeId = interestSchemeFilter;
+      if (categoryFilter !== 'all') params.categoryId = categoryFilter;
       if (range) {
         params.fromDate = range.from;
         params.toDate = range.to;
@@ -110,7 +114,7 @@ export default function ReportsPage() {
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entryTypeFilter, ledgerTypeFilter, interestSchemeFilter, activePreset, customFrom, customTo]);
+  }, [entryTypeFilter, ledgerTypeFilter, interestSchemeFilter, categoryFilter, activePreset, customFrom, customTo]);
 
   useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
 
@@ -138,6 +142,7 @@ export default function ReportsPage() {
       { header: 'Ref #',      key: 'running_number',  width: 18 },
       { header: 'Ledger',     key: 'ledger_name',     width: 25 },
       { header: 'Type',       key: 'entry_type',      width: 12 },
+      { header: 'Category',  key: 'category_name',   width: 18 },
       { header: 'Amount',     key: 'amount',          width: 15 },
       { header: 'Remarks',   key: 'notes',           width: 25 },
     ];
@@ -145,12 +150,13 @@ export default function ReportsPage() {
   };
 
   const handleExportPDF = () => {
-    const headers = ['Date', 'Ref #', 'Ledger', 'Type', 'Amount', 'Remarks'];
+    const headers = ['Date', 'Ref #', 'Ledger', 'Type', 'Category', 'Amount', 'Remarks'];
     const rows = visible.map((t) => [
       formatDate(t.date),
       t.running_number || '',
       t.ledger_name || '',
       t.entry_type === 'payment' ? 'Payment' : 'Receipt',
+      t.category_name || '—',
       formatCurrency(t.amount).replace('₹', 'Rs. '),
       t.notes || '',
     ]);
@@ -242,6 +248,20 @@ export default function ReportsPage() {
                 </button>
               ))}
             </div>
+          )}
+
+          {/* Category */}
+          {categories.length > 0 && (
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="input-field !py-1.5 !text-xs w-44"
+            >
+              <option value="all">All Categories</option>
+              {categories.map((c) => (
+                <option key={c.id} value={String(c.id)}>{c.name}</option>
+              ))}
+            </select>
           )}
 
           {/* Search */}
@@ -361,6 +381,7 @@ export default function ReportsPage() {
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Ledger</th>
                   <th className="px-4 py-2.5 text-center font-semibold text-slate-600">Type</th>
                   <th className="px-4 py-2.5 text-center font-semibold text-slate-600">Entry Type</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Category</th>
                   <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Amount</th>
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Remarks</th>
                 </tr>
@@ -389,6 +410,7 @@ export default function ReportsPage() {
                           {isPayment ? 'Payment' : 'Receipt'}
                         </span>
                       </td>
+                      <td className="px-4 py-2.5 text-slate-500">{txn.category_name || '—'}</td>
                       <td className={`px-4 py-2.5 text-right font-semibold ${isPayment ? 'text-red-600' : 'text-green-600'}`}>
                         {formatCurrency(txn.amount)}
                       </td>
@@ -401,7 +423,7 @@ export default function ReportsPage() {
               </tbody>
               <tfoot className="sticky bottom-0 z-10 bg-blue-100 border-t-2 border-slate-200">
                 <tr>
-                  <td colSpan={5} className="px-4 py-2.5 text-xs font-bold text-slate-600 uppercase tracking-wide">
+                  <td colSpan={6} className="px-4 py-2.5 text-xs font-bold text-slate-600 uppercase tracking-wide">
                     Total ({visible.length} transactions)
                   </td>
                   <td className="px-4 py-2.5 text-right text-sm font-bold text-slate-800">

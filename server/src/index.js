@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const { initializeDatabase } = require('./db/database');
 const { errorHandler } = require('./middleware/errorHandler');
 const { triggerDailyBackup } = require('./utils/backupService');
+const { register, httpRequestCounter } = require('./utils/metrics');
 const ledgerRoutes = require('./routes/ledgerRoutes');
 const ledgerTypeRoutes = require('./routes/accountRoutes');
 const transactionRoutes = require('./routes/paymentRoutes');
@@ -25,6 +26,14 @@ app.use(morgan('dev'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// HTTP request metrics
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    httpRequestCounter.labels(req.method, req.path, String(res.statusCode)).inc();
+  });
+  next();
+});
+
 // After every successful write request, trigger a daily backup (best-effort)
 app.use((req, res, next) => {
   if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
@@ -39,6 +48,12 @@ app.use((req, res, next) => {
 
 // Initialize database
 initializeDatabase();
+
+// Metrics endpoint
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
+});
 
 // API Routes
 app.use('/api/ledgers', ledgerRoutes);

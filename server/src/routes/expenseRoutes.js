@@ -9,7 +9,6 @@ router.put('/categories/:id',      (req, res, next) => expenseController.updateC
 router.delete('/categories/:id',   (req, res, next) => expenseController.deleteCategory(req, res, next));
 
 // Expenses
-router.get('/suggestions',         (req, res, next) => expenseController.getSuggestions(req, res, next));
 router.get('/summary',             (req, res, next) => expenseController.getSummary(req, res, next));
 router.get('/',                    (req, res, next) => expenseController.getAll(req, res, next));
 router.get('/:id',                 (req, res, next) => expenseController.getById(req, res, next));

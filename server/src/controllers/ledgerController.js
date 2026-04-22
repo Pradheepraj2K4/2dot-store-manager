@@ -56,6 +56,22 @@ class LedgerController {
     }
   }
 
+  bulkCreate(req, res, next) {
+    try {
+      const { ledgers } = req.body;
+      if (!Array.isArray(ledgers) || ledgers.length === 0) {
+        return res.status(400).json({ success: false, message: 'ledgers array is required' });
+      }
+      if (ledgers.length > 500) {
+        return res.status(400).json({ success: false, message: 'Cannot import more than 500 ledgers at once' });
+      }
+      const results = ledgerService.bulkCreateLedgers(ledgers);
+      res.status(201).json({ success: true, data: results });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   getCounts(req, res, next) {
     try {
       const counts = ledgerService.getLedgerCounts();

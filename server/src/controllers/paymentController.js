@@ -77,6 +77,15 @@ class TransactionController {
     }
   }
 
+  update(req, res, next) {
+    try {
+      const tx = transactionService.updateTransaction(parseInt(req.params.id), req.body);
+      res.json({ success: true, data: tx });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   delete(req, res, next) {
     try {
       transactionService.deleteTransaction(parseInt(req.params.id));

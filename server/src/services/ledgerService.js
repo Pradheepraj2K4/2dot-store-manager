@@ -57,10 +57,6 @@ class LedgerService {
   deleteLedger(id) {
     const existing = ledgerRepository.findById(id);
     if (!existing) throw new AppError('Ledger not found', 404);
-    const db = require('../db/connection').getDb();
-    const txCount = db.prepare('SELECT COUNT(*) AS cnt FROM transactions WHERE ledger_id = ?').get(id);
-    if (txCount && txCount.cnt > 0)
-      throw new AppError('Cannot delete a ledger that has transactions. Close it instead.', 400);
     ledgerRepository.delete(id);
     return { message: 'Ledger deleted successfully' };
   }
@@ -84,6 +80,20 @@ class LedgerService {
 
   getLedgersWithPendingInterest() {
     return ledgerRepository.getWithPendingInterest();
+  }
+
+  bulkCreateLedgers(items) {
+    const results = { created: 0, skipped: 0, errors: [] };
+    for (const item of items) {
+      try {
+        this.createLedger(item);
+        results.created++;
+      } catch (err) {
+        results.skipped++;
+        results.errors.push({ name: item.name, reason: err.message });
+      }
+    }
+    return results;
   }
 }
 

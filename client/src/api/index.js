@@ -14,6 +14,7 @@ export const ledgerApi = {
   getOutstanding: () => api.get('/ledgers/outstanding'),
   getOutstandingByType: (typeId) => api.get(`/ledgers/outstanding/type/${typeId}`),
   getPendingInterest: () => api.get('/ledgers/pending-interest'),
+  bulkCreate: (ledgers) => api.post('/ledgers/bulk', { ledgers }),
 };
 
 export const ledgerTypeApi = {
@@ -32,6 +33,7 @@ export const transactionApi = {
   getById: (id) => api.get(`/transactions/${id}`),
   getByLedger: (ledgerId) => api.get(`/transactions/ledger/${ledgerId}`),
   create: (data) => api.post('/transactions', data),
+  update: (id, data) => api.put(`/transactions/${id}`, data),
   delete: (id) => api.delete(`/transactions/${id}`),
   getSummary: () => api.get('/transactions/summary'),
   getRecent: (limit = 10) => api.get(`/transactions/recent?limit=${limit}`),

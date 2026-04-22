@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ledgerApi, ledgerTypeApi, interestApi } from "../../api";
 import { formatCurrency, todayISO } from "../../utils/helpers";
+import { validatePassword } from "../../utils/auth";
 import Modal from "../ui/Modal";
 import LoadingSpinner from "../ui/LoadingSpinner";
 import EmptyState from "../ui/EmptyState";
@@ -12,6 +13,7 @@ import {
   PencilSquareIcon,
   TrashIcon,
   BookOpenIcon,
+  LockClosedIcon,
 } from "@heroicons/react/24/outline";
 
 const GST_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z0-9]{1}Z[A-Z0-9]{1}$/;
@@ -52,6 +54,10 @@ export default function LedgerListPage() {
   const [editErrors, setEditErrors] = useState({});
   const [editTouched, setEditTouched] = useState({});
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deletePasswordError, setDeletePasswordError] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const deletePasswordRef = useRef(null);
   const [interestEnabled, setInterestEnabled] = useState(false);
   const navigate = useNavigate();
 
@@ -140,14 +146,35 @@ export default function LedgerListPage() {
     }
   };
 
-  const handleDelete = async (id) => {
+  const openDeleteConfirm = (ledger) => {
+    setDeleteConfirm(ledger);
+    setDeletePassword("");
+    setDeletePasswordError("");
+    setTimeout(() => deletePasswordRef.current?.focus(), 100);
+  };
+
+  const handleDelete = async () => {
+    if (!deletePassword) {
+      setDeletePasswordError("Password is required.");
+      return;
+    }
+    setDeleteLoading(true);
     try {
-      await ledgerApi.delete(id);
+      const valid = await validatePassword(deletePassword);
+      if (!valid) {
+        setDeletePasswordError("Incorrect password.");
+        setDeletePassword("");
+        deletePasswordRef.current?.focus();
+        return;
+      }
+      await ledgerApi.delete(deleteConfirm.id);
       toast.success("Ledger deleted successfully");
       setDeleteConfirm(null);
       fetchData();
     } catch (err) {
       toast.error(err.message);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -326,7 +353,7 @@ export default function LedgerListPage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            setDeleteConfirm(ledger);
+                            openDeleteConfirm(ledger);
                           }}
                           className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-debit-red transition-colors"
                           title="Delete"
@@ -532,23 +559,47 @@ export default function LedgerListPage() {
         title="Delete Ledger"
         size="sm"
       >
-        <p className="text-sm text-slate-600 mb-6">
+        <p className="text-sm text-slate-600 mb-4">
           Are you sure you want to delete <strong>{deleteConfirm?.name}</strong>
           ? This will also delete all associated transactions. This action
           cannot be undone.
         </p>
+        <div className="mb-5">
+          <label className="label flex items-center gap-1">
+            <LockClosedIcon className="h-3.5 w-3.5" />
+            Enter Password to Confirm
+          </label>
+          <input
+            ref={deletePasswordRef}
+            type="password"
+            value={deletePassword}
+            onChange={(e) => {
+              setDeletePassword(e.target.value);
+              setDeletePasswordError("");
+            }}
+            onKeyDown={(e) => e.key === "Enter" && handleDelete()}
+            className={`input-field mt-1 ${deletePasswordError ? "border-red-400" : ""}`}
+            placeholder="Enter your password"
+            autoComplete="current-password"
+          />
+          {deletePasswordError && (
+            <p className="text-xs text-red-500 mt-1">{deletePasswordError}</p>
+          )}
+        </div>
         <div className="flex justify-end gap-3">
           <button
             onClick={() => setDeleteConfirm(null)}
             className="btn-secondary"
+            disabled={deleteLoading}
           >
             Cancel
           </button>
           <button
-            onClick={() => handleDelete(deleteConfirm.id)}
+            onClick={handleDelete}
             className="btn-danger"
+            disabled={deleteLoading}
           >
-            Delete
+            {deleteLoading ? "Verifying…" : "Delete"}
           </button>
         </div>
       </Modal>

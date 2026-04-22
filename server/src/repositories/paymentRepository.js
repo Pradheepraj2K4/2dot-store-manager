@@ -104,6 +104,16 @@ class TransactionRepository {
     `).all(limit);
   }
 
+  update(id, { entry_type, amount, date, reference, notes, category_id }) {
+    const db = getDb();
+    db.prepare(`
+      UPDATE transactions
+      SET entry_type = ?, amount = ?, date = ?, reference = ?, notes = ?, category_id = ?
+      WHERE id = ?
+    `).run(entry_type, amount, date, reference || '', notes || '', category_id || null, id);
+    return this.findById(id);
+  }
+
   deleteById(id) {
     const db = getDb();
     db.prepare('DELETE FROM transactions WHERE id = ?').run(id);

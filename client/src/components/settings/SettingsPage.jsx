@@ -3,7 +3,8 @@ import { getDefaultPassword, getCustomPassword, setCustomPassword } from '../../
 import { expenseApi, transactionCategoryApi } from '../../api';
 import toast from 'react-hot-toast';
 import Modal from '../ui/Modal';
-import { LockClosedIcon, EyeIcon, EyeSlashIcon, PlusIcon, PencilIcon, TrashIcon, TagIcon } from '@heroicons/react/24/outline';
+import ImportContactsModal from './ImportContactsModal';
+import { LockClosedIcon, EyeIcon, EyeSlashIcon, PlusIcon, PencilIcon, TrashIcon, TagIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
 
 export default function SettingsPage() {
   const [showDefaultPassword, setShowDefaultPassword] = useState(false);
@@ -176,11 +177,32 @@ export default function SettingsPage() {
     }
   };
 
+  const [importContactsOpen, setImportContactsOpen] = useState(false);
+
   return (
     <div className="space-y-3 max-w-3xl">
       <div>
         <h1 className="page-title">Settings</h1>
         <p className="text-sm text-slate-500 mt-1">Manage application settings</p>
+      </div>
+
+      {/* ── Import Contacts ───────────────────────────────────────────── */}
+      <div className="card">
+        <div className="flex items-center gap-2 mb-2">
+          <ArrowUpTrayIcon className="h-5 w-5 text-trust-blue" />
+          <h2 className="text-base font-semibold text-slate-900">Import Contacts</h2>
+        </div>
+        <p className="text-xs text-slate-500 mb-4">
+          Import contacts from a <strong>.vcf</strong> (vCard) file and create them as <strong>Customer</strong> ledgers.
+          You can pick exactly which contacts to import from the file.
+        </p>
+        <button
+          onClick={() => setImportContactsOpen(true)}
+          className="btn-primary text-sm gap-2"
+        >
+          <ArrowUpTrayIcon className="h-4 w-4" />
+          Import from .vcf file
+        </button>
       </div>
 
 
@@ -408,6 +430,10 @@ export default function SettingsPage() {
           <button onClick={handleDeleteTxnCategory} className="btn-danger">Delete</button>
         </div>
       </Modal>
+      <ImportContactsModal
+        open={importContactsOpen}
+        onClose={() => setImportContactsOpen(false)}
+      />
     </div>
   );
 }

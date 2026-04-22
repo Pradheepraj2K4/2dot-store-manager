@@ -119,6 +119,42 @@ class TransactionService {
 
     run();
   }
+
+  updateTransaction(id, { entry_type, amount, date, reference, notes, category_id }) {
+    const db = getDb();
+    const tx = transactionRepository.findById(id);
+    if (!tx) throw new AppError('Transaction not found', 404);
+
+    const ledger = ledgerRepository.findById(tx.ledger_id);
+    if (!ledger) throw new AppError('Ledger not found', 404);
+
+    if (!['payment', 'receipt'].includes(entry_type)) throw new AppError('entry_type must be "payment" or "receipt"', 400);
+    const amt = parseFloat(amount);
+    if (isNaN(amt) || amt <= 0) throw new AppError('Amount must be a positive number', 400);
+
+    const behaviour = ledger.behaviour || 'customer';
+    const oldAmt = parseFloat(tx.amount);
+
+    const run = db.transaction(() => {
+      // Reverse old balance effect
+      let newBalance = ledger.current_balance;
+      if (behaviour === 'customer') {
+        newBalance = tx.entry_type === 'payment' ? newBalance - oldAmt : newBalance + oldAmt;
+      } else {
+        newBalance = tx.entry_type === 'payment' ? newBalance + oldAmt : newBalance - oldAmt;
+      }
+      // Apply new balance effect
+      if (behaviour === 'customer') {
+        newBalance = entry_type === 'payment' ? newBalance + amt : newBalance - amt;
+      } else {
+        newBalance = entry_type === 'payment' ? newBalance - amt : newBalance + amt;
+      }
+      ledgerRepository.updateBalance(tx.ledger_id, newBalance);
+      return transactionRepository.update(id, { entry_type, amount: amt, date, reference, notes, category_id });
+    });
+
+    return run();
+  }
 }
 
 module.exports = new TransactionService();

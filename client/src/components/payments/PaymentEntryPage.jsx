@@ -16,6 +16,7 @@ import {
   ArrowPathIcon,
   CalculatorIcon,
   PlusIcon,
+  PencilSquareIcon,
 } from '@heroicons/react/24/outline';
 
 export default function PaymentEntryPage() {
@@ -45,6 +46,10 @@ export default function PaymentEntryPage() {
 
   // Delete modal
   const [deleteTxnModal, setDeleteTxnModal] = useState({ open: false, txn: null });
+  // Edit modal
+  const [editTxnModal, setEditTxnModal] = useState({ open: false, txn: null });
+  const [editTxnForm, setEditTxnForm] = useState({});
+  const [editTxnSaving, setEditTxnSaving] = useState(false);
 
   // Category filter
   const [filterCategoryId, setFilterCategoryId] = useState('');
@@ -252,6 +257,39 @@ export default function PaymentEntryPage() {
       refreshAll();
     } catch (err) {
       toast.error(err.message);
+    }
+  };
+
+  const openEditTxn = (txn) => {
+    setEditTxnForm({
+      entry_type: txn.entry_type,
+      amount: String(txn.amount),
+      date: txn.date,
+      notes: txn.notes || '',
+      reference: txn.reference || '',
+      category_id: txn.category_id ? String(txn.category_id) : '',
+    });
+    setEditTxnModal({ open: true, txn });
+  };
+
+  const handleEditTxnSubmit = async (e) => {
+    e.preventDefault();
+    const amt = parseFloat(editTxnForm.amount);
+    if (isNaN(amt) || amt <= 0) { toast.error('Amount must be a positive number'); return; }
+    try {
+      setEditTxnSaving(true);
+      await transactionApi.update(editTxnModal.txn.id, {
+        ...editTxnForm,
+        amount: amt,
+        category_id: editTxnForm.category_id ? parseInt(editTxnForm.category_id) : null,
+      });
+      toast.success('Transaction updated');
+      setEditTxnModal({ open: false, txn: null });
+      refreshAll();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setEditTxnSaving(false);
     }
   };
 
@@ -675,14 +713,24 @@ export default function PaymentEntryPage() {
                             </button>
                           )}
                           {selectedLedger.status === 'active' && (
-                            <button
-                              type="button"
-                              onClick={() => setDeleteTxnModal({ open: true, txn })}
-                              className="text-slate-400 hover:text-red-600 transition-colors"
-                              title="Delete transaction"
-                            >
-                              <TrashIcon className="w-4 h-4" />
-                            </button>
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => openEditTxn(txn)}
+                                className="text-slate-400 hover:text-trust-blue transition-colors"
+                                title="Edit transaction"
+                              >
+                                <PencilSquareIcon className="w-4 h-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDeleteTxnModal({ open: true, txn })}
+                                className="text-slate-400 hover:text-red-600 transition-colors"
+                                title="Delete transaction"
+                              >
+                                <TrashIcon className="w-4 h-4" />
+                              </button>
+                            </>
                           )}
                         </div>
                       </td>
@@ -721,6 +769,76 @@ export default function PaymentEntryPage() {
             </button>
           </div>
         </div>
+      </Modal>
+
+      {/* Edit Transaction Modal */}
+      <Modal
+        open={editTxnModal.open}
+        onClose={() => setEditTxnModal({ open: false, txn: null })}
+        title="Edit Transaction"
+        size="sm"
+      >
+        {editTxnModal.txn && (
+          <form onSubmit={handleEditTxnSubmit} className="space-y-4">
+            <div>
+              <label className="label">Type</label>
+              <div className="flex gap-1 bg-slate-100 rounded-lg p-1 mt-1">
+                {['payment', 'receipt'].map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setEditTxnForm((f) => ({ ...f, entry_type: type }))}
+                    className={`flex-1 py-1.5 rounded-md text-sm font-medium transition-colors capitalize ${
+                      editTxnForm.entry_type === type
+                        ? 'bg-white text-slate-900 shadow-sm'
+                        : 'text-slate-500 hover:text-slate-700'
+                    }`}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="label">Amount</label>
+              <input
+                type="number"
+                value={editTxnForm.amount || ''}
+                onChange={(e) => setEditTxnForm((f) => ({ ...f, amount: e.target.value }))}
+                onWheel={(e) => e.target.blur()}
+                className="input-field mt-1"
+                min="0.01"
+                step="0.01"
+                required
+              />
+            </div>
+            <div>
+              <label className="label">Date</label>
+              <input
+                type="date"
+                value={editTxnForm.date || ''}
+                onChange={(e) => setEditTxnForm((f) => ({ ...f, date: e.target.value }))}
+                className="input-field mt-1"
+                required
+              />
+            </div>
+            <div>
+              <label className="label">Notes</label>
+              <input
+                type="text"
+                value={editTxnForm.notes || ''}
+                onChange={(e) => setEditTxnForm((f) => ({ ...f, notes: e.target.value }))}
+                className="input-field mt-1"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-1">
+              <button type="button" onClick={() => setEditTxnModal({ open: false, txn: null })} className="btn-secondary">Cancel</button>
+              <button type="submit" className="btn-primary" disabled={editTxnSaving}>
+                {editTxnSaving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
 
       {/* Delete Confirmation Modal */}

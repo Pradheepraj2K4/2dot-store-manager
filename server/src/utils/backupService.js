@@ -10,7 +10,7 @@
 
 const fs   = require('fs');
 const path = require('path');
-const { DB_PATH } = require('../db/connection');
+const { getDbPath } = require('../db/connection');
 
 function getTodayDateString() {
   const now = new Date();
@@ -41,7 +41,8 @@ function performBackup(backupDir) {
   const dateStr  = getTodayDateString();
   const destPath = path.join(backupDir, `inventory_${dateStr}.db`);
   try {
-    fs.copyFileSync(DB_PATH, destPath);
+    // Resolve the current tenant's DB file via AsyncLocalStorage context
+    fs.copyFileSync(getDbPath(), destPath);
     return { success: true, path: destPath, date: dateStr };
   } catch (err) {
     return { success: false, error: err.message };

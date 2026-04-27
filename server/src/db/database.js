@@ -2,29 +2,21 @@
  * Database orchestrator
  *
  * Single entry-point that the rest of the application imports.
- * Responsibilities:
- *   1. Open the SQLite connection (via connection.js).
- *   2. Run pending schema migrations (via migrations/index.js).
- *   3. Seed required default data (via seeds/settings.js).
- *
- * All other modules that need the DB instance should import `getDb` from
- * this file (re-exported from connection.js) so there is one canonical path.
+ * In multi-tenant mode databases are initialised lazily on the first
+ * request for each tenant (see connection.js).  This module re-exports
+ * the helpers that controllers and repositories depend on so that they
+ * do not need to change their import paths.
  */
 
-const { getDb, closeDb }   = require('./connection');
-const { runMigrations }    = require('./migrations');
-const { seedSettings }     = require('./seeds/settings');
+const { getDb, closeDb, getDbPath, extractTenant, runWithTenant } = require('./connection');
 
 /**
- * Initialises the database.
- * Called once at application startup (server/src/index.js).
+ * No-op kept for backward compatibility.
+ * Tenant databases are initialised lazily when the first request arrives.
  */
 function initializeDatabase() {
-  const db = getDb();
-  runMigrations(db);
-  seedSettings(db);
-  console.log('[DB] Database ready.');
+  console.log('[DB] Multi-tenant mode: databases initialised lazily per tenant.');
 }
 
-module.exports = { getDb, closeDb, initializeDatabase };
+module.exports = { getDb, closeDb, getDbPath, extractTenant, runWithTenant, initializeDatabase };
 

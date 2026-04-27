@@ -2,7 +2,7 @@ const express = require('express');
 const path = require('path');
 const cors = require('cors');
 const morgan = require('morgan');
-const { initializeDatabase } = require('./db/database');
+const { initializeDatabase, extractTenant, runWithTenant } = require('./db/database');
 const { errorHandler } = require('./middleware/errorHandler');
 const { triggerDailyBackup } = require('./utils/backupService');
 const { register, httpRequestCounter } = require('./utils/metrics');
@@ -34,6 +34,14 @@ app.use((req, res, next) => {
   next();
 });
 
+// ── Tenant resolution ──────────────────────────────────────────────────────
+// Extracts the tenant from the Host header (accounts-{tenant}.2dotloanmanager.in)
+// and binds every downstream handler to that tenant's database via AsyncLocalStorage.
+app.use((req, res, next) => {
+  const tenant = extractTenant(req.hostname);
+  runWithTenant(tenant, next);
+});
+
 // After every successful write request, trigger a daily backup (best-effort)
 app.use((req, res, next) => {
   if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
@@ -46,7 +54,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Initialize database
+// Log multi-tenant startup (databases are initialised lazily per tenant)
 initializeDatabase();
 
 // Metrics endpoint

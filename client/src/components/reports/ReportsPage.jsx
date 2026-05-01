@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { reportApi, ledgerTypeApi, interestSchemeApi, interestApi, transactionCategoryApi } from '../../api';
 import { formatCurrency, formatDate, todayISO } from '../../utils/helpers';
@@ -10,6 +10,9 @@ import {
   CalendarDaysIcon,
   MagnifyingGlassIcon,
   BanknotesIcon,
+  FunnelIcon,
+  XMarkIcon,
+  ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 
 // ── Date range helpers ────────────────────────────────────────────────────────
@@ -74,6 +77,29 @@ export default function ReportsPage() {
   const today = new Date();
   const [customFrom, setCustomFrom] = useState(getISODate(new Date(today.getFullYear(), today.getMonth(), 1)));
   const [customTo, setCustomTo]     = useState(todayISO());
+
+  // ── Dropdown state ─────────────────────────────────────────────────────
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [dateOpen, setDateOpen]     = useState(false);
+  const filterRef = useRef(null);
+  const dateRef   = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false);
+      if (dateRef.current   && !dateRef.current.contains(e.target))   setDateOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const activeFilterCount = [
+    entryTypeFilter !== 'all',
+    ledgerTypeFilter !== 'all',
+    interestSchemeFilter !== 'all',
+    categoryFilter !== 'all',
+    search.trim() !== '',
+  ].filter(Boolean).length;
 
   function activeDateRange() {
     if (activePreset === 'custom') return { from: customFrom, to: customTo };
@@ -164,7 +190,6 @@ export default function ReportsPage() {
   };
 
   const range = activeDateRange();
-  const ledgerTypeFilterOptions = [['all', 'All'], ...ledgerTypes.map((t) => [String(t.id), t.name])];
 
   return (
     <div className="flex flex-col h-full gap-2 min-h-0">
@@ -193,98 +218,243 @@ export default function ReportsPage() {
         </div>
       )}
 
-      {/* ── Filters ──────────────────────────────────────────────────────── */}
-      <div className="card p-4 flex flex-col gap-3 shrink-0">
-        {/* Row 1: entry type filter + ledger type + search + export */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Entry type (payment / receipt) */}
-          <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
-            {[['all', 'All'], ['payment', 'Payments'], ['receipt', 'Receipts']].map(([val, label]) => (
-              <button
-                key={val}
-                onClick={() => setEntryTypeFilter(val)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  entryTypeFilter === val
-                    ? 'bg-white text-slate-800 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+      {/* ── Filters toolbar ───────────────────────────────────────────────── */}
+      <div className="card p-3 shrink-0">
+        <div className="flex items-center gap-2 flex-wrap">
 
-          {/* Ledger type */}
-          <div className="flex gap-1 p-1 bg-slate-100 rounded-lg flex-wrap">
-            {ledgerTypeFilterOptions.map(([val, label]) => (
-              <button
-                key={val}
-                onClick={() => setLedgerTypeFilter(val)}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                  ledgerTypeFilter === val
-                    ? 'bg-white text-slate-800 shadow-sm'
-                    : 'text-slate-500 hover:text-slate-700'
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* Interest scheme */}
-          {interestEnabled && interestSchemes.length > 0 && (
-            <div className="flex gap-1 p-1 bg-slate-100 rounded-lg flex-wrap">
-              {[['all', 'All Schemes'], ...interestSchemes.map((s) => [String(s.id), s.name])].map(([val, label]) => (
-                <button
-                  key={val}
-                  onClick={() => setInterestSchemeFilter(val)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                    interestSchemeFilter === val
-                      ? 'bg-white text-slate-800 shadow-sm'
-                      : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Category */}
-          {categories.length > 0 && (
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="input-field !py-1.5 !text-xs w-44"
+          {/* ── Filter dropdown ────────────────────────────────────────────── */}
+          <div className="relative" ref={filterRef}>
+            <button
+              onClick={() => { setFilterOpen((v) => !v); setDateOpen(false); }}
+              className={`btn-secondary gap-1.5 ${activeFilterCount > 0 ? 'ring-1 ring-trust-blue text-trust-blue' : ''}`}
             >
-              <option value="all">All Categories</option>
-              {categories.map((c) => (
-                <option key={c.id} value={String(c.id)}>{c.name}</option>
-              ))}
-            </select>
-          )}
+              <FunnelIcon className="h-4 w-4" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="bg-trust-blue text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center leading-none font-bold">
+                  {activeFilterCount}
+                </span>
+              )}
+              <ChevronDownIcon className={`h-3.5 w-3.5 transition-transform ${filterOpen ? 'rotate-180' : ''}`} />
+            </button>
 
-          {/* Search */}
-          <div className="relative w-52">
-            <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name / ref #…"
-              className="input-field !pl-8 !py-1.5 !text-xs w-full"
-            />
-            {search && (
-              <button
-                onClick={() => setSearch('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs leading-none"
-              >
-                ✕
-              </button>
+            {filterOpen && (
+              <div className="absolute top-full left-0 mt-1.5 w-80 bg-white border border-slate-200 rounded-xl shadow-xl z-30 p-4 flex flex-col gap-4">
+                {/* Transaction Type */}
+                <div>
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Transaction Type</p>
+                  <div className="flex gap-1 p-1 bg-slate-100 rounded-lg">
+                    {[['all', 'All'], ['payment', 'Payments'], ['receipt', 'Receipts']].map(([val, label]) => (
+                      <button
+                        key={val}
+                        onClick={() => setEntryTypeFilter(val)}
+                        className={`flex-1 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          entryTypeFilter === val
+                            ? 'bg-white text-slate-800 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Ledger Type */}
+                <div>
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Ledger Type</p>
+                  <div className="flex flex-wrap gap-1 p-1 bg-slate-100 rounded-lg">
+                    {[['all', 'All'], ...ledgerTypes.map((t) => [String(t.id), t.name])].map(([val, label]) => (
+                      <button
+                        key={val}
+                        onClick={() => setLedgerTypeFilter(val)}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          ledgerTypeFilter === val
+                            ? 'bg-white text-slate-800 shadow-sm'
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Interest Scheme */}
+                {interestEnabled && interestSchemes.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Interest Scheme</p>
+                    <div className="flex flex-wrap gap-1 p-1 bg-slate-100 rounded-lg">
+                      {[['all', 'All Schemes'], ...interestSchemes.map((s) => [String(s.id), s.name])].map(([val, label]) => (
+                        <button
+                          key={val}
+                          onClick={() => setInterestSchemeFilter(val)}
+                          className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                            interestSchemeFilter === val
+                              ? 'bg-white text-slate-800 shadow-sm'
+                              : 'text-slate-500 hover:text-slate-700'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Category */}
+                {categories.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Category</p>
+                    <select
+                      value={categoryFilter}
+                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      className="input-field !py-1.5 !text-xs w-full"
+                    >
+                      <option value="all">All Categories</option>
+                      {categories.map((c) => (
+                        <option key={c.id} value={String(c.id)}>{c.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {/* Search */}
+                <div>
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">Search</p>
+                  <div className="relative">
+                    <MagnifyingGlassIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Name / ref #…"
+                      className="input-field !pl-8 !py-1.5 !text-xs w-full"
+                    />
+                    {search && (
+                      <button
+                        onClick={() => setSearch('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <XMarkIcon className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Clear all */}
+                {activeFilterCount > 0 && (
+                  <button
+                    onClick={() => {
+                      setEntryTypeFilter('all');
+                      setLedgerTypeFilter('all');
+                      setInterestSchemeFilter('all');
+                      setCategoryFilter('all');
+                      setSearch('');
+                    }}
+                    className="text-xs text-red-500 hover:text-red-700 font-medium text-left -mt-1"
+                  >
+                    Clear all filters
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
-          {/* Export */}
+          {/* ── Date dropdown ──────────────────────────────────────────────── */}
+          <div className="relative" ref={dateRef}>
+            <button
+              onClick={() => { setDateOpen((v) => !v); setFilterOpen(false); }}
+              className="btn-secondary gap-1.5"
+            >
+              <CalendarDaysIcon className="h-4 w-4" />
+              {PRESETS.find((p) => p.key === activePreset)?.label}
+              {activePreset !== 'custom' && range && (
+                <span className="text-xs text-slate-400 hidden sm:inline">
+                  ({formatDate(range.from)} — {formatDate(range.to)})
+                </span>
+              )}
+              <ChevronDownIcon className={`h-3.5 w-3.5 transition-transform ${dateOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {dateOpen && (
+              <div className="absolute top-full left-0 mt-1.5 w-72 bg-white border border-slate-200 rounded-xl shadow-xl z-30 p-4 flex flex-col gap-3">
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Date Range</p>
+                <div className="flex flex-wrap gap-2">
+                  {PRESETS.map((p) => (
+                    <button
+                      key={p.key}
+                      onClick={() => setActivePreset(p.key)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        activePreset === p.key
+                          ? 'bg-trust-blue text-white shadow-sm'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+                {activePreset === 'custom' && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="date"
+                      value={customFrom}
+                      max={customTo}
+                      onChange={(e) => setCustomFrom(e.target.value)}
+                      className="input-field !py-1 !text-xs flex-1"
+                    />
+                    <span className="text-xs text-slate-400">–</span>
+                    <input
+                      type="date"
+                      value={customTo}
+                      min={customFrom}
+                      max={todayISO()}
+                      onChange={(e) => setCustomTo(e.target.value)}
+                      className="input-field !py-1 !text-xs flex-1"
+                    />
+                  </div>
+                )}
+                {activePreset !== 'custom' && range && (
+                  <p className="text-xs text-slate-400">{formatDate(range.from)} — {formatDate(range.to)}</p>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* ── Active filter chips ────────────────────────────────────────── */}
+          {entryTypeFilter !== 'all' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">
+              {entryTypeFilter === 'payment' ? 'Payments' : 'Receipts'}
+              <button onClick={() => setEntryTypeFilter('all')} className="hover:text-blue-900"><XMarkIcon className="h-3 w-3" /></button>
+            </span>
+          )}
+          {ledgerTypeFilter !== 'all' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">
+              {ledgerTypes.find((t) => String(t.id) === ledgerTypeFilter)?.name}
+              <button onClick={() => setLedgerTypeFilter('all')} className="hover:text-blue-900"><XMarkIcon className="h-3 w-3" /></button>
+            </span>
+          )}
+          {interestSchemeFilter !== 'all' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">
+              {interestSchemes.find((s) => String(s.id) === interestSchemeFilter)?.name}
+              <button onClick={() => setInterestSchemeFilter('all')} className="hover:text-blue-900"><XMarkIcon className="h-3 w-3" /></button>
+            </span>
+          )}
+          {categoryFilter !== 'all' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">
+              {categories.find((c) => String(c.id) === categoryFilter)?.name}
+              <button onClick={() => setCategoryFilter('all')} className="hover:text-blue-900"><XMarkIcon className="h-3 w-3" /></button>
+            </span>
+          )}
+          {search.trim() && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-medium">
+              "{search}"
+              <button onClick={() => setSearch('')} className="hover:text-blue-900"><XMarkIcon className="h-3 w-3" /></button>
+            </span>
+          )}
+
+          {/* ── Export ────────────────────────────────────────────────────── */}
           <div className="flex gap-2 ml-auto">
             <button onClick={handleExportExcel} className="btn-secondary gap-2">
               <ArrowDownTrayIcon className="h-4 w-4" />Excel
@@ -293,56 +463,6 @@ export default function ReportsPage() {
               <ArrowDownTrayIcon className="h-4 w-4" />PDF
             </button>
           </div>
-        </div>
-
-        {/* Row 2: date presets */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          <div className="flex items-center gap-1.5 shrink-0">
-            <CalendarDaysIcon className="h-4 w-4 text-slate-400" />
-            <span className="text-xs font-medium text-slate-500">Period:</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {PRESETS.map((p) => (
-              <button
-                key={p.key}
-                onClick={() => setActivePreset(p.key)}
-                className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                  activePreset === p.key
-                    ? 'bg-trust-blue text-white shadow-sm'
-                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-
-          {activePreset === 'custom' ? (
-            <div className="flex items-center gap-2 flex-wrap sm:ml-2">
-              <input
-                type="date"
-                value={customFrom}
-                max={customTo}
-                onChange={(e) => setCustomFrom(e.target.value)}
-                className="input-field !py-1 !text-xs w-36"
-              />
-              <span className="text-xs text-slate-400">to</span>
-              <input
-                type="date"
-                value={customTo}
-                min={customFrom}
-                max={todayISO()}
-                onChange={(e) => setCustomTo(e.target.value)}
-                className="input-field !py-1 !text-xs w-36"
-              />
-            </div>
-          ) : (
-            range && (
-              <span className="text-xs text-slate-400 sm:ml-auto">
-                {formatDate(range.from)} — {formatDate(range.to)}
-              </span>
-            )
-          )}
         </div>
       </div>
 

@@ -104,14 +104,10 @@ export default function LedgerCreationPage() {
       });
       toast.success('Ledger created successfully');
       const newId = res.data?.id || res.data?.ledger?.id;
-      if (newId) {
-        navigate(`/ledger/${newId}`);
-      } else {
         setForm(EMPTY_FORM);
         setErrors({});
         setTouched({});
         nameRef.current?.focus();
-      }
     } catch (err) {
       toast.error(err.message || 'Failed to create ledger');
     } finally {

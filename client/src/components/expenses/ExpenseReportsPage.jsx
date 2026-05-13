@@ -90,24 +90,6 @@ export default function ExpenseReportsPage() {
       {/* Filters */}
       <div className="card py-3">
         <div className="flex flex-wrap items-end gap-2 pb-1">
-          <div className="w-44 min-w-[160px] shrink-0">
-            <label className="label">From Date</label>
-            <input
-              type="date"
-              value={filters.fromDate}
-              onChange={(e) => setFilters((p) => ({ ...p, fromDate: e.target.value }))}
-              className="input-field"
-            />
-          </div>
-          <div className="w-44 min-w-[160px] shrink-0">
-            <label className="label">To Date</label>
-            <input
-              type="date"
-              value={filters.toDate}
-              onChange={(e) => setFilters((p) => ({ ...p, toDate: e.target.value }))}
-              className="input-field"
-            />
-          </div>
           <div className="w-52 min-w-[180px] shrink-0">
             <label className="label">Category</label>
             <select
@@ -131,6 +113,24 @@ export default function ExpenseReportsPage() {
               placeholder="Search by name"
             />
           </div>
+          <div className="w-44 min-w-[160px] shrink-0">
+            <label className="label">From Date</label>
+            <input
+              type="date"
+              value={filters.fromDate}
+              onChange={(e) => setFilters((p) => ({ ...p, fromDate: e.target.value }))}
+              className="input-field"
+            />
+          </div>
+          <div className="w-44 min-w-[160px] shrink-0">
+            <label className="label">To Date</label>
+            <input
+              type="date"
+              value={filters.toDate}
+              onChange={(e) => setFilters((p) => ({ ...p, toDate: e.target.value }))}
+              className="input-field"
+            />
+          </div>
           <div className="shrink-0">
             <button
               onClick={() => setFilters({ fromDate: firstDayOfCurrentMonth(), toDate: todayISO(), categoryId: '', expenseName: '' })}
@@ -147,7 +147,7 @@ export default function ExpenseReportsPage() {
       ) : (
         <>
           {/* Summary + Breakdown */}
-          {expenses.length > 0 && (
+          {/* {expenses.length > 0 && (
             <div className="card py-2.5">
               <div className="flex items-center gap-4 overflow-x-auto whitespace-nowrap pb-2 mb-2 border-b border-slate-100 text-xs">
                 <div className="shrink-0">
@@ -185,9 +185,9 @@ export default function ExpenseReportsPage() {
                 </div>
               )}
             </div>
-          )}
+          )} */}
 
-          {/* Date-wise Expense List */}
+          {/* Expense Table */}
           {sortedDates.length === 0 ? (
             <EmptyState
               icon={DocumentChartBarIcon}
@@ -195,60 +195,66 @@ export default function ExpenseReportsPage() {
               description="Try adjusting your filters"
             />
           ) : (
-            <div className="space-y-1.5 max-h-[50vh] lg:max-h-[56vh] overflow-y-auto pr-1">
-              {sortedDates.map(({ date, items, total }) => (
-                <div key={date} className="card p-0 overflow-hidden">
-                  {/* Date Header */}
-                  <div className="px-3 py-2 bg-orange-50 border-b border-orange-100 flex items-center justify-between">
-                    <span className="text-sm font-semibold text-orange-800">{formatDate(date)}</span>
-                    <span className="text-sm font-semibold text-orange-700">{formatCurrency(total)}</span>
-                  </div>
-                  {/* Entries */}
-                  <table className="w-full text-sm">
-                    <tbody>
-                      {items.map((exp) => (
-                        <tr key={exp.id} className="border-b border-slate-50 last:border-0">
-                          <td className="px-3 py-1.5 font-medium text-slate-800">{exp.expense_name}</td>
-                          <td className="px-3 py-1.5">
-                            {exp.category_name ? (
-                              <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-orange-50 text-orange-700">
-                                {exp.category_name}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-slate-400">—</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-1.5 text-slate-500 text-xs max-w-[200px] truncate">
-                            {exp.notes || '—'}
-                          </td>
-                          <td className="px-3 py-1.5 text-right font-semibold text-orange-700 whitespace-nowrap">
-                            {formatCurrency(exp.amount)}
-                          </td>
-                          <td className="px-3 py-1.5 text-right">
-                            <button
-                              onClick={() => setDeleteModal({ open: true, expense: exp })}
-                              className="text-slate-400 hover:text-red-600 transition-colors"
-                              title="Delete"
-                            >
-                              <TrashIcon className="w-4 h-4" />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Grand Total Footer */}
-          {sortedDates.length > 0 && (
-            <div className="card py-2.5 px-3.5 flex items-center justify-between bg-orange-400 border border-orange-200 sticky bottom-0 z-10">
-              <span className="text-sm font-semibold text-white">
-                Grand Total ({expenses.length} entries)
-              </span>
-              <span className="text-lg font-bold text-white">{formatCurrency(grandTotal)}</span>
+            <div className="card p-0 overflow-hidden">
+              <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 330px)' }}>
+                <table className="w-full text-sm border-collapse">
+                  <thead className="sticky top-0 z-10 bg-slate-100">
+                    <tr className="text-slate-600 text-xs">
+                      <th className="px-3 py-2 text-center font-semibold border-b border-slate-200 w-10">S.No</th>
+                      <th className="px-3 py-2 text-left font-semibold border-b border-slate-200 whitespace-nowrap">Date</th>
+                      <th className="px-3 py-2 text-left font-semibold border-b border-slate-200">Expense Name</th>
+                      <th className="px-3 py-2 text-left font-semibold border-b border-slate-200">Category</th>
+                      <th className="px-3 py-2 text-left font-semibold border-b border-slate-200">Notes</th>
+                      <th className="px-3 py-2 text-right font-semibold border-b border-slate-200">Amount</th>
+                      <th className="px-3 py-2 border-b border-slate-200 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {expenses.map((exp, idx) => (
+                      <tr key={exp.id} className="border-b border-slate-100 hover:bg-slate-50 last:border-0">
+                        <td className="px-3 py-1.5 text-center text-xs text-slate-400">{idx + 1}</td>
+                        <td className="px-3 py-1.5 text-xs text-slate-600 whitespace-nowrap">{formatDate(exp.date)}</td>
+                        <td className="px-3 py-1.5 font-medium text-slate-800">{exp.expense_name}</td>
+                        <td className="px-3 py-1.5">
+                          {exp.category_name ? (
+                            <span className="inline-flex rounded-full px-2 py-0.5 text-xs font-medium bg-orange-50 text-orange-700">
+                              {exp.category_name}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-slate-400">—</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-1.5 text-slate-500 text-xs max-w-[200px] truncate">
+                          {exp.notes || '—'}
+                        </td>
+                        <td className="px-3 py-1.5 text-right font-semibold text-orange-700 whitespace-nowrap">
+                          {formatCurrency(exp.amount)}
+                        </td>
+                        <td className="px-3 py-1.5 text-center">
+                          <button
+                            onClick={() => setDeleteModal({ open: true, expense: exp })}
+                            className="text-slate-400 hover:text-red-600 transition-colors"
+                            title="Delete"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="sticky bottom-0 z-10 bg-orange-400">
+                    <tr>
+                      <td colSpan={5} className="px-3 py-2.5 text-sm font-semibold text-white">
+                        Grand Total ({expenses.length} entries)
+                      </td>
+                      <td className="px-3 py-2.5 text-right text-base font-bold text-white whitespace-nowrap">
+                        {formatCurrency(grandTotal)}
+                      </td>
+                      <td className="bg-orange-400" />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
             </div>
           )}
         </>

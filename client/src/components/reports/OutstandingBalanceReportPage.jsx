@@ -36,12 +36,13 @@ export default function OutstandingBalanceReportPage() {
 
   const filtered = useMemo(() => {
     return ledgers.filter((l) => {
+      const hasBalance = (l.current_balance || 0) !== 0;
       const matchesSearch =
         l.name.toLowerCase().includes(search.toLowerCase()) ||
         (l.phone || '').includes(search) ||
         (l.place || '').toLowerCase().includes(search.toLowerCase());
       const matchesBehaviour = behaviourFilter === 'all' || l.behaviour === behaviourFilter;
-      return matchesSearch && matchesBehaviour;
+      return hasBalance && matchesSearch && matchesBehaviour;
     });
   }, [ledgers, search, behaviourFilter]);
 

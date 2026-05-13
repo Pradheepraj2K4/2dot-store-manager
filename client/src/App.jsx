@@ -16,6 +16,7 @@ import DeveloperSettingsPage from './components/settings/DeveloperSettingsPage';
 import ExpensePage from './components/expenses/ExpensePage';
 import ExpenseReportsPage from './components/expenses/ExpenseReportsPage';
 import PaymentEntryPage from './components/payments/PaymentEntryPage';
+import DayBookPage from './components/reports/DayBookPage';
 
 export default function App() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
                 <Route path="/expenses" element={<ExpensePage />} />
                 <Route path="/expense-reports" element={<ExpenseReportsPage />} />
                 <Route path="/payment-entry" element={<PaymentEntryPage />} />
+                <Route path="/day-book" element={<DayBookPage />} />
               </Routes>
             </AppLayout>
           </ProtectedRoute>

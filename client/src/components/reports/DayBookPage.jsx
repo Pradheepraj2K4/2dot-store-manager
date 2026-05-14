@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { transactionApi, expenseApi } from '../../api';
 import { formatCurrency, formatDate, todayISO } from '../../utils/helpers';
+import { exportToExcel } from '../../utils/exportUtils';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
 import toast from 'react-hot-toast';
-import { QueueListIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { QueueListIcon, ArrowPathIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 
 function firstDayOfCurrentMonth() {
   const d = new Date();
@@ -73,15 +74,40 @@ export default function DayBookPage() {
   const totalDebit = useMemo(() => entries.reduce((s, e) => s + e.debit, 0), [entries]);
   const totalCredit = useMemo(() => entries.reduce((s, e) => s + e.credit, 0), [entries]);
 
+  const handleExportExcel = () => {
+    const columns = [
+      { header: 'S.No',       key: 'sno',       width: 8  },
+      { header: 'Date',       key: 'date',      width: 15 },
+      { header: 'Details',    key: 'details',   width: 35 },
+      { header: 'Voucher No', key: 'voucherNo', width: 18 },
+      { header: 'Debit (₹)', key: 'debit',     width: 15 },
+      { header: 'Credit (₹)',key: 'credit',    width: 15 },
+    ];
+    const rows = entries.map((e, idx) => ({
+      sno: idx + 1,
+      date: formatDate(e.date),
+      details: e.details,
+      voucherNo: e.voucherNo,
+      debit: e.debit > 0 ? e.debit : '',
+      credit: e.credit > 0 ? e.credit : '',
+    }));
+    exportToExcel(rows, columns, 'Day_Book');
+  };
+
   return (
     <div className="space-y-1.5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="page-title">Day Book</h1>
-        <button onClick={fetchData} className="btn-secondary gap-2">
-          <ArrowPathIcon className="h-4 w-4" />
-          Refresh
-        </button>
+        <div className="flex gap-2">
+          <button onClick={handleExportExcel} className="btn-secondary gap-2">
+            <ArrowDownTrayIcon className="h-4 w-4" />Excel
+          </button>
+          <button onClick={fetchData} className="btn-secondary gap-2">
+            <ArrowPathIcon className="h-4 w-4" />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Filters */}

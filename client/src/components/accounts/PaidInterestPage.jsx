@@ -4,7 +4,8 @@ import { formatCurrency, formatDate, todayISO } from '../../utils/helpers';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
 import toast from 'react-hot-toast';
-import { CheckCircleIcon, MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { exportToExcel } from '../../utils/exportUtils';
+import { CheckCircleIcon, MagnifyingGlassIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 
 function firstOfMonthISO() {
   const now = new Date();
@@ -42,17 +43,44 @@ export default function PaidInterestPage() {
 
   const totalPaid = filtered.reduce((s, e) => s + e.amount, 0);
 
+  const handleExportExcel = () => {
+    const columns = [
+      { header: 'Ledger',      key: 'ledger_name',       width: 25 },
+      { header: 'Period From', key: 'from_date',          width: 15 },
+      { header: 'Period To',   key: 'to_date',            width: 15 },
+      { header: 'Principal (₹)', key: 'principal_at_time', width: 18 },
+      { header: 'Amount (₹)', key: 'amount',             width: 15 },
+      { header: 'Paid On',     key: 'paid_date',          width: 15 },
+      { header: 'Direction',   key: 'direction',          width: 12 },
+    ];
+    const rows = filtered.map((e) => ({
+      ledger_name: e.ledger_name,
+      from_date: formatDate(e.from_date),
+      to_date: formatDate(e.to_date),
+      principal_at_time: e.principal_at_time,
+      amount: e.amount,
+      paid_date: e.paid_date ? formatDate(e.paid_date) : '',
+      direction: e.behaviour === 'customer' ? 'Incoming' : 'Outgoing',
+    }));
+    exportToExcel(rows, columns, 'Paid_Interest');
+  };
+
   return (
     <div className="space-y-2">
       {/* Header */}
-      <div>
-        <h1 className="page-title flex items-center gap-2">
-          <CheckCircleIcon className="h-6 w-6 text-green-500" />
-          Paid Interest
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          All interest entries that have been marked as paid
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div>
+          <h1 className="page-title flex items-center gap-2">
+            <CheckCircleIcon className="h-6 w-6 text-green-500" />
+            Paid Interest
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            All interest entries that have been marked as paid
+          </p>
+        </div>
+        <button onClick={handleExportExcel} className="btn-secondary gap-2 shrink-0">
+          <ArrowDownTrayIcon className="h-4 w-4" />Excel
+        </button>
       </div>
 
       {/* Summary Cards */}

@@ -5,7 +5,9 @@ import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
 import Modal from '../ui/Modal';
 import toast from 'react-hot-toast';
-import { DocumentChartBarIcon, ArrowPathIcon, TrashIcon } from '@heroicons/react/24/outline';
+import { exportToExcel } from '../../utils/exportUtils';
+import { EditExpenseModal } from './ExpensePage';
+import { DocumentChartBarIcon, ArrowPathIcon, TrashIcon, ArrowDownTrayIcon, PencilIcon } from '@heroicons/react/24/outline';
 
 function firstDayOfCurrentMonth() {
   const d = new Date();
@@ -18,6 +20,7 @@ export default function ExpenseReportsPage() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
   const [deleteModal, setDeleteModal] = useState({ open: false, expense: null });
+  const [editModal, setEditModal] = useState({ open: false, expense: null });
   const [filters, setFilters] = useState({
     fromDate: firstDayOfCurrentMonth(),
     toDate: todayISO(),
@@ -74,6 +77,26 @@ export default function ExpenseReportsPage() {
 
   const grandTotal = expenses.reduce((s, e) => s + e.amount, 0);
 
+  const handleExportExcel = () => {
+    const columns = [
+      { header: 'S.No',         key: 'sno',           width: 8  },
+      { header: 'Date',         key: 'date',          width: 15 },
+      { header: 'Expense Name', key: 'expense_name',  width: 28 },
+      { header: 'Category',     key: 'category_name', width: 20 },
+      { header: 'Notes',        key: 'notes',         width: 30 },
+      { header: 'Amount (₹)',  key: 'amount',        width: 15 },
+    ];
+    const rows = expenses.map((exp, idx) => ({
+      sno: idx + 1,
+      date: formatDate(exp.date),
+      expense_name: exp.expense_name,
+      category_name: exp.category_name || '',
+      notes: exp.notes || '',
+      amount: exp.amount,
+    }));
+    exportToExcel(rows, columns, 'Expense_Report');
+  };
+
   return (
     <div className="space-y-1.5">
       {/* Header */}
@@ -81,10 +104,15 @@ export default function ExpenseReportsPage() {
         <div>
           <h1 className="page-title">Expense Reports</h1>
         </div>
-        <button onClick={fetchData} className="btn-secondary gap-2">
-          <ArrowPathIcon className="h-4 w-4" />
-          Refresh
-        </button>
+        <div className="flex gap-2">
+          <button onClick={handleExportExcel} className="btn-secondary gap-2">
+            <ArrowDownTrayIcon className="h-4 w-4" />Excel
+          </button>
+          <button onClick={fetchData} className="btn-secondary gap-2">
+            <ArrowPathIcon className="h-4 w-4" />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -207,6 +235,7 @@ export default function ExpenseReportsPage() {
                       <th className="px-3 py-2 text-left font-semibold border-b border-slate-200">Notes</th>
                       <th className="px-3 py-2 text-right font-semibold border-b border-slate-200">Amount</th>
                       <th className="px-3 py-2 border-b border-slate-200 w-10"></th>
+                      <th className="px-3 py-2 border-b border-slate-200 w-10"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -232,6 +261,15 @@ export default function ExpenseReportsPage() {
                         </td>
                         <td className="px-3 py-1.5 text-center">
                           <button
+                            onClick={() => setEditModal({ open: true, expense: exp })}
+                            className="text-slate-400 hover:text-blue-600 transition-colors"
+                            title="Edit"
+                          >
+                            <PencilIcon className="w-4 h-4" />
+                          </button>
+                        </td>
+                        <td className="px-3 py-1.5 text-center">
+                          <button
                             onClick={() => setDeleteModal({ open: true, expense: exp })}
                             className="text-slate-400 hover:text-red-600 transition-colors"
                             title="Delete"
@@ -251,6 +289,7 @@ export default function ExpenseReportsPage() {
                         {formatCurrency(grandTotal)}
                       </td>
                       <td className="bg-orange-400" />
+                      <td className="bg-orange-400" />
                     </tr>
                   </tfoot>
                 </table>
@@ -258,6 +297,18 @@ export default function ExpenseReportsPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* Edit Modal */}
+      {editModal.expense && (
+        <EditExpenseModal
+          expense={editModal.expense}
+          categories={categories}
+          open={editModal.open}
+          onClose={() => setEditModal({ open: false, expense: null })}
+          onSaved={() => { setEditModal({ open: false, expense: null }); fetchData(); }}
+          onCategoryCreated={async (cat) => setCategories((prev) => [...prev, cat])}
+        />
       )}
 
       {/* Delete Confirmation */}

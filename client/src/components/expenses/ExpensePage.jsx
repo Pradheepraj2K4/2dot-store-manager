@@ -318,7 +318,7 @@ function ExpenseForm({ categories, onCreated, onCategoryCreated }) {
 }
 
 /* ─── Edit Expense Modal ─────────────────────────────────────────── */
-function EditExpenseModal({ expense, categories, open, onClose, onSaved, onCategoryCreated }) {
+export function EditExpenseModal({ expense, categories, open, onClose, onSaved, onCategoryCreated }) {
   const [form, setForm] = useState({
     expense_name: expense?.expense_name || '',
     expense_category_id: expense?.expense_category_id || null,

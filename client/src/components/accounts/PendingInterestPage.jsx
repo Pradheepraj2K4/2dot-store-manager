@@ -5,9 +5,11 @@ import { formatCurrency, formatDate } from '../../utils/helpers';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
 import toast from 'react-hot-toast';
+import { exportToExcel } from '../../utils/exportUtils';
 import {
   ClockIcon,
   MagnifyingGlassIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 
 export default function PendingInterestPage() {
@@ -47,19 +49,50 @@ export default function PendingInterestPage() {
   const totalPending = filtered.reduce((sum, l) => sum + (l.pending_interest || 0), 0);
   const totalOutstanding = filtered.reduce((sum, l) => sum + (l.current_balance || 0), 0);
 
+  const handleExportExcel = () => {
+    const columns = [
+      { header: 'Ledger Name',       key: 'name',             width: 25 },
+      { header: 'Type',              key: 'type_name',        width: 15 },
+      { header: 'Phone',             key: 'phone',            width: 14 },
+      { header: 'Place',             key: 'place',            width: 15 },
+      { header: 'Current Balance (₹)', key: 'current_balance', width: 20 },
+      { header: 'Pending Interest (₹)', key: 'pending_interest', width: 22 },
+      { header: 'Pending Count',     key: 'pending_count',    width: 15 },
+      { header: 'Interest Rate',     key: 'interest_rate_label', width: 18 },
+      { header: 'Direction',         key: 'direction',        width: 12 },
+    ];
+    const rows = filtered.map((l) => ({
+      name: l.name,
+      type_name: l.type_name || '',
+      phone: l.phone || '',
+      place: l.place || '',
+      current_balance: l.current_balance || 0,
+      pending_interest: l.pending_interest || 0,
+      pending_count: l.pending_count,
+      interest_rate_label: `${l.interest_rate}% ${l.interest_scheme}`,
+      direction: l.behaviour === 'customer' ? 'Incoming' : 'Outgoing',
+    }));
+    exportToExcel(rows, columns, 'Pending_Interest');
+  };
+
   if (loading) return <LoadingSpinner className="py-20" size="lg" />;
 
   return (
     <div className="space-y-2">
       {/* Header */}
-      <div>
-        <h1 className="page-title flex items-center gap-2">
-          <ClockIcon className="h-6 w-6 text-amber-500" />
-          Pending Interest
-        </h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Ledgers with pending due interest ({filtered.length} ledgers)
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div>
+          <h1 className="page-title flex items-center gap-2">
+            <ClockIcon className="h-6 w-6 text-amber-500" />
+            Pending Interest
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Ledgers with pending due interest ({filtered.length} ledgers)
+          </p>
+        </div>
+        <button onClick={handleExportExcel} className="btn-secondary gap-2 shrink-0">
+          <ArrowDownTrayIcon className="h-4 w-4" />Excel
+        </button>
       </div>
 
       {/* Summary Cards */}

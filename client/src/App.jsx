@@ -17,6 +17,10 @@ import ExpensePage from './components/expenses/ExpensePage';
 import ExpenseReportsPage from './components/expenses/ExpenseReportsPage';
 import PaymentEntryPage from './components/payments/PaymentEntryPage';
 import DayBookPage from './components/reports/DayBookPage';
+import ItemListPage from './components/items/ItemListPage';
+import ItemCreationPage from './components/items/ItemCreationPage';
+import ItemSalesEntryPage from './components/sales/ItemSalesEntryPage';
+import ItemSalesListPage from './components/sales/ItemSalesListPage';
 
 export default function App() {
   return (
@@ -43,6 +47,12 @@ export default function App() {
                 <Route path="/expense-reports" element={<ExpenseReportsPage />} />
                 <Route path="/payment-entry" element={<PaymentEntryPage />} />
                 <Route path="/day-book" element={<DayBookPage />} />
+                <Route path="/items" element={<ItemListPage />} />
+                <Route path="/items/new" element={<ItemCreationPage />} />
+                <Route path="/items/:id/edit" element={<ItemCreationPage />} />
+                <Route path="/item-sales" element={<ItemSalesListPage />} />
+                <Route path="/item-sales/new" element={<ItemSalesEntryPage />} />
+                <Route path="/item-sales/:id/edit" element={<ItemSalesEntryPage />} />
               </Routes>
             </AppLayout>
           </ProtectedRoute>

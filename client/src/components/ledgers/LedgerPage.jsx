@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ledgerApi, transactionApi, interestApi, settingsApi, ledgerTypeApi, interestSchemeApi } from '../../api';
+import { ledgerApi, transactionApi, interestApi, settingsApi, ledgerTypeApi, interestSchemeApi, saleApi } from '../../api';
 import { formatCurrency, formatDate, formatDateTime, todayISO } from '../../utils/helpers';
 import { buildInterestReceiptHtml, fetchLogoDataUrl } from '../../utils/interestReceipt';
 import { buildTransactionReceiptHtml } from '../../utils/transactionReceipt';
@@ -17,6 +17,9 @@ import {
   TrashIcon,
   PrinterIcon,
   PencilSquareIcon,
+  ChevronRightIcon,
+  ChevronDownIcon,
+  ShoppingBagIcon,
 } from '@heroicons/react/24/outline';
 
 /* ─── Validation helpers (shared by edit modal) ───────────────────── */
@@ -646,6 +649,9 @@ export default function LedgerPage() {
   const navigate = useNavigate();
   const [ledger, setLedger] = useState(null);
   const [transactions, setTransactions] = useState([]);
+  const [sales, setSales] = useState([]);
+  const [expandedSales, setExpandedSales] = useState({});
+  const [deleteSaleModal, setDeleteSaleModal] = useState({ open: false, sale: null });
   const [interestEnabled, setInterestEnabled] = useState(false);
   const [loading, setLoading] = useState(true);
   const [closeLedgerModal, setCloseLedgerModal] = useState(false);
@@ -674,14 +680,16 @@ export default function LedgerPage() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const [ledgerRes, txnsRes, intRes] = await Promise.all([
+      const [ledgerRes, txnsRes, intRes, salesRes] = await Promise.all([
         ledgerApi.getById(id),
         transactionApi.getByLedger(id),
         interestApi.isEnabled(),
+        saleApi.getByLedger(id).catch(() => ({ data: [] })),
       ]);
       setLedger(ledgerRes.data);
       setTransactions(txnsRes.data);
       setInterestEnabled(intRes.data.enabled);
+      setSales(salesRes.data || []);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -826,6 +834,21 @@ export default function LedgerPage() {
     } catch (err) {
       toast.error(err.message);
     }
+  };
+
+  const handleDeleteSale = async () => {
+    try {
+      await saleApi.delete(deleteSaleModal.sale.id);
+      toast.success('Sale deleted');
+      setDeleteSaleModal({ open: false, sale: null });
+      fetchData();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const toggleSaleExpand = (saleId) => {
+    setExpandedSales((p) => ({ ...p, [saleId]: !p[saleId] }));
   };
 
   const openEditTxn = (txn) => {
@@ -977,7 +1000,7 @@ export default function LedgerPage() {
       {hasInterest && <InterestSection ledgerId={id} ledger={ledger} onRefresh={fetchData} />}
 
       {/* Transaction History */}
-      {transactions.length === 0 ? (
+      {transactions.length === 0 && sales.length === 0 ? (
         <EmptyState
           icon={BanknotesIcon}
           title="No transactions"
@@ -987,7 +1010,7 @@ export default function LedgerPage() {
         <div className="card p-0 overflow-hidden">
           <div className="px-4 py-3 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-slate-700">
-              Transactions ({transactions.length})
+              Transactions ({transactions.length + sales.length})
             </h2>
           </div>
           <div className="overflow-x-auto">
@@ -1004,57 +1027,160 @@ export default function LedgerPage() {
                 </tr>
               </thead>
               <tbody>
-                {transactions.map((txn) => {
-                  const isPayment = txn.entry_type === 'payment';
-                  return (
-                    <tr key={txn.id} className="border-b border-slate-100">
-                      <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{txn.running_number}</td>
-                      <td className="px-4 py-2.5">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${isPayment ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
-                          }`}>
-                          {isPayment ? 'Payment' : 'Receipt'}
-                        </span>
-                      </td>
-                      <td className={`px-4 py-2.5 text-right font-semibold ${isPayment ? 'text-red-600' : 'text-green-600'}`}>
-                        {formatCurrency(txn.amount)}
-                      </td>
-                      <td className="px-4 py-2.5 text-slate-600">{formatDate(txn.date)}</td>
-                      <td className="px-4 py-2.5 text-slate-500 text-xs max-w-[200px] truncate">{txn.notes || '—'}</td>
-                      <td className="px-4 py-2.5 text-slate-400 text-xs">{formatDateTime(txn.created_at)}</td>
-                      <td className="px-4 py-2.5">
-                        <div className="flex items-center gap-1">
-                          {printReceiptsPaymentEnabled && (
-                            <button
-                              onClick={() => openTxnPreview(txn)}
-                              className="text-slate-400 hover:text-blue-600 transition-colors"
-                              title="Print receipt"
-                            >
-                              <PrinterIcon className="w-4 h-4" />
-                            </button>
-                          )}
-                          {isActive && (
-                            <>
-                              <button
-                                onClick={() => openEditTxn(txn)}
-                                className="text-slate-400 hover:text-trust-blue transition-colors"
-                                title="Edit transaction"
-                              >
-                                <PencilSquareIcon className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => setDeleteTxnModal({ open: true, txn })}
-                                className="text-slate-400 hover:text-red-600 transition-colors"
-                                title="Delete transaction"
-                              >
-                                <TrashIcon className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {[
+                  ...transactions.map((t) => ({ kind: 'txn', date: t.date, created_at: t.created_at, data: t })),
+                  ...sales.map((s) => ({ kind: 'sale', date: s.date, created_at: s.created_at, data: s })),
+                ]
+                  .sort((a, b) => {
+                    if (a.date !== b.date) return a.date < b.date ? 1 : -1;
+                    return (a.created_at || '') < (b.created_at || '') ? 1 : -1;
+                  })
+                  .flatMap((row) => {
+                    if (row.kind === 'txn') {
+                      const txn = row.data;
+                      const isPayment = txn.entry_type === 'payment';
+                      return [
+                        <tr key={`txn-${txn.id}`} className="border-b border-slate-100">
+                          <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{txn.running_number}</td>
+                          <td className="px-4 py-2.5">
+                            <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${isPayment ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'
+                              }`}>
+                              {isPayment ? 'Payment' : 'Receipt'}
+                            </span>
+                          </td>
+                          <td className={`px-4 py-2.5 text-right font-semibold ${isPayment ? 'text-red-600' : 'text-green-600'}`}>
+                            {formatCurrency(txn.amount)}
+                          </td>
+                          <td className="px-4 py-2.5 text-slate-600">{formatDate(txn.date)}</td>
+                          <td className="px-4 py-2.5 text-slate-500 text-xs max-w-[200px] truncate">{txn.notes || '—'}</td>
+                          <td className="px-4 py-2.5 text-slate-400 text-xs">{formatDateTime(txn.created_at)}</td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex items-center gap-1">
+                              {printReceiptsPaymentEnabled && (
+                                <button
+                                  onClick={() => openTxnPreview(txn)}
+                                  className="text-slate-400 hover:text-blue-600 transition-colors"
+                                  title="Print receipt"
+                                >
+                                  <PrinterIcon className="w-4 h-4" />
+                                </button>
+                              )}
+                              {isActive && (
+                                <>
+                                  <button
+                                    onClick={() => openEditTxn(txn)}
+                                    className="text-slate-400 hover:text-trust-blue transition-colors"
+                                    title="Edit transaction"
+                                  >
+                                    <PencilSquareIcon className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => setDeleteTxnModal({ open: true, txn })}
+                                    className="text-slate-400 hover:text-red-600 transition-colors"
+                                    title="Delete transaction"
+                                  >
+                                    <TrashIcon className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>,
+                      ];
+                    }
+                    const sale = row.data;
+                    const isOpen = expandedSales[sale.id];
+                    const rows = [
+                      <tr key={`sale-${sale.id}`} className="border-b border-slate-100">
+                        <td className="px-4 py-2.5 font-mono text-xs text-slate-600">
+                          <button
+                            type="button"
+                            onClick={() => toggleSaleExpand(sale.id)}
+                            className="inline-flex items-center gap-1 hover:text-slate-900"
+                          >
+                            {isOpen ? <ChevronDownIcon className="h-3.5 w-3.5" /> : <ChevronRightIcon className="h-3.5 w-3.5" />}
+                            #{sale.sale_number}
+                          </button>
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                            <ShoppingBagIcon className="h-3 w-3" />
+                            Sale
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-right font-semibold text-red-600">
+                          {formatCurrency(sale.total_amount)}
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-600">
+                          {formatDate(sale.date)}{sale.time ? ` · ${sale.time}` : ''}
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-500 text-xs max-w-[200px] truncate">
+                          {sale.item_count} item{sale.item_count === 1 ? '' : 's'}{sale.notes ? ` · ${sale.notes}` : ''}
+                        </td>
+                        <td className="px-4 py-2.5 text-slate-400 text-xs">{formatDateTime(sale.created_at)}</td>
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center gap-1">
+                            {isActive && (
+                              <>
+                                <button
+                                  onClick={() => navigate(`/item-sales/${sale.id}/edit`)}
+                                  className="text-slate-400 hover:text-trust-blue transition-colors"
+                                  title="Edit sale"
+                                >
+                                  <PencilSquareIcon className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => setDeleteSaleModal({ open: true, sale })}
+                                  className="text-slate-400 hover:text-red-600 transition-colors"
+                                  title="Delete sale"
+                                >
+                                  <TrashIcon className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>,
+                    ];
+                    if (isOpen && sale.items?.length) {
+                      rows.push(
+                        <tr key={`sale-${sale.id}-detail`} className="border-b border-slate-100 bg-amber-50/30">
+                          <td colSpan={7} className="px-4 py-3">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="text-slate-500">
+                                  <th className="text-left px-2 py-1">#</th>
+                                  <th className="text-left px-2 py-1">Item</th>
+                                  <th className="text-left px-2 py-1">Unit</th>
+                                  <th className="text-right px-2 py-1">MRP</th>
+                                  <th className="text-right px-2 py-1">Rate</th>
+                                  <th className="text-right px-2 py-1">Disc %</th>
+                                  <th className="text-right px-2 py-1">Amount</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {sale.items.map((line, idx) => (
+                                  <tr key={line.id} className="border-t border-amber-100">
+                                    <td className="px-2 py-1 text-slate-500">{idx + 1}</td>
+                                    <td className="px-2 py-1 text-slate-700">
+                                      {line.item_name}
+                                      {line.item_id && <span className="ml-2 font-mono text-[10px] text-slate-400">#{line.item_id}</span>}
+                                    </td>
+                                    <td className="px-2 py-1 text-slate-600">{line.unit}</td>
+                                    <td className="px-2 py-1 text-right text-slate-600">{formatCurrency(line.mrp)}</td>
+                                    <td className="px-2 py-1 text-right text-slate-700">{formatCurrency(line.rate)}</td>
+                                    <td className="px-2 py-1 text-right text-slate-600">{line.discount_percent || 0}%</td>
+                                    <td className="px-2 py-1 text-right font-medium text-slate-800">{formatCurrency(line.amount)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return rows;
+                  })}
               </tbody>
             </table>
           </div>
@@ -1363,17 +1489,17 @@ export default function LedgerPage() {
         )}
       </Modal>
 
-      {/* Delete Transaction Confirmation */}
-      <Modal open={deleteTxnModal.open} onClose={() => setDeleteTxnModal({ open: false, txn: null })} title="Delete Transaction" size="sm">
-        {deleteTxnModal.txn && (
+      {/* Delete Sale Confirmation */}
+      <Modal open={deleteSaleModal.open} onClose={() => setDeleteSaleModal({ open: false, sale: null })} title="Delete Sale" size="sm">
+        {deleteSaleModal.sale && (
           <>
             <p className="text-sm text-slate-600 mb-6">
-              Delete <strong>{deleteTxnModal.txn.running_number}</strong> ({deleteTxnModal.txn.entry_type === 'payment' ? 'Payment' : 'Receipt'} of{' '}
-              <strong>{formatCurrency(deleteTxnModal.txn.amount)}</strong>)? This will reverse the balance effect.
+              Delete sale <strong>#{deleteSaleModal.sale.sale_number}</strong> of{' '}
+              <strong>{formatCurrency(deleteSaleModal.sale.total_amount)}</strong>? This will reverse the balance effect.
             </p>
             <div className="flex justify-end gap-3">
-              <button onClick={() => setDeleteTxnModal({ open: false, txn: null })} className="btn-secondary">Cancel</button>
-              <button onClick={handleDeleteTransaction} className="btn-danger">Delete</button>
+              <button onClick={() => setDeleteSaleModal({ open: false, sale: null })} className="btn-secondary">Cancel</button>
+              <button onClick={handleDeleteSale} className="btn-danger">Delete</button>
             </div>
           </>
         )}

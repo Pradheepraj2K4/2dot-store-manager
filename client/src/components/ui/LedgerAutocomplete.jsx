@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { ledgerApi } from '../../api';
 
-export default function LedgerAutocomplete({ value, onChange, placeholder = 'Search ledger...' }) {
+export default function LedgerAutocomplete({ value, onChange, placeholder = 'Search ledger...', behaviour, autoFocus = false }) {
   const [ledgers, setLedgers] = useState([]);
   const [search, setSearch] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -11,14 +11,18 @@ export default function LedgerAutocomplete({ value, onChange, placeholder = 'Sea
   const dropdownRef = useRef(null);
 
   useEffect(() => {
-    ledgerApi.getAll().then((res) => setLedgers(res.data)).catch(() => {});
-  }, []);
+    const params = behaviour ? { behaviour } : {};
+    ledgerApi.getAll(params).then((res) => setLedgers(res.data)).catch(() => {});
+  }, [behaviour]);
 
-  const filtered = ledgers.filter((l) =>
-    l.name.toLowerCase().includes(search.toLowerCase()) ||
-    (l.phone || '').includes(search) ||
-    (l.place || '').toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = ledgers.filter((l) => {
+    if (behaviour && l.behaviour !== behaviour) return false;
+    return (
+      l.name.toLowerCase().includes(search.toLowerCase()) ||
+      (l.phone || '').includes(search) ||
+      (l.place || '').toLowerCase().includes(search.toLowerCase())
+    );
+  });
 
   useEffect(() => {
     if (isOpen) setHighlightedIndex(0);
@@ -117,6 +121,7 @@ export default function LedgerAutocomplete({ value, onChange, placeholder = 'Sea
               placeholder={placeholder}
               className="input-field pr-8"
               autoComplete="off"
+              autoFocus={autoFocus}
             />
             <ChevronDownIcon
               className={`absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none transition-transform ${isOpen ? 'rotate-180' : ''}`}

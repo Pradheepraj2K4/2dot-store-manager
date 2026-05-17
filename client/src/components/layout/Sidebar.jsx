@@ -1,4 +1,4 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import {
   HomeIcon,
@@ -17,6 +17,10 @@ import {
   CheckCircleIcon,
   ArrowsRightLeftIcon,
   XMarkIcon,
+  CubeIcon,
+  ShoppingBagIcon,
+  Squares2X2Icon,
+  ChevronDownIcon,
 } from '@heroicons/react/24/outline';
 import { logout } from '../../utils/auth';
 import { interestApi, expenseApi } from '../../api';
@@ -24,7 +28,15 @@ import toast from 'react-hot-toast';
 
 const baseNavigation = [
   { name: 'Dashboard', href: '/', icon: HomeIcon },
-  { name: 'Ledgers', href: '/ledgers', icon: BookOpenIcon },
+  {
+    name: 'Master',
+    icon: Squares2X2Icon,
+    children: [
+      { name: 'Ledgers', href: '/ledgers', icon: BookOpenIcon },
+      { name: 'Items', href: '/items', icon: CubeIcon },
+    ],
+  },
+  { name: 'Item Sales', href: '/item-sales/new', icon: ShoppingBagIcon },
   { name: 'Payment/Receipt Entry', href: '/payment-entry', icon: ArrowsRightLeftIcon },
   { name: 'Day Book', href: '/day-book', icon: QueueListIcon },
   { name: 'Reports', href: '/reports', icon: DocumentChartBarIcon },
@@ -35,8 +47,10 @@ const baseNavigation = [
 
 export default function Sidebar({ open, onClose }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [interestEnabled, setInterestEnabled] = useState(false);
   const [expenseEnabled, setExpenseEnabled] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState({ Master: true });
 
   useEffect(() => {
     interestApi.isEnabled().then((res) => {
@@ -110,24 +124,68 @@ export default function Sidebar({ open, onClose }) {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
-        {navigation.map((item) => (
-          <NavLink
-            key={item.name}
-            to={item.href}
-            end={item.href === '/'}
-            onClick={onClose}
-            className={({ isActive }) =>
-              `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                isActive
-                  ? 'bg-trust-blue text-white shadow-lg shadow-trust-blue/25'
-                  : 'text-slate-300 hover:bg-sidebar-hover hover:text-white'
-              }`
-            }
-          >
-            <item.icon className="h-5 w-5 flex-shrink-0" />
-            {item.name}
-          </NavLink>
-        ))}
+        {navigation.map((item) => {
+          if (item.children) {
+            const isGroupActive = item.children.some((c) => location.pathname.startsWith(c.href));
+            const isExpanded = expandedGroups[item.name] ?? isGroupActive;
+            return (
+              <div key={item.name}>
+                <button
+                  type="button"
+                  onClick={() => setExpandedGroups((p) => ({ ...p, [item.name]: !isExpanded }))}
+                  className={`w-full group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                    isGroupActive
+                      ? 'text-white'
+                      : 'text-slate-300 hover:bg-sidebar-hover hover:text-white'
+                  }`}
+                >
+                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  <span className="flex-1 text-left">{item.name}</span>
+                  <ChevronDownIcon className={`h-4 w-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                </button>
+                {isExpanded && (
+                  <div className="mt-1 ml-2 space-y-1 border-l border-slate-700 pl-2">
+                    {item.children.map((child) => (
+                      <NavLink
+                        key={child.name}
+                        to={child.href}
+                        onClick={onClose}
+                        className={({ isActive }) =>
+                          `group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                            isActive
+                              ? 'bg-trust-blue text-white shadow-lg shadow-trust-blue/25'
+                              : 'text-slate-300 hover:bg-sidebar-hover hover:text-white'
+                          }`
+                        }
+                      >
+                        <child.icon className="h-4 w-4 flex-shrink-0" />
+                        {child.name}
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          }
+          return (
+            <NavLink
+              key={item.name}
+              to={item.href}
+              end={item.href === '/'}
+              onClick={onClose}
+              className={({ isActive }) =>
+                `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  isActive
+                    ? 'bg-trust-blue text-white shadow-lg shadow-trust-blue/25'
+                    : 'text-slate-300 hover:bg-sidebar-hover hover:text-white'
+                }`
+              }
+            >
+              <item.icon className="h-5 w-5 flex-shrink-0" />
+              {item.name}
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Footer */}

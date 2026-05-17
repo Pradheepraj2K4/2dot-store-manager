@@ -119,3 +119,29 @@ export const expenseApi = {
   },
   isEnabled: () => api.get('/settings/expense_module_enabled'),
 };
+
+export const itemApi = {
+  getAll: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return api.get(`/items${qs ? `?${qs}` : ''}`);
+  },
+  getById: (id) => api.get(`/items/${id}`),
+  create: (data) => api.post('/items', data),
+  update: (id, data) => api.put(`/items/${id}`, data),
+  delete: (id) => api.delete(`/items/${id}`),
+  getBrands: () => api.get('/items/brands'),
+  getCategories: () => api.get('/items/categories'),
+};
+
+export const saleApi = {
+  getAll: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return api.get(`/sales${qs ? `?${qs}` : ''}`);
+  },
+  getById: (id) => api.get(`/sales/${id}`),
+  getByLedger: (ledgerId) => api.get(`/sales/ledger/${ledgerId}`),
+  getNextNumber: () => api.get('/sales/next-number'),
+  create: (data) => api.post('/sales', data),
+  update: (id, data) => api.put(`/sales/${id}`, data),
+  delete: (id) => api.delete(`/sales/${id}`),
+};

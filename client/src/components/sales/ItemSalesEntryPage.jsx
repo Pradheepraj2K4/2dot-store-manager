@@ -12,17 +12,21 @@ import { formatCurrency, todayISO } from '../../utils/helpers';
 import LedgerAutocomplete from '../ui/LedgerAutocomplete';
 import LoadingSpinner from '../ui/LoadingSpinner';
 
-const FIELD_ORDER = ['itemName', 'unit', 'rate', 'discount'];
+const FIELD_ORDER = ['itemName', 'unit', 'qty', 'rate', 'discount', 'gst'];
 
 function nowHHMM() {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function computeAmount({ rate, discount_percent }) {
+function computeAmount({ rate, quantity, discount_percent, gst_percent }) {
   const r = parseFloat(rate) || 0;
+  const q = parseFloat(quantity) || 1;
   const d = parseFloat(discount_percent) || 0;
-  return Math.round(r * (1 - d / 100) * 100) / 100;
+  const g = parseFloat(gst_percent) || 0;
+  const taxable = r * q * (1 - d / 100);
+  const gst = taxable * g / 100;
+  return Math.round((taxable + gst) * 100) / 100;
 }
 
 function emptyLine() {
@@ -32,7 +36,9 @@ function emptyLine() {
     unit: DEFAULT_ITEM_UNIT,
     mrp: 0,
     rate: '',
+    quantity: '1',
     discount_percent: '',
+    gst_percent: '',
     amount: 0,
   };
 }
@@ -243,7 +249,9 @@ export default function ItemSalesEntryPage() {
             unit: l.unit || DEFAULT_ITEM_UNIT,
             mrp: l.mrp || 0,
             rate: String(l.rate),
+            quantity: String(l.quantity ?? 1),
             discount_percent: l.discount_percent ? String(l.discount_percent) : '',
+            gst_percent: l.gst_percent ? String(l.gst_percent) : '',
             amount: l.amount,
           }))
         );
@@ -272,7 +280,9 @@ export default function ItemSalesEntryPage() {
           unit: newItem.unit || DEFAULT_ITEM_UNIT,
           mrp: newItem.mrp || 0,
           rate: String(newItem.mrp || ''),
-          amount: computeAmount({ rate: newItem.mrp, discount_percent: 0 }),
+          quantity: '1',
+          gst_percent: newItem.gst_percent ? String(newItem.gst_percent) : '',
+          amount: computeAmount({ rate: newItem.mrp, quantity: 1, discount_percent: 0, gst_percent: newItem.gst_percent || 0 }),
         };
         return next;
       });
@@ -308,6 +318,8 @@ export default function ItemSalesEntryPage() {
       unit: item.unit || DEFAULT_ITEM_UNIT,
       mrp: item.mrp || 0,
       rate: String(item.mrp || ''),
+      quantity: '1',
+      gst_percent: item.gst_percent ? String(item.gst_percent) : '',
     });
   };
 
@@ -330,12 +342,24 @@ export default function ItemSalesEntryPage() {
   const totals = useMemo(() => {
     const total = lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
     const grossTotal = lines.reduce(
-      (s, l) => s + (parseFloat(l.rate) || 0) * 1,
+      (s, l) => s + (parseFloat(l.rate) || 0) * (parseFloat(l.quantity) || 1),
       0
     );
-    const discountTotal = Math.max(0, grossTotal - total);
+    const gstTotal = lines.reduce((s, l) => {
+      const r = parseFloat(l.rate) || 0;
+      const q = parseFloat(l.quantity) || 1;
+      const d = parseFloat(l.discount_percent) || 0;
+      const g = parseFloat(l.gst_percent) || 0;
+      const taxable = r * q * (1 - d / 100);
+      return s + Math.round(taxable * g / 100 * 100) / 100;
+    }, 0);
+    const discountTotal = lines.reduce((s, l) => {
+      const gross = (parseFloat(l.rate) || 0) * (parseFloat(l.quantity) || 1);
+      const d = parseFloat(l.discount_percent) || 0;
+      return s + gross * d / 100;
+    }, 0);
     const lineCount = lines.filter((l) => l.item_name && l.item_name.trim()).length;
-    return { total, discountTotal, lineCount };
+    return { total, discountTotal, gstTotal, lineCount };
   }, [lines]);
 
   const handleSave = async () => {
@@ -364,8 +388,9 @@ export default function ItemSalesEntryPage() {
           unit: l.unit || DEFAULT_ITEM_UNIT,
           mrp: parseFloat(l.mrp) || 0,
           rate: parseFloat(l.rate) || 0,
-          quantity: 1,
+          quantity: parseFloat(l.quantity) || 1,
           discount_percent: parseFloat(l.discount_percent) || 0,
+          gst_percent: parseFloat(l.gst_percent) || 0,
           amount: parseFloat(l.amount) || 0,
         })),
       };
@@ -393,9 +418,9 @@ export default function ItemSalesEntryPage() {
   if (loading) return <LoadingSpinner className="py-20" size="lg" />;
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 flex-shrink-0">
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate(-1)}
@@ -445,18 +470,20 @@ export default function ItemSalesEntryPage() {
       </div>
 
       {/* Items table */}
-      <div className="card p-0 overflow-hidden">
-        <div className="overflow-x-auto">
+      <div className="card p-0 overflow-hidden flex flex-col flex-1 min-h-0 mt-3">
+        <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50">
+              <tr className="border-b border-slate-200 bg-slate-50 sticky top-0 z-10">
                 <th className="px-3 py-2 text-left font-semibold text-slate-600 w-12">S.no</th>
                 <th className="px-3 py-2 text-left font-semibold text-slate-600 w-20">Item ID</th>
                 <th className="px-3 py-2 text-left font-semibold text-slate-600 min-w-[18rem]">Item Name</th>
                 <th className="px-3 py-2 text-left font-semibold text-slate-600 w-28">Unit</th>
                 <th className="px-3 py-2 text-right font-semibold text-slate-600 w-24">MRP</th>
                 <th className="px-3 py-2 text-right font-semibold text-slate-600 w-28">Rate</th>
+                <th className="px-3 py-2 text-right font-semibold text-slate-600 w-24">Qty</th>
                 <th className="px-3 py-2 text-right font-semibold text-slate-600 w-24">Disc %</th>
+                <th className="px-3 py-2 text-right font-semibold text-slate-600 w-24">GST %</th>
                 <th className="px-3 py-2 text-right font-semibold text-slate-600 w-28">Amount</th>
                 <th className="px-3 py-2 w-10"></th>
               </tr>
@@ -509,6 +536,21 @@ export default function ItemSalesEntryPage() {
                   </td>
                   <td className="px-3 py-2">
                     <input
+                      ref={(el) => setCellRef(idx, 'qty', { current: el })}
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      value={line.quantity}
+                      onChange={(e) => updateLine(idx, { quantity: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'qty'); }
+                      }}
+                      className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
+                      placeholder="1"
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
                       ref={(el) => setCellRef(idx, 'discount', { current: el })}
                       type="number"
                       step="0.01"
@@ -516,6 +558,21 @@ export default function ItemSalesEntryPage() {
                       onChange={(e) => updateLine(idx, { discount_percent: e.target.value })}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'discount'); }
+                      }}
+                      className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
+                      placeholder="0"
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      ref={(el) => setCellRef(idx, 'gst', { current: el })}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={line.gst_percent}
+                      onChange={(e) => updateLine(idx, { gst_percent: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'gst'); }
                       }}
                       className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
                       placeholder="0"
@@ -556,45 +613,53 @@ export default function ItemSalesEntryPage() {
       </div>
 
       {/* Footer: notes + totals + save */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="md:col-span-2">
-          <label className="text-xs text-slate-500">Notes</label>
-          <textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            rows={2}
-            className="input-field"
-            placeholder="Optional remarks for this sale"
-          />
+      <div className="flex-shrink-0 rounded-xl border border-slate-200 bg-white shadow-sm mt-3">
+        <div className="px-4 pt-4 pb-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="md:col-span-2 flex flex-col gap-1">
+            <label className="text-xs font-medium text-slate-500">Notes</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              rows={3}
+              className="input-field resize-none"
+              placeholder="Optional remarks for this sale"
+            />
+          </div>
+          <div className="flex flex-col justify-between gap-2 bg-slate-50 rounded-lg px-4 py-3 border border-slate-100">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-500">Items</span>
+                <span className="font-medium text-slate-700">{totals.lineCount}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-500">Total Discount</span>
+                <span className="font-medium text-amber-700">{formatCurrency(totals.discountTotal)}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-500">Total GST</span>
+                <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal)}</span>
+              </div>
+            </div>
+            <div className="flex items-center justify-between text-base border-t border-slate-200 pt-2 mt-1">
+              <span className="font-semibold text-slate-700">Total Amount</span>
+              <span className="font-bold text-lg text-debit-red">{formatCurrency(totals.total)}</span>
+            </div>
+          </div>
         </div>
-        <div className="card space-y-1.5">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-500">Items</span>
-            <span className="font-medium">{totals.lineCount}</span>
-          </div>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-slate-500">Total Discount</span>
-            <span className="font-medium text-amber-700">{formatCurrency(totals.discountTotal)}</span>
-          </div>
-          <div className="flex items-center justify-between text-base border-t border-slate-200 pt-1.5 mt-1.5">
-            <span className="font-semibold text-slate-700">Total Amount</span>
-            <span className="font-bold text-debit-red">{formatCurrency(totals.total)}</span>
-          </div>
-        </div>
-      </div>
 
-      <div className="flex items-center justify-end gap-2">
-        <button type="button" onClick={() => navigate('/item-sales')} className="btn-secondary">
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={saving}
-          className="btn-primary"
-        >
-          {saving ? 'Saving…' : (isEdit ? 'Update Sale' : 'Save Sale')}
-        </button>
+        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-100">
+          <button type="button" onClick={() => navigate('/item-sales')} className="btn-secondary">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className="btn-primary"
+          >
+            {saving ? 'Saving…' : (isEdit ? 'Update Sale' : 'Save Sale')}
+          </button>
+        </div>
       </div>
     </div>
   );

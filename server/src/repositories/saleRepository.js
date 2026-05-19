@@ -10,11 +10,11 @@ class SaleRepository {
     return String(row.next);
   }
 
-  create({ sale_number, ledger_id, date, time, total_amount, total_discount, item_count, notes, items }) {
+  create({ sale_number, ledger_id, date, time, total_amount, total_discount, total_gst, item_count, notes, items }) {
     const db = getDb();
     const info = db.prepare(`
-      INSERT INTO sales (sale_number, ledger_id, date, time, total_amount, total_discount, item_count, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO sales (sale_number, ledger_id, date, time, total_amount, total_discount, total_gst, item_count, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       sale_number,
       ledger_id,
@@ -22,14 +22,15 @@ class SaleRepository {
       time || '',
       total_amount,
       total_discount || 0,
+      total_gst || 0,
       item_count || (items ? items.length : 0),
       notes || ''
     );
     const saleId = info.lastInsertRowid;
     if (Array.isArray(items)) {
       const stmt = db.prepare(`
-        INSERT INTO sale_items (sale_id, item_id, item_name, unit, mrp, rate, quantity, discount_percent, amount, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO sale_items (sale_id, item_id, item_name, unit, mrp, rate, quantity, discount_percent, gst_percent, gst_amount, amount, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       items.forEach((line, idx) => {
         stmt.run(
@@ -41,6 +42,8 @@ class SaleRepository {
           parseFloat(line.rate) || 0,
           parseFloat(line.quantity) || 1,
           parseFloat(line.discount_percent) || 0,
+          parseFloat(line.gst_percent) || 0,
+          parseFloat(line.gst_amount) || 0,
           parseFloat(line.amount) || 0,
           idx
         );
@@ -101,17 +104,18 @@ class SaleRepository {
     return db.prepare('DELETE FROM sales WHERE id = ?').run(id);
   }
 
-  update(id, { date, time, total_amount, total_discount, item_count, notes, items }) {
+  update(id, { date, time, total_amount, total_discount, total_gst, item_count, notes, items }) {
     const db = getDb();
     db.prepare(`
       UPDATE sales
-      SET date = ?, time = ?, total_amount = ?, total_discount = ?, item_count = ?, notes = ?
+      SET date = ?, time = ?, total_amount = ?, total_discount = ?, total_gst = ?, item_count = ?, notes = ?
       WHERE id = ?
     `).run(
       date,
       time || '',
       total_amount,
       total_discount || 0,
+      total_gst || 0,
       item_count || (items ? items.length : 0),
       notes || '',
       id
@@ -119,8 +123,8 @@ class SaleRepository {
     if (Array.isArray(items)) {
       db.prepare('DELETE FROM sale_items WHERE sale_id = ?').run(id);
       const stmt = db.prepare(`
-        INSERT INTO sale_items (sale_id, item_id, item_name, unit, mrp, rate, quantity, discount_percent, amount, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO sale_items (sale_id, item_id, item_name, unit, mrp, rate, quantity, discount_percent, gst_percent, gst_amount, amount, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       items.forEach((line, idx) => {
         stmt.run(
@@ -132,6 +136,8 @@ class SaleRepository {
           parseFloat(line.rate) || 0,
           parseFloat(line.quantity) || 1,
           parseFloat(line.discount_percent) || 0,
+          parseFloat(line.gst_percent) || 0,
+          parseFloat(line.gst_amount) || 0,
           parseFloat(line.amount) || 0,
           idx
         );

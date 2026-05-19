@@ -4,15 +4,25 @@ const { AppError } = require('../middleware/errorHandler');
 const { getDb } = require('../db/database');
 
 /**
- * Compute the line amount: (rate * quantity) less the discount %.
+ * Compute per-line amounts.
+ * taxable = rate * qty * (1 - disc/100)
+ * gst_amount = taxable * gst_percent / 100
+ * amount (line total) = taxable + gst_amount
  */
-function computeLineAmount(line) {
+function computeLineAmounts(line) {
   const rate = parseFloat(line.rate) || 0;
-  const qty = parseFloat(line.quantity) || 1;
+  const qty  = parseFloat(line.quantity) || 1;
   const disc = parseFloat(line.discount_percent) || 0;
-  const gross = rate * qty;
-  const net = gross * (1 - disc / 100);
-  return Math.round(net * 100) / 100;
+  const gst  = parseFloat(line.gst_percent) || 0;
+  const taxable   = rate * qty * (1 - disc / 100);
+  const gst_amount = Math.round(taxable * gst / 100 * 100) / 100;
+  const amount     = Math.round((taxable + gst_amount) * 100) / 100;
+  return { gst_amount, amount };
+}
+
+/** @deprecated kept for compatibility — use computeLineAmounts */
+function computeLineAmount(line) {
+  return computeLineAmounts(line).amount;
 }
 
 function applyLedgerDelta(behaviour, delta) {
@@ -46,18 +56,25 @@ class SaleService {
     if (!ledger) throw new AppError('Ledger not found', 404);
     if (ledger.status === 'closed') throw new AppError('Cannot record sale on a closed ledger', 400);
 
-    const normalisedItems = data.items.map((line) => ({
-      ...line,
-      quantity: parseFloat(line.quantity) || 1,
-      rate: parseFloat(line.rate) || 0,
-      mrp: parseFloat(line.mrp) || 0,
-      discount_percent: parseFloat(line.discount_percent) || 0,
-      amount: computeLineAmount(line),
-    }));
+    const normalisedItems = data.items.map((line) => {
+      const { gst_amount, amount } = computeLineAmounts(line);
+      return {
+        ...line,
+        quantity: parseFloat(line.quantity) || 1,
+        rate: parseFloat(line.rate) || 0,
+        mrp: parseFloat(line.mrp) || 0,
+        discount_percent: parseFloat(line.discount_percent) || 0,
+        gst_percent: parseFloat(line.gst_percent) || 0,
+        gst_amount,
+        amount,
+      };
+    });
     const total_amount = normalisedItems.reduce((s, l) => s + l.amount, 0);
+    const total_gst    = normalisedItems.reduce((s, l) => s + l.gst_amount, 0);
     const total_discount = normalisedItems.reduce((s, l) => {
       const gross = (parseFloat(l.rate) || 0) * (parseFloat(l.quantity) || 1);
-      return s + (gross - l.amount);
+      const taxable = gross * (1 - (parseFloat(l.discount_percent) || 0) / 100);
+      return s + (gross - taxable);
     }, 0);
 
     const run = db.transaction(() => {
@@ -69,6 +86,7 @@ class SaleService {
         time: data.time || '',
         total_amount: Math.round(total_amount * 100) / 100,
         total_discount: Math.round(total_discount * 100) / 100,
+        total_gst: Math.round(total_gst * 100) / 100,
         item_count: normalisedItems.length,
         notes: data.notes || '',
         items: normalisedItems,
@@ -89,18 +107,25 @@ class SaleService {
     const ledger = ledgerRepository.findById(existing.ledger_id);
     if (!ledger) throw new AppError('Ledger not found', 404);
 
-    const normalisedItems = data.items.map((line) => ({
-      ...line,
-      quantity: parseFloat(line.quantity) || 1,
-      rate: parseFloat(line.rate) || 0,
-      mrp: parseFloat(line.mrp) || 0,
-      discount_percent: parseFloat(line.discount_percent) || 0,
-      amount: computeLineAmount(line),
-    }));
+    const normalisedItems = data.items.map((line) => {
+      const { gst_amount, amount } = computeLineAmounts(line);
+      return {
+        ...line,
+        quantity: parseFloat(line.quantity) || 1,
+        rate: parseFloat(line.rate) || 0,
+        mrp: parseFloat(line.mrp) || 0,
+        discount_percent: parseFloat(line.discount_percent) || 0,
+        gst_percent: parseFloat(line.gst_percent) || 0,
+        gst_amount,
+        amount,
+      };
+    });
     const total_amount = normalisedItems.reduce((s, l) => s + l.amount, 0);
+    const total_gst    = normalisedItems.reduce((s, l) => s + l.gst_amount, 0);
     const total_discount = normalisedItems.reduce((s, l) => {
       const gross = (parseFloat(l.rate) || 0) * (parseFloat(l.quantity) || 1);
-      return s + (gross - l.amount);
+      const taxable = gross * (1 - (parseFloat(l.discount_percent) || 0) / 100);
+      return s + (gross - taxable);
     }, 0);
 
     const run = db.transaction(() => {
@@ -114,6 +139,7 @@ class SaleService {
         time: data.time != null ? data.time : existing.time,
         total_amount: Math.round(total_amount * 100) / 100,
         total_discount: Math.round(total_discount * 100) / 100,
+        total_gst: Math.round(total_gst * 100) / 100,
         item_count: normalisedItems.length,
         notes: data.notes || '',
         items: normalisedItems,

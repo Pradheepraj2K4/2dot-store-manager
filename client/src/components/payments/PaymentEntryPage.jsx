@@ -26,6 +26,12 @@ export default function PaymentEntryPage() {
   const initialLedgerId = searchParams.get('ledgerId');
 
   const [entryType, setEntryType] = useState(initialType);
+
+  // Sync type when user navigates between the two sidebar menu items
+  useEffect(() => {
+    const t = searchParams.get('type') === 'receipt' ? 'receipt' : 'payment';
+    setEntryType(t);
+  }, [searchParams]);
   const [selectedLedger, setSelectedLedger] = useState(null);
   const [loadingLedger, setLoadingLedger] = useState(false);
 
@@ -367,8 +373,8 @@ export default function PaymentEntryPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="page-title">Payment &amp; Receipt Entry</h1>
-          <p className="text-sm text-slate-500">Record payments and receipts for any ledger</p>
+          <h1 className="page-title">{isPayment ? 'Payment Entry' : 'Receipt Entry'}</h1>
+          <p className="text-sm text-slate-500">{isPayment ? 'Record payments made to any ledger' : 'Record receipts collected from any ledger'}</p>
         </div>
         {selectedLedger && (
           <button onClick={refreshAll} className="btn-secondary gap-2">
@@ -376,34 +382,6 @@ export default function PaymentEntryPage() {
             Refresh
           </button>
         )}
-      </div>
-
-      {/* Entry Type Toggle */}
-      <div className="flex gap-1 bg-slate-100 rounded-xl p-1 w-fit">
-        <button
-          type="button"
-          onClick={() => handleTypeChange('payment')}
-          className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
-            isPayment
-              ? 'bg-white text-red-700 shadow-sm border border-red-100'
-              : 'text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <ArrowUpCircleIcon className="h-4 w-4" />
-          Payment
-        </button>
-        <button
-          type="button"
-          onClick={() => handleTypeChange('receipt')}
-          className={`flex items-center gap-2 px-5 py-2 rounded-lg text-sm font-medium transition-colors ${
-            !isPayment
-              ? 'bg-white text-green-700 shadow-sm border border-green-100'
-              : 'text-slate-600 hover:bg-slate-200'
-          }`}
-        >
-          <ArrowDownCircleIcon className="h-4 w-4" />
-          Receipt
-        </button>
       </div>
 
       {/* Ledger Selection */}

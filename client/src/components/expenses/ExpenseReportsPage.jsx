@@ -94,7 +94,16 @@ export default function ExpenseReportsPage() {
       notes: exp.notes || '',
       amount: exp.amount,
     }));
-    exportToExcel(rows, columns, 'Expense_Report');
+    exportToExcel(rows, columns, 'Expense_Report', {
+      footer: {
+        sno: '',
+        date: '',
+        expense_name: '',
+        category_name: '',
+        notes: 'Total Amount',
+        amount: grandTotal,
+      },
+    });
   };
 
   return (

@@ -15,12 +15,13 @@ import {
   DocumentTextIcon,
   BanknotesIcon,
   CheckCircleIcon,
-  ArrowsRightLeftIcon,
   XMarkIcon,
   CubeIcon,
   ShoppingBagIcon,
   Squares2X2Icon,
   ChevronDownIcon,
+  ArrowUpCircleIcon,
+  ArrowDownCircleIcon,
 } from '@heroicons/react/24/outline';
 import { logout } from '../../utils/auth';
 import { interestApi, expenseApi } from '../../api';
@@ -37,7 +38,8 @@ const baseNavigation = [
     ],
   },
   { name: 'Item Sales', href: '/item-sales/new', icon: ShoppingBagIcon },
-  { name: 'Payment/Receipt Entry', href: '/payment-entry', icon: ArrowsRightLeftIcon },
+  { name: 'Payment Entry', href: '/payment-entry?type=payment', matchPath: '/payment-entry', matchSearch: 'type=payment', icon: ArrowUpCircleIcon },
+  { name: 'Receipt Entry', href: '/payment-entry?type=receipt', matchPath: '/payment-entry', matchSearch: 'type=receipt', icon: ArrowDownCircleIcon },
   { name: 'Day Book', href: '/day-book', icon: QueueListIcon },
   { name: 'Reports', href: '/reports', icon: DocumentChartBarIcon },
   { name: 'Outstanding Balances', href: '/outstanding-balances', icon: CurrencyRupeeIcon },
@@ -165,6 +167,27 @@ export default function Sidebar({ open, onClose }) {
                   </div>
                 )}
               </div>
+            );
+          }
+          // Items with matchPath use query-param based active detection
+          if (item.matchPath) {
+            const isActive = location.pathname === item.matchPath && location.search === `?${item.matchSearch}`;
+            return (
+              <NavLink
+                key={item.name}
+                to={item.href}
+                onClick={onClose}
+                className={() =>
+                  `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'bg-trust-blue text-white shadow-lg shadow-trust-blue/25'
+                      : 'text-slate-300 hover:bg-sidebar-hover hover:text-white'
+                  }`
+                }
+              >
+                <item.icon className="h-5 w-5 flex-shrink-0" />
+                {item.name}
+              </NavLink>
             );
           }
           return (

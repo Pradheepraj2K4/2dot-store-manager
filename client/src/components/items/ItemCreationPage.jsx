@@ -11,6 +11,8 @@ function validate(form) {
   if (!form.name || !form.name.trim()) errors.name = 'Item name is required.';
   if (form.mrp !== '' && isNaN(parseFloat(form.mrp))) errors.mrp = 'MRP must be a number.';
   else if (form.mrp !== '' && parseFloat(form.mrp) < 0) errors.mrp = 'MRP cannot be negative.';
+  if (form.gst_percent !== '' && isNaN(parseFloat(form.gst_percent))) errors.gst_percent = 'GST % must be a number.';
+  else if (form.gst_percent !== '' && parseFloat(form.gst_percent) < 0) errors.gst_percent = 'GST % cannot be negative.';
   return errors;
 }
 
@@ -31,6 +33,7 @@ export default function ItemCreationPage() {
     name: initialName,
     unit: DEFAULT_ITEM_UNIT,
     mrp: '',
+    gst_percent: '',
     brand: '',
     category: '',
   });
@@ -55,6 +58,7 @@ export default function ItemCreationPage() {
           name: it.name,
           unit: it.unit || DEFAULT_ITEM_UNIT,
           mrp: it.mrp != null ? String(it.mrp) : '',
+          gst_percent: it.gst_percent != null && it.gst_percent !== 0 ? String(it.gst_percent) : '',
           brand: it.brand || '',
           category: it.category || '',
         });
@@ -69,7 +73,7 @@ export default function ItemCreationPage() {
   };
 
   // Enter-key navigation between form fields
-  const FIELD_ORDER = ['name', 'unit', 'mrp', 'brand', 'category'];
+  const FIELD_ORDER = ['name', 'unit', 'mrp', 'gst_percent', 'brand', 'category'];
   const fieldRefs = useRef({});
   const setFieldRef = (name) => (el) => { fieldRefs.current[name] = el; };
   const submitBtnRef = useRef(null);
@@ -100,6 +104,7 @@ export default function ItemCreationPage() {
         name: form.name.trim(),
         unit: form.unit,
         mrp: parseFloat(form.mrp) || 0,
+        gst_percent: parseFloat(form.gst_percent) || 0,
         brand: form.brand.trim(),
         category: form.category.trim(),
       };
@@ -159,7 +164,7 @@ export default function ItemCreationPage() {
           <FieldError msg={errors.name} />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="label">Unit</label>
             <select
@@ -189,6 +194,22 @@ export default function ItemCreationPage() {
               placeholder="0.00"
             />
             <FieldError msg={errors.mrp} />
+          </div>
+          <div>
+            <label className="label">GST %</label>
+            <input
+              ref={setFieldRef('gst_percent')}
+              type="number"
+              step="0.01"
+              min="0"
+              name="gst_percent"
+              value={form.gst_percent}
+              onChange={handleChange}
+              onKeyDown={handleFieldKeyDown('gst_percent')}
+              className={`input-field ${errors.gst_percent ? 'border-red-400' : ''}`}
+              placeholder="e.g. 18"
+            />
+            <FieldError msg={errors.gst_percent} />
           </div>
         </div>
 

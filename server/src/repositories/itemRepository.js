@@ -20,26 +20,27 @@ class ItemRepository {
     return db.prepare('SELECT * FROM items WHERE id = ?').get(id);
   }
 
-  create({ name, unit, mrp, brand, category }) {
+  create({ name, unit, mrp, brand, category, gst_percent }) {
     const db = getDb();
     const info = db.prepare(`
-      INSERT INTO items (name, unit, mrp, brand, category)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO items (name, unit, mrp, brand, category, gst_percent)
+      VALUES (?, ?, ?, ?, ?, ?)
     `).run(
       name.trim(),
       (unit || 'Nos').trim(),
       parseFloat(mrp) || 0,
       (brand || '').trim(),
-      (category || '').trim()
+      (category || '').trim(),
+      parseFloat(gst_percent) || 0
     );
     return this.getById(info.lastInsertRowid);
   }
 
-  update(id, { name, unit, mrp, brand, category, status }) {
+  update(id, { name, unit, mrp, brand, category, gst_percent, status }) {
     const db = getDb();
     db.prepare(`
       UPDATE items
-      SET name = ?, unit = ?, mrp = ?, brand = ?, category = ?,
+      SET name = ?, unit = ?, mrp = ?, brand = ?, category = ?, gst_percent = ?,
           status = COALESCE(?, status),
           updated_at = datetime('now', 'localtime')
       WHERE id = ?
@@ -49,6 +50,7 @@ class ItemRepository {
       parseFloat(mrp) || 0,
       (brand || '').trim(),
       (category || '').trim(),
+      parseFloat(gst_percent) || 0,
       status || null,
       id
     );

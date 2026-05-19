@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
-export async function exportToExcel(data, columns, filename = 'report') {
+export async function exportToExcel(data, columns, filename = 'report', options = {}) {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('Report');
 
@@ -37,6 +37,21 @@ export async function exportToExcel(data, columns, filename = 'report') {
       };
     }
   });
+
+  // Optional footer row
+  if (options.footer) {
+    const footerRow = worksheet.addRow(options.footer);
+    footerRow.font = { bold: true };
+    footerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE2E8F0' },
+    };
+    // Right-align every cell in the footer
+    footerRow.eachCell((cell) => {
+      cell.alignment = { horizontal: 'right' };
+    });
+  }
 
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {

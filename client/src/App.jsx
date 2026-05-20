@@ -1,26 +1,27 @@
-import { Routes, Route } from 'react-router-dom';
-import AppLayout from './components/layout/AppLayout';
-import ProtectedRoute from './components/auth/ProtectedRoute';
-import LoginPage from './components/auth/LoginPage';
-import DashboardPage from './components/dashboard/DashboardPage';
-import LedgerCreationPage from './components/ledgers/LedgerCreationPage';
-import LedgerListPage from './components/ledgers/LedgerListPage';
-import LedgerPage from './components/ledgers/LedgerPage';
-import PendingInterestPage from './components/accounts/PendingInterestPage';
-import PaidInterestPage from './components/accounts/PaidInterestPage';
-import ReportsPage from './components/reports/ReportsPage';
-import OutstandingBalanceReportPage from './components/reports/OutstandingBalanceReportPage';
-import StatementOfAccountPage from './components/reports/StatementOfAccountPage';
-import SettingsPage from './components/settings/SettingsPage';
-import DeveloperSettingsPage from './components/settings/DeveloperSettingsPage';
-import ExpensePage from './components/expenses/ExpensePage';
-import ExpenseReportsPage from './components/expenses/ExpenseReportsPage';
-import PaymentEntryPage from './components/payments/PaymentEntryPage';
-import DayBookPage from './components/reports/DayBookPage';
-import ItemListPage from './components/items/ItemListPage';
-import ItemCreationPage from './components/items/ItemCreationPage';
-import ItemSalesEntryPage from './components/sales/ItemSalesEntryPage';
-import ItemSalesListPage from './components/sales/ItemSalesListPage';
+import { Routes, Route } from "react-router-dom";
+import AppLayout from "./components/layout/AppLayout";
+import ProtectedRoute from "./components/auth/ProtectedRoute";
+import LoginPage from "./components/auth/LoginPage";
+import DashboardPage from "./components/dashboard/DashboardPage";
+import LedgerCreationPage from "./components/ledgers/LedgerCreationPage";
+import LedgerListPage from "./components/ledgers/LedgerListPage";
+import LedgerPage from "./components/ledgers/LedgerPage";
+import PendingInterestPage from "./components/accounts/PendingInterestPage";
+import PaidInterestPage from "./components/accounts/PaidInterestPage";
+import ReportsPage from "./components/reports/ReportsPage";
+import OutstandingBalanceReportPage from "./components/reports/OutstandingBalanceReportPage";
+import StatementOfAccountPage from "./components/reports/StatementOfAccountPage";
+import SettingsPage from "./components/settings/SettingsPage";
+import DeveloperSettingsPage from "./components/settings/DeveloperSettingsPage";
+import ExpensePage from "./components/expenses/ExpensePage";
+import ExpenseReportsPage from "./components/expenses/ExpenseReportsPage";
+import PaymentEntryPage from "./components/payments/PaymentEntryPage";
+import DayBookPage from "./components/reports/DayBookPage";
+import ItemListPage from "./components/items/ItemListPage";
+import ItemCreationPage from "./components/items/ItemCreationPage";
+import ItemSalesEntryPage from "./components/sales/ItemSalesEntryPage";
+import ItemSalesListPage from "./components/sales/ItemSalesListPage";
+import SalesReportPage from "./components/sales/SalesReportPage";
 
 export default function App() {
   return (
@@ -33,26 +34,51 @@ export default function App() {
             <AppLayout>
               <Routes>
                 <Route path="/" element={<DashboardPage />} />
-                <Route path="/ledger-creation" element={<LedgerCreationPage />} />
+                <Route
+                  path="/ledger-creation"
+                  element={<LedgerCreationPage />}
+                />
                 <Route path="/ledgers" element={<LedgerListPage />} />
                 <Route path="/ledger/:id" element={<LedgerPage />} />
-                <Route path="/pending-interest" element={<PendingInterestPage />} />
+                <Route
+                  path="/pending-interest"
+                  element={<PendingInterestPage />}
+                />
                 <Route path="/paid-interest" element={<PaidInterestPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
-                <Route path="/outstanding-balances" element={<OutstandingBalanceReportPage />} />
-                <Route path="/statement-of-account" element={<StatementOfAccountPage />} />
+                <Route
+                  path="/outstanding-balances"
+                  element={<OutstandingBalanceReportPage />}
+                />
+                <Route
+                  path="/statement-of-account"
+                  element={<StatementOfAccountPage />}
+                />
                 <Route path="/settings" element={<SettingsPage />} />
-                <Route path="/developer-settings" element={<DeveloperSettingsPage />} />
+                <Route
+                  path="/developer-settings"
+                  element={<DeveloperSettingsPage />}
+                />
                 <Route path="/expenses" element={<ExpensePage />} />
-                <Route path="/expense-reports" element={<ExpenseReportsPage />} />
+                <Route
+                  path="/expense-reports"
+                  element={<ExpenseReportsPage />}
+                />
                 <Route path="/payment-entry" element={<PaymentEntryPage />} />
                 <Route path="/day-book" element={<DayBookPage />} />
                 <Route path="/items" element={<ItemListPage />} />
                 <Route path="/items/new" element={<ItemCreationPage />} />
                 <Route path="/items/:id/edit" element={<ItemCreationPage />} />
                 <Route path="/item-sales" element={<ItemSalesListPage />} />
-                <Route path="/item-sales/new" element={<ItemSalesEntryPage />} />
-                <Route path="/item-sales/:id/edit" element={<ItemSalesEntryPage />} />
+                <Route
+                  path="/item-sales/new"
+                  element={<ItemSalesEntryPage />}
+                />
+                <Route
+                  path="/item-sales/:id/edit"
+                  element={<ItemSalesEntryPage />}
+                />
+                <Route path="/sales-report" element={<SalesReportPage />} />
               </Routes>
             </AppLayout>
           </ProtectedRoute>

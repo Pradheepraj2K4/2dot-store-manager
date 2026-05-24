@@ -22,6 +22,9 @@ import ItemCreationPage from "./components/items/ItemCreationPage";
 import ItemSalesEntryPage from "./components/sales/ItemSalesEntryPage";
 import ItemSalesListPage from "./components/sales/ItemSalesListPage";
 import SalesReportPage from "./components/sales/SalesReportPage";
+import ItemPurchaseEntryPage from "./components/purchases/ItemPurchaseEntryPage";
+import ItemPurchaseListPage from "./components/purchases/ItemPurchaseListPage";
+import PurchaseReportPage from "./components/purchases/PurchaseReportPage";
 
 export default function App() {
   return (
@@ -79,6 +82,16 @@ export default function App() {
                   element={<ItemSalesEntryPage />}
                 />
                 <Route path="/sales-report" element={<SalesReportPage />} />
+                <Route path="/item-purchases" element={<ItemPurchaseListPage />} />
+                <Route
+                  path="/item-purchases/new"
+                  element={<ItemPurchaseEntryPage />}
+                />
+                <Route
+                  path="/item-purchases/:id/edit"
+                  element={<ItemPurchaseEntryPage />}
+                />
+                <Route path="/purchase-report" element={<PurchaseReportPage />} />
               </Routes>
             </AppLayout>
           </ProtectedRoute>

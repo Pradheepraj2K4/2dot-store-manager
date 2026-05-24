@@ -4,17 +4,13 @@ import toast from 'react-hot-toast';
 import {
   ArrowLeftIcon,
   PlusIcon,
-  PrinterIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
-import { itemApi, saleApi, settingsApi } from '../../api';
+import { itemApi, purchaseApi } from '../../api';
 import { ITEM_UNITS, DEFAULT_ITEM_UNIT } from '../../utils/itemConstants';
 import { formatCurrency, todayISO } from '../../utils/helpers';
-import { buildSaleReceiptHtml } from '../../utils/saleReceipt';
-import { fetchLogoDataUrl } from '../../utils/interestReceipt';
 import LedgerAutocomplete from '../ui/LedgerAutocomplete';
 import LoadingSpinner from '../ui/LoadingSpinner';
-import Modal from '../ui/Modal';
 
 const FIELD_ORDER = ['itemName', 'unit', 'qty', 'rate', 'discount', 'gst'];
 
@@ -45,16 +41,7 @@ function emptyLine() {
     gst_percent: '',
     amount: 0,
     current_stock: null,
-    original_quantity: 0,
   };
-}
-
-// Max quantity that can be entered on a line without driving stock negative.
-// For an edited line, the previously-saved quantity is added back since
-// reversing the old line on save returns that stock.
-function maxQtyFor(line) {
-  if (!line.item_id || line.current_stock == null) return Infinity;
-  return (parseFloat(line.current_stock) || 0) + (parseFloat(line.original_quantity) || 0);
 }
 
 function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnter, onAddNew }) {
@@ -65,9 +52,7 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
   const containerRef = useRef(null);
   const dropdownRef = useRef(null);
 
-  useEffect(() => {
-    registerRef(inputRef);
-  }, [registerRef]);
+  useEffect(() => { registerRef(inputRef); }, [registerRef]);
 
   useEffect(() => {
     const handler = (e) => {
@@ -82,13 +67,10 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Recompute dropdown position when opened, or on scroll/resize
   useEffect(() => {
     if (!open) return;
     const update = () => {
-      if (inputRef.current) {
-        setAnchorRect(inputRef.current.getBoundingClientRect());
-      }
+      if (inputRef.current) setAnchorRect(inputRef.current.getBoundingClientRect());
     };
     update();
     window.addEventListener('scroll', update, true);
@@ -197,12 +179,9 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
                   <span className="text-[10px] font-mono text-slate-500">#{it.id}</span>
                 </div>
                 <div className="text-xs text-slate-500 truncate flex items-center justify-between">
-                  <span className="truncate">
-                    {[it.brand, it.category].filter(Boolean).join(' · ') || '—'}
-                    <span className="ml-2 text-slate-400">{formatCurrency(it.mrp)}</span>
-                  </span>
-                  <span className="ml-2 whitespace-nowrap">
-                    Stock: <span className={Number(it.current_stock) <= 0 ? 'text-debit-red font-medium' : 'text-credit-green font-medium'}>
+                  <span>{[it.brand, it.category].filter(Boolean).join(' · ') || '—'}</span>
+                  <span className="ml-2 text-slate-400">
+                    Stock: <span className={Number(it.current_stock) < 0 ? 'text-debit-red' : 'text-credit-green'}>
                       {Number(it.current_stock || 0)}
                     </span>
                   </span>
@@ -216,15 +195,16 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
   );
 }
 
-export default function ItemSalesEntryPage() {
+export default function ItemPurchaseEntryPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { id: saleIdParam } = useParams();
-  const isEdit = Boolean(saleIdParam);
+  const { id: purchaseIdParam } = useParams();
+  const isEdit = Boolean(purchaseIdParam);
 
   const [items, setItems] = useState([]);
   const [ledger, setLedger] = useState(null);
-  const [saleNumber, setSaleNumber] = useState('');
+  const [purchaseNumber, setPurchaseNumber] = useState('');
+  const [billNumber, setBillNumber] = useState('');
   const [date, setDate] = useState(todayISO());
   const [time, setTime] = useState(nowHHMM());
   const [notes, setNotes] = useState('');
@@ -232,37 +212,6 @@ export default function ItemSalesEntryPage() {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
 
-  // ── Receipt / print state ─────────────────────────────────────────────
-  const [store, setStore] = useState({});
-  const [logoDataUrl, setLogoDataUrl] = useState(null);
-  const [receiptFormat, setReceiptFormat] = useState('thermal');
-  const [printEnabled, setPrintEnabled] = useState(false);
-  const [previewModal, setPreviewModal] = useState({ open: false, html: '', sale: null });
-  const previewIframeRef = useRef(null);
-  const navigateAfterPreviewRef = useRef(false);
-
-  // Load store profile + receipt config + print toggle on mount
-  useEffect(() => {
-    (async () => {
-      const [profileRes, configRes, printRes] = await Promise.all([
-        settingsApi.getStoreProfile().catch(() => ({ data: {} })),
-        settingsApi.getReceiptConfig().catch(() => ({ data: {} })),
-        settingsApi.get('print_receipts_sale_enabled').catch(() => ({ data: { value: 'false' } })),
-      ]);
-      const profile = profileRes.data || {};
-      setStore(profile);
-      const fmt = (configRes.data && configRes.data.format) || 'thermal';
-      setReceiptFormat(['a4', 'a5', 'thermal'].includes(fmt) ? fmt : 'thermal');
-      const pv = printRes.data?.value;
-      setPrintEnabled(pv === true || pv === 'true');
-      if (profile.logo_path) {
-        const dl = await fetchLogoDataUrl(profile.logo_path);
-        setLogoDataUrl(dl);
-      }
-    })();
-  }, []);
-
-  // refs: { [rowIndex]: { itemName, unit, rate, discount } -> ref }
   const cellRefs = useRef({});
   const setCellRef = (row, field, ref) => {
     if (!cellRefs.current[row]) cellRefs.current[row] = {};
@@ -285,44 +234,26 @@ export default function ItemSalesEntryPage() {
   useEffect(() => {
     refreshItems();
     if (!isEdit) {
-      saleApi.getNextNumber().then((r) => setSaleNumber(r.data?.sale_number || '')).catch(() => {});
+      purchaseApi.getNextNumber()
+        .then((r) => setPurchaseNumber(r.data?.purchase_number || ''))
+        .catch(() => {});
     }
   }, [refreshItems, isEdit]);
 
-  // Whenever the items list refreshes, sync each line's current_stock snapshot
-  // so newly-loaded or freshly-refreshed stock numbers reach the qty validator
-  // and the row UI.
-  useEffect(() => {
-    if (!items.length) return;
-    setLines((prev) => {
-      let changed = false;
-      const next = prev.map((l) => {
-        if (!l.item_id) return l;
-        const item = items.find((it) => it.id === l.item_id);
-        if (!item) return l;
-        const stock = Number(item.current_stock ?? 0);
-        if (l.current_stock === stock) return l;
-        changed = true;
-        return { ...l, current_stock: stock };
-      });
-      return changed ? next : prev;
-    });
-  }, [items]);
-
-  // Load existing sale (edit mode)
   useEffect(() => {
     if (!isEdit) return;
     setLoading(true);
-    saleApi.getById(saleIdParam)
+    purchaseApi.getById(purchaseIdParam)
       .then((res) => {
-        const sale = res.data;
-        setSaleNumber(sale.sale_number);
-        setDate(sale.date);
-        setTime(sale.time || '');
-        setNotes(sale.notes || '');
-        setLedger({ id: sale.ledger_id, name: sale.ledger_name, behaviour: 'customer' });
+        const p = res.data;
+        setPurchaseNumber(p.purchase_number);
+        setBillNumber(p.bill_number || '');
+        setDate(p.date);
+        setTime(p.time || '');
+        setNotes(p.notes || '');
+        setLedger({ id: p.ledger_id, name: p.ledger_name });
         setLines(
-          (sale.items || []).map((l) => ({
+          (p.items || []).map((l) => ({
             item_id: l.item_id,
             item_name: l.item_name,
             unit: l.unit || DEFAULT_ITEM_UNIT,
@@ -333,15 +264,14 @@ export default function ItemSalesEntryPage() {
             gst_percent: l.gst_percent ? String(l.gst_percent) : '',
             amount: l.amount,
             current_stock: null,
-            original_quantity: parseFloat(l.quantity) || 0,
           }))
         );
       })
       .catch((err) => toast.error(err.message))
       .finally(() => setLoading(false));
-  }, [isEdit, saleIdParam]);
+  }, [isEdit, purchaseIdParam]);
 
-  // After returning from the item creation page, pick up the newly created item.
+  // After returning from item creation
   useEffect(() => {
     const raw = sessionStorage.getItem('lastCreatedItem');
     if (!raw) return;
@@ -349,7 +279,6 @@ export default function ItemSalesEntryPage() {
     try {
       const newItem = JSON.parse(raw);
       refreshItems();
-      // Find first empty line or append one and apply the new item
       setLines((prev) => {
         const idx = prev.findIndex((l) => !l.item_name);
         const target = idx >= 0 ? idx : prev.length;
@@ -360,10 +289,11 @@ export default function ItemSalesEntryPage() {
           item_name: newItem.name,
           unit: newItem.unit || DEFAULT_ITEM_UNIT,
           mrp: newItem.mrp || 0,
-          rate: String(newItem.mrp || ''),
+          rate: '',
           quantity: '1',
           gst_percent: newItem.gst_percent ? String(newItem.gst_percent) : '',
-          amount: computeAmount({ rate: newItem.mrp, quantity: 1, discount_percent: 0, gst_percent: newItem.gst_percent || 0 }),
+          current_stock: newItem.current_stock ?? 0,
+          amount: 0,
         };
         return next;
       });
@@ -393,34 +323,16 @@ export default function ItemSalesEntryPage() {
   };
 
   const handleSelectItem = (idx, item) => {
-    const stock = Number(item.current_stock ?? 0);
-    if (stock <= 0) {
-      toast.error(`"${item.name}" is out of stock`);
-      return;
-    }
     updateLine(idx, {
       item_id: item.id,
       item_name: item.name,
       unit: item.unit || DEFAULT_ITEM_UNIT,
       mrp: item.mrp || 0,
-      rate: String(item.mrp || ''),
+      rate: '',
       quantity: '1',
       gst_percent: item.gst_percent ? String(item.gst_percent) : '',
-      current_stock: stock,
-      original_quantity: 0,
+      current_stock: item.current_stock ?? 0,
     });
-  };
-
-  const handleQuantityChange = (idx, value) => {
-    const line = lines[idx];
-    const max = maxQtyFor(line);
-    const num = parseFloat(value);
-    if (!isNaN(num) && num > max) {
-      toast.error(`Only ${max} ${line.unit || ''} available in stock`);
-      updateLine(idx, { quantity: String(max) });
-      return;
-    }
-    updateLine(idx, { quantity: value });
   };
 
   const handleCellEnter = (rowIdx, field) => {
@@ -428,7 +340,6 @@ export default function ItemSalesEntryPage() {
     if (currentIdx < FIELD_ORDER.length - 1) {
       focusCell(rowIdx, FIELD_ORDER[currentIdx + 1]);
     } else {
-      // Last field (discount) — add new row and focus its item name
       const isLastRow = rowIdx === lines.length - 1;
       if (isLastRow) {
         setLines((prev) => [...prev, emptyLine()]);
@@ -441,10 +352,6 @@ export default function ItemSalesEntryPage() {
 
   const totals = useMemo(() => {
     const total = lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
-    const grossTotal = lines.reduce(
-      (s, l) => s + (parseFloat(l.rate) || 0) * (parseFloat(l.quantity) || 1),
-      0
-    );
     const gstTotal = lines.reduce((s, l) => {
       const r = parseFloat(l.rate) || 0;
       const q = parseFloat(l.quantity) || 1;
@@ -459,42 +366,22 @@ export default function ItemSalesEntryPage() {
       return s + gross * d / 100;
     }, 0);
     const lineCount = lines.filter((l) => l.item_name && l.item_name.trim()).length;
-    return { total, discountTotal, gstTotal, lineCount };
+    const qtyTotal = lines.reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0);
+    return { total, discountTotal, gstTotal, lineCount, qtyTotal };
   }, [lines]);
 
   const handleSave = async () => {
-    if (!ledger) { toast.error('Select a customer ledger'); return; }
+    if (!ledger) { toast.error('Select a ledger'); return; }
     const validLines = lines.filter((l) => l.item_name && l.item_name.trim());
     if (validLines.length === 0) { toast.error('Add at least one item line'); return; }
-
     for (let i = 0; i < validLines.length; i++) {
       const l = validLines[i];
-      if (parseFloat(l.rate) < 0 || isNaN(parseFloat(l.rate))) {
+      if (isNaN(parseFloat(l.rate)) || parseFloat(l.rate) < 0) {
         toast.error(`Row ${i + 1}: rate is invalid`);
         return;
       }
-    }
-
-    // Stock check — aggregate quantities per item and ensure they don't
-    // exceed each item's available stock (plus this sale's original quantity
-    // if editing).
-    const perItem = new Map();
-    for (const l of validLines) {
-      if (!l.item_id) continue;
-      const entry = perItem.get(l.item_id) || {
-        name: l.item_name,
-        qty: 0,
-        available: (Number(l.current_stock) || 0) + (Number(l.original_quantity) || 0),
-        unit: l.unit,
-      };
-      entry.qty += parseFloat(l.quantity) || 0;
-      // current_stock/original_quantity are per-line snapshots; if multiple
-      // rows share an item, keep the first row's available value.
-      perItem.set(l.item_id, entry);
-    }
-    for (const [, info] of perItem) {
-      if (info.qty > info.available) {
-        toast.error(`Quantity for "${info.name}" exceeds available stock (${info.available} ${info.unit || ''})`);
+      if (isNaN(parseFloat(l.quantity)) || parseFloat(l.quantity) <= 0) {
+        toast.error(`Row ${i + 1}: quantity must be greater than zero`);
         return;
       }
     }
@@ -503,6 +390,7 @@ export default function ItemSalesEntryPage() {
       setSaving(true);
       const payload = {
         ledger_id: ledger.id,
+        bill_number: billNumber,
         date,
         time,
         notes,
@@ -519,14 +407,10 @@ export default function ItemSalesEntryPage() {
         })),
       };
       const res = isEdit
-        ? await saleApi.update(saleIdParam, payload)
-        : await saleApi.create(payload);
-      toast.success(isEdit ? 'Sale updated' : `Sale #${res.data.sale_number} saved`);
-      if (res.data) {
-        openSalePreview(res.data, ledger?.name, true);
-      } else {
-        navigate('/item-sales');
-      }
+        ? await purchaseApi.update(purchaseIdParam, payload)
+        : await purchaseApi.create(payload);
+      toast.success(isEdit ? 'Purchase updated' : `Purchase #${res.data.purchase_number} saved`);
+      navigate('/item-purchases');
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -534,39 +418,10 @@ export default function ItemSalesEntryPage() {
     }
   };
 
-  const openSalePreview = (sale, customerName, navigateAfter = false) => {
-    const html = buildSaleReceiptHtml({
-      sale,
-      ledgerName: customerName || sale.ledger_name,
-      store,
-      logoDataUrl,
-      format: receiptFormat,
-    });
-    navigateAfterPreviewRef.current = navigateAfter;
-    setPreviewModal({ open: true, html, sale });
-  };
-
-  const closePreview = () => {
-    const shouldNavigate = navigateAfterPreviewRef.current;
-    navigateAfterPreviewRef.current = false;
-    setPreviewModal({ open: false, html: '', sale: null });
-    if (shouldNavigate) navigate('/item-sales');
-  };
-
-  const handlePrintCurrent = async () => {
-    if (!isEdit) return;
-    try {
-      const res = await saleApi.getById(saleIdParam);
-      openSalePreview(res.data, ledger?.name, false);
-    } catch (err) {
-      toast.error(err.message);
-    }
-  };
-
   const handleAddNewItem = (rowIdx) => {
     const currentName = lines[rowIdx]?.item_name || '';
     const qs = new URLSearchParams({
-      returnTo: isEdit ? `/item-sales/${saleIdParam}/edit` : '/item-sales/new',
+      returnTo: isEdit ? `/item-purchases/${purchaseIdParam}/edit` : '/item-purchases/new',
       ...(currentName ? { name: currentName } : {}),
     }).toString();
     navigate(`/items/new?${qs}`);
@@ -576,7 +431,6 @@ export default function ItemSalesEntryPage() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 flex-shrink-0">
         <div className="flex items-center gap-2">
           <button
@@ -587,33 +441,30 @@ export default function ItemSalesEntryPage() {
             <ArrowLeftIcon className="h-5 w-5" />
           </button>
           <div>
-            <h1 className="page-title">{isEdit ? 'Edit Sale' : 'Item Sales Entry'}</h1>
+            <h1 className="page-title">{isEdit ? 'Edit Purchase' : 'Item Purchase'}</h1>
             <p className="text-sm text-slate-500">
-              Sale #{saleNumber || '—'}
+              Purchase #{purchaseNumber || '—'}
             </p>
           </div>
-          {isEdit && (
-            <button
-              type="button"
-              onClick={handlePrintCurrent}
-              className="ml-2 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              title="Print receipt"
-            >
-              <PrinterIcon className="h-4 w-4" />
-              Print
-            </button>
-          )}
         </div>
 
-        {/* Top-right: customer ledger + date + time */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:w-auto w-full">
-          <div className="sm:w-64">
-            <label className="text-xs text-slate-500">Customer Ledger *</label>
+        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 sm:w-auto w-full">
+          <div className="sm:w-56">
+            <label className="text-xs text-slate-500">Supplier / Ledger *</label>
             <LedgerAutocomplete
               value={ledger}
               onChange={setLedger}
-              behaviour="customer"
-              placeholder="Search customer…"
+              placeholder="Search ledger…"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-slate-500">Bill #</label>
+            <input
+              type="text"
+              value={billNumber}
+              onChange={(e) => setBillNumber(e.target.value)}
+              className="input-field"
+              placeholder="Supplier invoice no."
             />
           </div>
           <div>
@@ -637,7 +488,6 @@ export default function ItemSalesEntryPage() {
         </div>
       </div>
 
-      {/* Items table */}
       <div className="card p-0 overflow-hidden flex flex-col flex-1 min-h-0 mt-3">
         <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
@@ -647,8 +497,9 @@ export default function ItemSalesEntryPage() {
                 <th className="px-3 py-2 text-left font-semibold text-slate-600 w-20">Item ID</th>
                 <th className="px-3 py-2 text-left font-semibold text-slate-600 min-w-[18rem]">Item Name</th>
                 <th className="px-3 py-2 text-left font-semibold text-slate-600 w-28">Unit</th>
+                <th className="px-3 py-2 text-right font-semibold text-slate-600 w-20">In Stock</th>
                 <th className="px-3 py-2 text-right font-semibold text-slate-600 w-24">MRP</th>
-                <th className="px-3 py-2 text-right font-semibold text-slate-600 w-28">Rate</th>
+                <th className="px-3 py-2 text-right font-semibold text-slate-600 w-28">Cost Rate</th>
                 <th className="px-3 py-2 text-right font-semibold text-slate-600 w-24">Qty</th>
                 <th className="px-3 py-2 text-right font-semibold text-slate-600 w-24">Disc %</th>
                 <th className="px-3 py-2 text-right font-semibold text-slate-600 w-24">GST %</th>
@@ -657,115 +508,122 @@ export default function ItemSalesEntryPage() {
               </tr>
             </thead>
             <tbody>
-              {lines.map((line, idx) => (
-                <tr key={idx} className="border-b border-slate-100">
-                  <td className="px-3 py-2 text-slate-500">{idx + 1}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-slate-600">
-                    {line.item_id || '—'}
-                  </td>
-                  <td className="px-3 py-2">
-                    <ItemNameCell
-                      value={line.item_name}
-                      items={items}
-                      onChange={(v) => updateLine(idx, { item_name: v, item_id: null })}
-                      onSelect={(it) => handleSelectItem(idx, it)}
-                      registerRef={(ref) => setCellRef(idx, 'itemName', ref)}
-                      onKeyEnter={() => handleCellEnter(idx, 'itemName')}
-                      onAddNew={() => handleAddNewItem(idx)}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <select
-                      ref={(el) => setCellRef(idx, 'unit', { current: el })}
-                      value={line.unit}
-                      onChange={(e) => updateLine(idx, { unit: e.target.value })}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'unit'); }
-                      }}
-                      className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
-                    >
-                      {ITEM_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-                    </select>
-                  </td>
-                  <td className="px-3 py-2 text-right text-slate-700">{formatCurrency(line.mrp || 0)}</td>
-                  <td className="px-3 py-2">
-                    <input
-                      ref={(el) => setCellRef(idx, 'rate', { current: el })}
-                      type="number"
-                      step="0.01"
-                      value={line.rate}
-                      onChange={(e) => updateLine(idx, { rate: e.target.value })}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'rate'); }
-                      }}
-                      className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
-                      placeholder="0.00"
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      ref={(el) => setCellRef(idx, 'qty', { current: el })}
-                      type="number"
-                      step="0.001"
-                      min="0"
-                      value={line.quantity}
-                      onChange={(e) => handleQuantityChange(idx, e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'qty'); }
-                      }}
-                      className={`w-full px-2 py-1.5 text-sm text-right border rounded focus:outline-none focus:ring-1 ${
-                        line.item_id && parseFloat(line.quantity) > maxQtyFor(line)
-                          ? 'border-debit-red focus:border-debit-red focus:ring-debit-red'
-                          : 'border-slate-200 focus:border-trust-blue focus:ring-trust-blue'
-                      }`}
-                      placeholder="1"
-                      title={line.item_id && line.current_stock != null ? `In stock: ${line.current_stock}` : undefined}
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      ref={(el) => setCellRef(idx, 'discount', { current: el })}
-                      type="number"
-                      step="0.01"
-                      value={line.discount_percent}
-                      onChange={(e) => updateLine(idx, { discount_percent: e.target.value })}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'discount'); }
-                      }}
-                      className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
-                      placeholder="0"
-                    />
-                  </td>
-                  <td className="px-3 py-2">
-                    <input
-                      ref={(el) => setCellRef(idx, 'gst', { current: el })}
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={line.gst_percent}
-                      onChange={(e) => updateLine(idx, { gst_percent: e.target.value })}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'gst'); }
-                      }}
-                      className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
-                      placeholder="0"
-                    />
-                  </td>
-                  <td className="px-3 py-2 text-right font-semibold text-slate-800">
-                    {formatCurrency(line.amount || 0)}
-                  </td>
-                  <td className="px-3 py-2 text-right">
-                    <button
-                      type="button"
-                      onClick={() => removeLine(idx)}
-                      className="text-slate-400 hover:text-red-600 transition-colors"
-                      title="Remove row"
-                    >
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {lines.map((line, idx) => {
+                const stock = line.current_stock;
+                return (
+                  <tr key={idx} className="border-b border-slate-100">
+                    <td className="px-3 py-2 text-slate-500">{idx + 1}</td>
+                    <td className="px-3 py-2 font-mono text-xs text-slate-600">
+                      {line.item_id || '—'}
+                    </td>
+                    <td className="px-3 py-2">
+                      <ItemNameCell
+                        value={line.item_name}
+                        items={items}
+                        onChange={(v) => updateLine(idx, { item_name: v, item_id: null, current_stock: null })}
+                        onSelect={(it) => handleSelectItem(idx, it)}
+                        registerRef={(ref) => setCellRef(idx, 'itemName', ref)}
+                        onKeyEnter={() => handleCellEnter(idx, 'itemName')}
+                        onAddNew={() => handleAddNewItem(idx)}
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <select
+                        ref={(el) => setCellRef(idx, 'unit', { current: el })}
+                        value={line.unit}
+                        onChange={(e) => updateLine(idx, { unit: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'unit'); }
+                        }}
+                        className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
+                      >
+                        {ITEM_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                      </select>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      {stock == null ? (
+                        <span className="text-slate-300">—</span>
+                      ) : (
+                        <span className={Number(stock) < 0 ? 'text-debit-red font-medium' : 'text-slate-600'}>
+                          {Number(stock)}
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-right text-slate-700">{formatCurrency(line.mrp || 0)}</td>
+                    <td className="px-3 py-2">
+                      <input
+                        ref={(el) => setCellRef(idx, 'rate', { current: el })}
+                        type="number"
+                        step="0.01"
+                        value={line.rate}
+                        onChange={(e) => updateLine(idx, { rate: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'rate'); }
+                        }}
+                        className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
+                        placeholder="0.00"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        ref={(el) => setCellRef(idx, 'qty', { current: el })}
+                        type="number"
+                        step="0.001"
+                        min="0"
+                        value={line.quantity}
+                        onChange={(e) => updateLine(idx, { quantity: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'qty'); }
+                        }}
+                        className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
+                        placeholder="1"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        ref={(el) => setCellRef(idx, 'discount', { current: el })}
+                        type="number"
+                        step="0.01"
+                        value={line.discount_percent}
+                        onChange={(e) => updateLine(idx, { discount_percent: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'discount'); }
+                        }}
+                        className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
+                        placeholder="0"
+                      />
+                    </td>
+                    <td className="px-3 py-2">
+                      <input
+                        ref={(el) => setCellRef(idx, 'gst', { current: el })}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={line.gst_percent}
+                        onChange={(e) => updateLine(idx, { gst_percent: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'gst'); }
+                        }}
+                        className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
+                        placeholder="0"
+                      />
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-slate-800">
+                      {formatCurrency(line.amount || 0)}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={() => removeLine(idx)}
+                        className="text-slate-400 hover:text-red-600 transition-colors"
+                        title="Remove row"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -785,7 +643,6 @@ export default function ItemSalesEntryPage() {
         </div>
       </div>
 
-      {/* Footer: notes + totals + save */}
       <div className="flex-shrink-0 rounded-xl border border-slate-200 bg-white shadow-sm mt-3">
         <div className="px-4 pt-4 pb-3 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2 flex flex-col gap-1">
@@ -795,7 +652,7 @@ export default function ItemSalesEntryPage() {
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
               className="input-field resize-none"
-              placeholder="Optional remarks for this sale"
+              placeholder="Optional remarks for this purchase"
             />
           </div>
           <div className="flex flex-col justify-between gap-2 bg-slate-50 rounded-lg px-4 py-3 border border-slate-100">
@@ -803,6 +660,10 @@ export default function ItemSalesEntryPage() {
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-500">Items</span>
                 <span className="font-medium text-slate-700">{totals.lineCount}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-500">Total Qty</span>
+                <span className="font-medium text-slate-700">{totals.qtyTotal}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-500">Total Discount</span>
@@ -815,13 +676,13 @@ export default function ItemSalesEntryPage() {
             </div>
             <div className="flex items-center justify-between text-base border-t border-slate-200 pt-2 mt-1">
               <span className="font-semibold text-slate-700">Total Amount</span>
-              <span className="font-bold text-lg text-debit-red">{formatCurrency(totals.total)}</span>
+              <span className="font-bold text-lg text-credit-green">{formatCurrency(totals.total)}</span>
             </div>
           </div>
         </div>
 
         <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-100">
-          <button type="button" onClick={() => navigate('/item-sales')} className="btn-secondary">
+          <button type="button" onClick={() => navigate('/item-purchases')} className="btn-secondary">
             Cancel
           </button>
           <button
@@ -830,67 +691,10 @@ export default function ItemSalesEntryPage() {
             disabled={saving}
             className="btn-primary"
           >
-            {saving ? 'Saving…' : (isEdit ? 'Update Sale' : 'Save Sale')}
+            {saving ? 'Saving…' : (isEdit ? 'Update Purchase' : 'Save Purchase')}
           </button>
         </div>
       </div>
-
-      {/* Receipt Preview Modal */}
-      <Modal open={previewModal.open} onClose={closePreview} title="Sale Receipt Preview" size="lg">
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-slate-500">Format:</span>
-            {['thermal', 'a5', 'a4'].map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => {
-                  setReceiptFormat(f);
-                  if (previewModal.sale) {
-                    const html = buildSaleReceiptHtml({
-                      sale: previewModal.sale,
-                      ledgerName: ledger?.name || previewModal.sale.ledger_name,
-                      store,
-                      logoDataUrl,
-                      format: f,
-                    });
-                    setPreviewModal((prev) => ({ ...prev, html }));
-                  }
-                }}
-                className={`rounded-md px-2.5 py-1 text-xs font-medium border ${
-                  receiptFormat === f
-                    ? 'bg-emerald-600 text-white border-emerald-600'
-                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                }`}
-              >
-                {f === 'thermal' ? 'Thermal 80mm' : f.toUpperCase()}
-              </button>
-            ))}
-          </div>
-          <iframe
-            ref={previewIframeRef}
-            srcDoc={previewModal.html}
-            title="Sale Receipt Preview"
-            className="w-full border border-slate-200 rounded bg-white"
-            style={{ minHeight: 380, maxHeight: 600, overflowX: 'hidden' }}
-            onLoad={(e) => {
-              const doc = e.target.contentDocument;
-              if (doc) e.target.style.height = Math.min(doc.body.scrollHeight + 8, 600) + 'px';
-            }}
-          />
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={closePreview} className="btn-secondary">Close</button>
-            <button
-              type="button"
-              onClick={() => previewIframeRef.current?.contentWindow?.print()}
-              className="btn-primary inline-flex items-center gap-1.5"
-            >
-              <PrinterIcon className="h-4 w-4" />
-              Print
-            </button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 }

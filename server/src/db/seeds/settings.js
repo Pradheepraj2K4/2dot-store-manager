@@ -18,6 +18,7 @@ const DEFAULT_SETTINGS = [
   ['gst_fields_enabled', 'false'],
   ['print_receipts_payment_enabled', 'false'],
   ['print_receipts_interest_enabled', 'false'],
+  ['print_receipts_sale_enabled', 'false'],
   [
     'receipt_config',
     JSON.stringify({

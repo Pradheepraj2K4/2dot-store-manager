@@ -1,7 +1,18 @@
 const saleRepository = require('../repositories/saleRepository');
 const ledgerRepository = require('../repositories/ledgerRepository');
+const itemRepository = require('../repositories/itemRepository');
 const { AppError } = require('../middleware/errorHandler');
 const { getDb } = require('../db/database');
+
+/** Apply +qty per line (use negative sign to reverse). */
+function applyStockDelta(items, sign) {
+  for (const line of items || []) {
+    if (!line.item_id) continue;
+    const qty = parseFloat(line.quantity) || 0;
+    if (!qty) continue;
+    itemRepository.adjustStock(line.item_id, sign * qty);
+  }
+}
 
 /**
  * Compute per-line amounts.
@@ -94,6 +105,9 @@ class SaleService {
 
       const delta = applyLedgerDelta(ledger.behaviour, total_amount);
       ledgerRepository.updateBalance(ledger.id, ledger.current_balance + delta);
+
+      // Decrement stock for every linked item line
+      applyStockDelta(normalisedItems, -1);
       return sale;
     });
     return run();
@@ -134,6 +148,10 @@ class SaleService {
       const newDelta = applyLedgerDelta(ledger.behaviour, total_amount);
       ledgerRepository.updateBalance(ledger.id, ledger.current_balance - oldDelta + newDelta);
 
+      // Reverse previous stock impact, apply new
+      applyStockDelta(existing.items, +1);
+      applyStockDelta(normalisedItems, -1);
+
       return saleRepository.update(id, {
         date: data.date || existing.date,
         time: data.time != null ? data.time : existing.time,
@@ -158,6 +176,8 @@ class SaleService {
         const oldDelta = applyLedgerDelta(ledger.behaviour, existing.total_amount);
         ledgerRepository.updateBalance(ledger.id, ledger.current_balance - oldDelta);
       }
+      // Restore stock back to inventory
+      applyStockDelta(existing.items, +1);
       saleRepository.delete(id);
     });
     run();

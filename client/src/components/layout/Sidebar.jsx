@@ -49,6 +49,18 @@ const baseNavigation = [
     ],
   },
   {
+    name: "Purchases",
+    icon: ArrowDownCircleIcon,
+    children: [
+      { name: "New Purchase", href: "/item-purchases/new", icon: ArrowDownCircleIcon },
+      {
+        name: "Purchase Report",
+        href: "/purchase-report",
+        icon: DocumentChartBarIcon,
+      },
+    ],
+  },
+  {
     name: "Payment Entry",
     href: "/payment-entry?type=payment",
     matchPath: "/payment-entry",

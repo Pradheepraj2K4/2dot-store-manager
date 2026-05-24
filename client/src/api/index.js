@@ -145,3 +145,16 @@ export const saleApi = {
   update: (id, data) => api.put(`/sales/${id}`, data),
   delete: (id) => api.delete(`/sales/${id}`),
 };
+
+export const purchaseApi = {
+  getAll: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return api.get(`/purchases${qs ? `?${qs}` : ''}`);
+  },
+  getById: (id) => api.get(`/purchases/${id}`),
+  getByLedger: (ledgerId) => api.get(`/purchases/ledger/${ledgerId}`),
+  getNextNumber: () => api.get('/purchases/next-number'),
+  create: (data) => api.post('/purchases', data),
+  update: (id, data) => api.put(`/purchases/${id}`, data),
+  delete: (id) => api.delete(`/purchases/${id}`),
+};

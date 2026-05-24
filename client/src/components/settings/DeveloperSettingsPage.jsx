@@ -66,6 +66,7 @@ export default function DeveloperSettingsPage() {
   // Print receipt settings
   const [printReceiptsPaymentEnabled, setPrintReceiptsPaymentEnabled] = useState(false);
   const [printReceiptsInterestEnabled, setPrintReceiptsInterestEnabled] = useState(false);
+  const [printReceiptsSaleEnabled, setPrintReceiptsSaleEnabled] = useState(false);
 
   // Data tab state
   const [clearingData, setClearingData] = useState(false);
@@ -129,6 +130,7 @@ export default function DeveloperSettingsPage() {
       // Load print receipt settings
       setPrintReceiptsPaymentEnabled(data.print_receipts_payment_enabled === true || data.print_receipts_payment_enabled === 'true');
       setPrintReceiptsInterestEnabled(data.print_receipts_interest_enabled === true || data.print_receipts_interest_enabled === 'true');
+      setPrintReceiptsSaleEnabled(data.print_receipts_sale_enabled === true || data.print_receipts_sale_enabled === 'true');
       // Load backup settings
       try {
         const bRes = await settingsApi.getBackupStatus();
@@ -1010,6 +1012,35 @@ export default function DeveloperSettingsPage() {
                           await settingsApi.update('print_receipts_interest_enabled', String(newVal));
                           setPrintReceiptsInterestEnabled(newVal);
                           toast.success(`Interest receipt printing ${newVal ? 'enabled' : 'disabled'}`);
+                        } catch (err) {
+                          toast.error(err.message);
+                        }
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
+                  </label>
+                </div>
+
+                {/* Receipt Printing — Sales */}
+                <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-white">
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-slate-800">Sales Invoice</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      When enabled, a thermal/A4/A5 invoice preview is automatically opened after saving a
+                      sale. The format follows the global receipt format chosen below.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer ml-4">
+                    <input
+                      type="checkbox"
+                      checked={printReceiptsSaleEnabled}
+                      onChange={async (e) => {
+                        const newVal = e.target.checked;
+                        try {
+                          await settingsApi.update('print_receipts_sale_enabled', String(newVal));
+                          setPrintReceiptsSaleEnabled(newVal);
+                          toast.success(`Sales receipt printing ${newVal ? 'enabled' : 'disabled'}`);
                         } catch (err) {
                           toast.error(err.message);
                         }

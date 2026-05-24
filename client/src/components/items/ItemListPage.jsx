@@ -35,6 +35,7 @@ export default function ItemListPage() {
     return (
       String(it.id).includes(q) ||
       it.name.toLowerCase().includes(q) ||
+      (it.item_code || '').toLowerCase().includes(q) ||
       (it.brand || '').toLowerCase().includes(q) ||
       (it.category || '').toLowerCase().includes(q)
     );
@@ -74,7 +75,7 @@ export default function ItemListPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by id, name, brand, category…"
+              placeholder="Search by id, code, name, brand, category…"
               className="input-field pl-9"
             />
           </div>
@@ -92,6 +93,7 @@ export default function ItemListPage() {
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Category</th>
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Unit</th>
                   <th className="px-4 py-2.5 text-right font-semibold text-slate-600">MRP</th>
+                  <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Stock</th>
                   <th className="px-4 py-2.5"></th>
                 </tr>
               </thead>
@@ -104,6 +106,11 @@ export default function ItemListPage() {
                     <td className="px-4 py-2.5 text-slate-600">{it.category || '—'}</td>
                     <td className="px-4 py-2.5 text-slate-600">{it.unit}</td>
                     <td className="px-4 py-2.5 text-right text-slate-700">{formatCurrency(it.mrp)}</td>
+                    <td className="px-4 py-2.5 text-right">
+                      <span className={Number(it.current_stock) < 0 ? 'text-debit-red font-medium' : Number(it.current_stock) > 0 ? 'text-credit-green font-medium' : 'text-slate-500'}>
+                        {Number(it.current_stock || 0)}
+                      </span>
+                    </td>
                     <td className="px-4 py-2.5">
                       <div className="flex items-center gap-1">
                         <button

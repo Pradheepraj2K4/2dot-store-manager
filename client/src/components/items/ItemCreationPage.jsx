@@ -31,6 +31,7 @@ export default function ItemCreationPage() {
 
   const [form, setForm] = useState({
     name: initialName,
+    item_code: '',
     unit: DEFAULT_ITEM_UNIT,
     mrp: '',
     gst_percent: '',
@@ -56,6 +57,7 @@ export default function ItemCreationPage() {
         const it = res.data;
         setForm({
           name: it.name,
+          item_code: it.item_code || '',
           unit: it.unit || DEFAULT_ITEM_UNIT,
           mrp: it.mrp != null ? String(it.mrp) : '',
           gst_percent: it.gst_percent != null && it.gst_percent !== 0 ? String(it.gst_percent) : '',
@@ -73,7 +75,7 @@ export default function ItemCreationPage() {
   };
 
   // Enter-key navigation between form fields
-  const FIELD_ORDER = ['name', 'unit', 'mrp', 'gst_percent', 'brand', 'category'];
+  const FIELD_ORDER = ['name', 'item_code', 'unit', 'mrp', 'gst_percent', 'brand', 'category'];
   const fieldRefs = useRef({});
   const setFieldRef = (name) => (el) => { fieldRefs.current[name] = el; };
   const submitBtnRef = useRef(null);
@@ -102,6 +104,7 @@ export default function ItemCreationPage() {
       setSaving(true);
       const payload = {
         name: form.name.trim(),
+        item_code: form.item_code.trim(),
         unit: form.unit,
         mrp: parseFloat(form.mrp) || 0,
         gst_percent: parseFloat(form.gst_percent) || 0,
@@ -162,6 +165,21 @@ export default function ItemCreationPage() {
             placeholder="e.g. Surf Excel 1kg"
           />
           <FieldError msg={errors.name} />
+        </div>
+
+        <div>
+          <label className="label">Item Code</label>
+          <input
+            ref={setFieldRef('item_code')}
+            type="text"
+            name="item_code"
+            value={form.item_code}
+            onChange={handleChange}
+            onKeyDown={handleFieldKeyDown('item_code')}
+            className="input-field"
+            placeholder="Optional SKU / barcode — e.g. SX-1KG"
+          />
+          <p className="text-xs text-slate-400 mt-1">Searchable from sales &amp; purchase entry.</p>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

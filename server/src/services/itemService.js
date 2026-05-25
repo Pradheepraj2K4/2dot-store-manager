@@ -39,6 +39,10 @@ class ItemService {
   getCategories() {
     return itemRepository.getDistinctCategories();
   }
+
+  getStockReport(filters = {}) {
+    return itemRepository.getStockReport(filters);
+  }
 }
 
 module.exports = new ItemService();

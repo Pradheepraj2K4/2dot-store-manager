@@ -47,6 +47,19 @@ class ItemController {
       res.json({ success: true, data: itemService.getCategories() });
     } catch (err) { next(err); }
   }
+
+  getStockReport(req, res, next) {
+    try {
+      const { search, brand, category, lowStockOnly } = req.query;
+      const rows = itemService.getStockReport({
+        search,
+        brand,
+        category,
+        lowStockOnly: lowStockOnly === 'true' || lowStockOnly === '1',
+      });
+      res.json({ success: true, data: rows });
+    } catch (err) { next(err); }
+  }
 }
 
 module.exports = new ItemController();

@@ -21,6 +21,10 @@ import {
   ChevronDownIcon,
   ArrowUpCircleIcon,
   ArrowDownCircleIcon,
+  ArrowUturnLeftIcon,
+  ClipboardDocumentListIcon,
+  ArchiveBoxIcon,
+  CalculatorIcon,
 } from "@heroicons/react/24/outline";
 import { logout } from "../../utils/auth";
 import { interestApi, expenseApi } from "../../api";
@@ -37,27 +41,23 @@ const baseNavigation = [
     ],
   },
   {
-    name: "Sales",
-    icon: ShoppingBagIcon,
+    name: "Inventory Transactions",
+    icon: ClipboardDocumentListIcon,
     children: [
-      { name: "New Sale", href: "/item-sales/new", icon: ShoppingBagIcon },
-      {
-        name: "Sales Report",
-        href: "/sales-report",
-        icon: DocumentChartBarIcon,
-      },
+      { name: "Sales Entry", href: "/item-sales/new", icon: ShoppingBagIcon },
+      { name: "Purchase Entry", href: "/item-purchases/new", icon: ArrowDownCircleIcon },
+      { name: "Estimation", href: "/estimations", icon: CalculatorIcon },
+      { name: "Sales Return Entry", href: "/sales-returns", icon: ArrowUturnLeftIcon },
+      { name: "Purchase Return Entry", href: "/purchase-returns", icon: ArrowUturnLeftIcon },
     ],
   },
   {
-    name: "Purchases",
-    icon: ArrowDownCircleIcon,
+    name: "Inventory Reports",
+    icon: DocumentChartBarIcon,
     children: [
-      { name: "New Purchase", href: "/item-purchases/new", icon: ArrowDownCircleIcon },
-      {
-        name: "Purchase Report",
-        href: "/purchase-report",
-        icon: DocumentChartBarIcon,
-      },
+      { name: "Sales Report", href: "/sales-report", icon: DocumentChartBarIcon },
+      { name: "Purchase Report", href: "/purchase-report", icon: DocumentChartBarIcon },
+      { name: "Stock Report", href: "/stock-report", icon: ArchiveBoxIcon },
     ],
   },
   {
@@ -74,17 +74,15 @@ const baseNavigation = [
     matchSearch: "type=receipt",
     icon: ArrowDownCircleIcon,
   },
-  { name: "Day Book", href: "/day-book", icon: QueueListIcon },
-  { name: "Reports", href: "/reports", icon: DocumentChartBarIcon },
   {
-    name: "Outstanding Balances",
-    href: "/outstanding-balances",
-    icon: CurrencyRupeeIcon,
-  },
-  {
-    name: "Statement of Account",
-    href: "/statement-of-account",
+    name: "Accounts Reports",
     icon: DocumentTextIcon,
+    children: [
+      { name: "Day Book", href: "/day-book", icon: QueueListIcon },
+      { name: "Accounts Statement", href: "/statement-of-account", icon: DocumentTextIcon },
+      { name: "Outstanding Report", href: "/outstanding-balances", icon: CurrencyRupeeIcon },
+      { name: "Overall Report", href: "/reports", icon: DocumentChartBarIcon },
+    ],
   },
   { name: "Settings", href: "/settings", icon: Cog6ToothIcon },
 ];
@@ -115,9 +113,9 @@ export default function Sidebar({ open, onClose }) {
   const navigation = (() => {
     let nav = [...baseNavigation];
     if (interestEnabled) {
-      // Insert after Statement of Account
-      const soaIdx = nav.findIndex((n) => n.href === "/statement-of-account");
-      const insertAt = soaIdx >= 0 ? soaIdx + 1 : nav.length;
+      // Insert after Accounts Reports group
+      const acctIdx = nav.findIndex((n) => n.name === "Accounts Reports");
+      const insertAt = acctIdx >= 0 ? acctIdx + 1 : nav.length;
       nav = [
         ...nav.slice(0, insertAt),
         {
@@ -208,20 +206,20 @@ export default function Sidebar({ open, onClose }) {
                         [item.name]: !isExpanded,
                       }))
                     }
-                    className={`w-full group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                    className={`w-full group flex items-center gap-2 rounded-md px-2.5 py-2 text-xs font-medium transition-colors ${
                       isGroupActive
                         ? "text-white"
                         : "text-slate-300 hover:bg-sidebar-hover hover:text-white"
                     }`}
                   >
-                    <item.icon className="h-5 w-5 flex-shrink-0" />
+                    <item.icon className="h-4 w-4 flex-shrink-0" />
                     <span className="flex-1 text-left">{item.name}</span>
                     <ChevronDownIcon
-                      className={`h-4 w-4 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+                      className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`}
                     />
                   </button>
                   {isExpanded && (
-                    <div className="mt-1 ml-2 space-y-1 border-l border-slate-700 pl-2">
+                    <div className="mt-0.5 ml-2 space-y-0.5 border-l border-slate-700 pl-2">
                       {item.children.map((child) => (
                         <NavLink
                           key={child.name}
@@ -229,14 +227,14 @@ export default function Sidebar({ open, onClose }) {
                           end={child.end}
                           onClick={onClose}
                           className={({ isActive }) =>
-                            `group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
+                            `group flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
                               isActive
-                                ? "bg-trust-blue text-white shadow-lg shadow-trust-blue/25"
-                                : "text-slate-300 hover:bg-sidebar-hover hover:text-white"
+                                ? "bg-trust-blue text-white shadow-sm shadow-trust-blue/25"
+                                : "text-slate-400 hover:bg-sidebar-hover hover:text-slate-200"
                             }`
                           }
                         >
-                          <child.icon className="h-4 w-4 flex-shrink-0" />
+                          <child.icon className="h-3.5 w-3.5 flex-shrink-0" />
                           {child.name}
                         </NavLink>
                       ))}
@@ -256,14 +254,14 @@ export default function Sidebar({ open, onClose }) {
                   to={item.href}
                   onClick={onClose}
                   className={() =>
-                    `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                    `group flex items-center gap-2 rounded-md px-2.5 py-2 text-xs font-medium transition-colors ${
                       isActive
-                        ? "bg-trust-blue text-white shadow-lg shadow-trust-blue/25"
+                        ? "bg-trust-blue text-white shadow-sm shadow-trust-blue/25"
                         : "text-slate-300 hover:bg-sidebar-hover hover:text-white"
                     }`
                   }
                 >
-                  <item.icon className="h-5 w-5 flex-shrink-0" />
+                  <item.icon className="h-4 w-4 flex-shrink-0" />
                   {item.name}
                 </NavLink>
               );
@@ -275,14 +273,14 @@ export default function Sidebar({ open, onClose }) {
                 end={item.href === "/"}
                 onClick={onClose}
                 className={({ isActive }) =>
-                  `group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                  `group flex items-center gap-2 rounded-md px-2.5 py-2 text-xs font-medium transition-colors ${
                     isActive
-                      ? "bg-trust-blue text-white shadow-lg shadow-trust-blue/25"
+                      ? "bg-trust-blue text-white shadow-sm shadow-trust-blue/25"
                       : "text-slate-300 hover:bg-sidebar-hover hover:text-white"
                   }`
                 }
               >
-                <item.icon className="h-5 w-5 flex-shrink-0" />
+                <item.icon className="h-4 w-4 flex-shrink-0" />
                 {item.name}
               </NavLink>
             );

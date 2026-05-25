@@ -1,11 +1,21 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { transactionApi, expenseApi } from '../../api';
+import { transactionApi, expenseApi, saleApi, purchaseApi, salesReturnApi, purchaseReturnApi } from '../../api';
 import { formatCurrency, formatDate, todayISO } from '../../utils/helpers';
 import { exportToExcel } from '../../utils/exportUtils';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
 import toast from 'react-hot-toast';
 import { QueueListIcon, ArrowPathIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+
+const TYPE_OPTIONS = [
+  { value: 'all',              label: 'All Entries' },
+  { value: 'sale',             label: 'Sales' },
+  { value: 'purchase',         label: 'Purchases' },
+  { value: 'sales_return',     label: 'Sales Returns' },
+  { value: 'purchase_return',  label: 'Purchase Returns' },
+  { value: 'transaction',      label: 'Transactions' },
+  { value: 'expense',          label: 'Expenses' },
+];
 
 function firstDayOfCurrentMonth() {
   const d = new Date();
@@ -18,6 +28,7 @@ export default function DayBookPage() {
   const [filters, setFilters] = useState({
     fromDate: firstDayOfCurrentMonth(),
     toDate: todayISO(),
+    type: 'all',
   });
 
   const fetchData = useCallback(async () => {
@@ -27,16 +38,25 @@ export default function DayBookPage() {
       if (filters.fromDate) params.fromDate = filters.fromDate;
       if (filters.toDate) params.toDate = filters.toDate;
 
-      const [txRes, expRes] = await Promise.allSettled([
+      const [txRes, expRes, saleRes, purchaseRes, srRes, prRes] = await Promise.allSettled([
         transactionApi.getAll(params),
         expenseApi.getAll(params),
+        saleApi.getAll(params),
+        purchaseApi.getAll(params),
+        salesReturnApi.getAll(params),
+        purchaseReturnApi.getAll(params),
       ]);
 
       const transactions = txRes.status === 'fulfilled' ? (txRes.value.data || []) : [];
-      const expenses = expRes.status === 'fulfilled' ? (expRes.value.data || []) : [];
+      const expenses     = expRes.status === 'fulfilled' ? (expRes.value.data || []) : [];
+      const sales        = saleRes.status === 'fulfilled' ? (saleRes.value.data || []) : [];
+      const purchases    = purchaseRes.status === 'fulfilled' ? (purchaseRes.value.data || []) : [];
+      const salesRets    = srRes.status === 'fulfilled' ? (srRes.value.data || []) : [];
+      const purchRets    = prRes.status === 'fulfilled' ? (prRes.value.data || []) : [];
 
       const txEntries = transactions.map((tx) => ({
         id: `tx-${tx.id}`,
+        type: 'transaction',
         sortKey: tx.id,
         date: tx.date,
         details: tx.ledger_name + (tx.notes ? ` — ${tx.notes}` : ''),
@@ -47,6 +67,7 @@ export default function DayBookPage() {
 
       const expEntries = expenses.map((exp) => ({
         id: `exp-${exp.id}`,
+        type: 'expense',
         sortKey: exp.id,
         date: exp.date,
         details: exp.expense_name + (exp.category_name ? ` [${exp.category_name}]` : ''),
@@ -55,11 +76,71 @@ export default function DayBookPage() {
         credit: 0,
       }));
 
-      const merged = [...txEntries, ...expEntries].sort((a, b) => {
-        const dateCmp = b.date.localeCompare(a.date);
-        if (dateCmp !== 0) return dateCmp;
-        return b.sortKey - a.sortKey;
+      // Sales → Credit (income)
+      const saleEntries = sales.map((s) => ({
+        id: `sal-${s.id}`,
+        type: 'sale',
+        sortKey: s.id,
+        date: s.date,
+        details: `${s.ledger_name} — Sale #${s.sale_number}`,
+        voucherNo: `SAL-${String(s.sale_number).padStart(5, '0')}`,
+        debit: 0,
+        credit: s.total_amount,
+      }));
+
+      // Purchases → Debit (expenditure)
+      const purchEntries = purchases.map((p) => {
+        const billRef = p.bill_number ? ` [Bill: ${p.bill_number}]` : '';
+        return {
+          id: `pur-${p.id}`,
+          type: 'purchase',
+          sortKey: p.id,
+          date: p.date,
+          details: `${p.ledger_name} — Purchase #${p.purchase_number}${billRef}`,
+          voucherNo: `PUR-${String(p.purchase_number).padStart(5, '0')}`,
+          debit: p.total_amount,
+          credit: 0,
+        };
       });
+
+      // Sales Returns → Debit (reduces income)
+      const srEntries = salesRets.map((r) => {
+        const ref = r.sale_number ? ` [Sale #${r.sale_number}]` : '';
+        return {
+          id: `sr-${r.id}`,
+          type: 'sales_return',
+          sortKey: r.id,
+          date: r.date,
+          details: `${r.ledger_name} — Sales Return #${r.return_number}${ref}`,
+          voucherNo: `SR-${String(r.return_number).padStart(5, '0')}`,
+          debit: r.total_amount,
+          credit: 0,
+        };
+      });
+
+      // Purchase Returns → Credit (reduces expenditure)
+      const prEntries = purchRets.map((r) => {
+        const ref = r.bill_number
+          ? ` [Bill: ${r.bill_number}]`
+          : r.purchase_number ? ` [Purchase #${r.purchase_number}]` : '';
+        return {
+          id: `pr-${r.id}`,
+          type: 'purchase_return',
+          sortKey: r.id,
+          date: r.date,
+          details: `${r.ledger_name} — Purchase Return #${r.return_number}${ref}`,
+          voucherNo: `PR-${String(r.return_number).padStart(5, '0')}`,
+          debit: 0,
+          credit: r.total_amount,
+        };
+      });
+
+      const merged = [...txEntries, ...expEntries, ...saleEntries, ...purchEntries, ...srEntries, ...prEntries]
+        .sort((a, b) => {
+          const dateCmp = b.date.localeCompare(a.date);
+          if (dateCmp !== 0) return dateCmp;
+          return b.sortKey - a.sortKey;
+        });
 
       setEntries(merged);
     } catch (err) {
@@ -67,23 +148,28 @@ export default function DayBookPage() {
     } finally {
       setLoading(false);
     }
-  }, [filters]);
+  }, [filters.fromDate, filters.toDate]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  const totalDebit = useMemo(() => entries.reduce((s, e) => s + e.debit, 0), [entries]);
-  const totalCredit = useMemo(() => entries.reduce((s, e) => s + e.credit, 0), [entries]);
+  const filtered = useMemo(() => {
+    if (filters.type === 'all') return entries;
+    return entries.filter((e) => e.type === filters.type);
+  }, [entries, filters.type]);
+
+  const totalDebit  = useMemo(() => filtered.reduce((s, e) => s + e.debit, 0), [filtered]);
+  const totalCredit = useMemo(() => filtered.reduce((s, e) => s + e.credit, 0), [filtered]);
 
   const handleExportExcel = () => {
     const columns = [
       { header: 'S.No',       key: 'sno',       width: 8  },
       { header: 'Date',       key: 'date',      width: 15 },
-      { header: 'Details',    key: 'details',   width: 35 },
+      { header: 'Details',    key: 'details',   width: 40 },
       { header: 'Voucher No', key: 'voucherNo', width: 18 },
       { header: 'Debit (₹)', key: 'debit',     width: 15 },
       { header: 'Credit (₹)',key: 'credit',    width: 15 },
     ];
-    const rows = entries.map((e, idx) => ({
+    const rows = filtered.map((e, idx) => ({
       sno: idx + 1,
       date: formatDate(e.date),
       details: e.details,
@@ -131,9 +217,21 @@ export default function DayBookPage() {
               className="input-field"
             />
           </div>
+          <div className="w-48 min-w-[180px] shrink-0">
+            <label className="label">Type</label>
+            <select
+              value={filters.type}
+              onChange={(e) => setFilters((p) => ({ ...p, type: e.target.value }))}
+              className="input-field"
+            >
+              {TYPE_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
           <div className="shrink-0">
             <button
-              onClick={() => setFilters({ fromDate: firstDayOfCurrentMonth(), toDate: todayISO() })}
+              onClick={() => setFilters({ fromDate: firstDayOfCurrentMonth(), toDate: todayISO(), type: 'all' })}
               className="btn-secondary text-xs h-10 px-3 whitespace-nowrap"
             >
               This Month
@@ -144,7 +242,7 @@ export default function DayBookPage() {
 
       {loading ? (
         <LoadingSpinner className="py-12" size="lg" />
-      ) : entries.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <EmptyState
           icon={QueueListIcon}
           title="No transactions found"
@@ -165,7 +263,7 @@ export default function DayBookPage() {
                 </tr>
               </thead>
               <tbody>
-                {entries.map((entry, idx) => (
+                {filtered.map((entry, idx) => (
                   <tr key={entry.id} className="border-b border-slate-100 hover:bg-slate-50 last:border-0">
                     <td className="px-3 py-1.5 text-center text-xs text-slate-400">{idx + 1}</td>
                     <td className="px-3 py-1.5 text-xs text-slate-600 whitespace-nowrap">{formatDate(entry.date)}</td>
@@ -183,7 +281,7 @@ export default function DayBookPage() {
               <tfoot className="sticky bottom-0 z-10 bg-slate-700">
                 <tr>
                   <td colSpan={4} className="px-3 py-2.5 text-sm font-semibold text-white">
-                    Total ({entries.length} entries)
+                    Total ({filtered.length} entries)
                   </td>
                   <td className="px-3 py-2.5 text-right text-base font-bold text-red-300 whitespace-nowrap">
                     {formatCurrency(totalDebit)}

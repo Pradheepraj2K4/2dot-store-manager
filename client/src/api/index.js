@@ -131,6 +131,10 @@ export const itemApi = {
   delete: (id) => api.delete(`/items/${id}`),
   getBrands: () => api.get('/items/brands'),
   getCategories: () => api.get('/items/categories'),
+  getStockReport: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return api.get(`/items/stock-report${qs ? `?${qs}` : ''}`);
+  },
 };
 
 export const saleApi = {
@@ -157,4 +161,43 @@ export const purchaseApi = {
   create: (data) => api.post('/purchases', data),
   update: (id, data) => api.put(`/purchases/${id}`, data),
   delete: (id) => api.delete(`/purchases/${id}`),
+};
+
+export const estimationApi = {
+  getAll: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return api.get(`/estimations${qs ? `?${qs}` : ''}`);
+  },
+  getById: (id) => api.get(`/estimations/${id}`),
+  getNextNumber: () => api.get('/estimations/next-number'),
+  create: (data) => api.post('/estimations', data),
+  update: (id, data) => api.put(`/estimations/${id}`, data),
+  delete: (id) => api.delete(`/estimations/${id}`),
+  convert: (id) => api.post(`/estimations/${id}/convert`),
+};
+
+export const salesReturnApi = {
+  getAll: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return api.get(`/sales-returns${qs ? `?${qs}` : ''}`);
+  },
+  getById: (id) => api.get(`/sales-returns/${id}`),
+  getByLedger: (ledgerId) => api.get(`/sales-returns/ledger/${ledgerId}`),
+  getNextNumber: () => api.get('/sales-returns/next-number'),
+  create: (data) => api.post('/sales-returns', data),
+  update: (id, data) => api.put(`/sales-returns/${id}`, data),
+  delete: (id) => api.delete(`/sales-returns/${id}`),
+};
+
+export const purchaseReturnApi = {
+  getAll: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return api.get(`/purchase-returns${qs ? `?${qs}` : ''}`);
+  },
+  getById: (id) => api.get(`/purchase-returns/${id}`),
+  getByLedger: (ledgerId) => api.get(`/purchase-returns/ledger/${ledgerId}`),
+  getNextNumber: () => api.get('/purchase-returns/next-number'),
+  create: (data) => api.post('/purchase-returns', data),
+  update: (id, data) => api.put(`/purchase-returns/${id}`, data),
+  delete: (id) => api.delete(`/purchase-returns/${id}`),
 };

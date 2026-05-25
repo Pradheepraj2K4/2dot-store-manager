@@ -25,6 +25,13 @@ import SalesReportPage from "./components/sales/SalesReportPage";
 import ItemPurchaseEntryPage from "./components/purchases/ItemPurchaseEntryPage";
 import ItemPurchaseListPage from "./components/purchases/ItemPurchaseListPage";
 import PurchaseReportPage from "./components/purchases/PurchaseReportPage";
+import EstimationEntryPage from "./components/sales/EstimationEntryPage";
+import EstimationListPage from "./components/sales/EstimationListPage";
+import SalesReturnEntryPage from "./components/sales/SalesReturnEntryPage";
+import SalesReturnListPage from "./components/sales/SalesReturnListPage";
+import PurchaseReturnEntryPage from "./components/purchases/PurchaseReturnEntryPage";
+import PurchaseReturnListPage from "./components/purchases/PurchaseReturnListPage";
+import StockReportPage from "./components/items/StockReportPage";
 
 export default function App() {
   return (
@@ -92,6 +99,16 @@ export default function App() {
                   element={<ItemPurchaseEntryPage />}
                 />
                 <Route path="/purchase-report" element={<PurchaseReportPage />} />
+                <Route path="/estimations" element={<EstimationListPage />} />
+                <Route path="/estimation" element={<EstimationEntryPage />} />
+                <Route path="/estimation/:id/edit" element={<EstimationEntryPage />} />
+                <Route path="/sales-returns" element={<SalesReturnListPage />} />
+                <Route path="/sales-return" element={<SalesReturnEntryPage />} />
+                <Route path="/sales-return/:id/edit" element={<SalesReturnEntryPage />} />
+                <Route path="/purchase-returns" element={<PurchaseReturnListPage />} />
+                <Route path="/purchase-return" element={<PurchaseReturnEntryPage />} />
+                <Route path="/purchase-return/:id/edit" element={<PurchaseReturnEntryPage />} />
+                <Route path="/stock-report" element={<StockReportPage />} />
               </Routes>
             </AppLayout>
           </ProtectedRoute>

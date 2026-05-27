@@ -208,6 +208,7 @@ export default function ItemPurchaseEntryPage() {
   const [date, setDate] = useState(todayISO());
   const [time, setTime] = useState(nowHHMM());
   const [notes, setNotes] = useState('');
+  const [billDiscount, setBillDiscount] = useState('0');
   const [lines, setLines] = useState([emptyLine()]);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
@@ -251,6 +252,7 @@ export default function ItemPurchaseEntryPage() {
         setDate(p.date);
         setTime(p.time || '');
         setNotes(p.notes || '');
+        setBillDiscount(p.bill_discount != null ? String(p.bill_discount) : '0');
         setLedger({ id: p.ledger_id, name: p.ledger_name });
         setLines(
           (p.items || []).map((l) => ({
@@ -370,6 +372,8 @@ export default function ItemPurchaseEntryPage() {
     return { total, discountTotal, gstTotal, lineCount, qtyTotal };
   }, [lines]);
 
+  const netTotal = Math.max(0, totals.total - (parseFloat(billDiscount) || 0));
+
   const handleSave = async () => {
     if (!ledger) { toast.error('Select a ledger'); return; }
     const validLines = lines.filter((l) => l.item_name && l.item_name.trim());
@@ -394,6 +398,7 @@ export default function ItemPurchaseEntryPage() {
         date,
         time,
         notes,
+        bill_discount: parseFloat(billDiscount) || 0,
         items: validLines.map((l) => ({
           item_id: l.item_id,
           item_name: l.item_name.trim(),
@@ -666,8 +671,19 @@ export default function ItemPurchaseEntryPage() {
                 <span className="font-medium text-slate-700">{totals.qtyTotal}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-500">Total Discount</span>
+                <span className="text-slate-500">Total Item Discount</span>
                 <span className="font-medium text-amber-700">{formatCurrency(totals.discountTotal)}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-500">Total Bill Discount</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={billDiscount}
+                  onChange={(e) => setBillDiscount(e.target.value)}
+                  className="w-28 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm text-amber-700 font-medium focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
+                />
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-500">Total GST</span>
@@ -676,7 +692,7 @@ export default function ItemPurchaseEntryPage() {
             </div>
             <div className="flex items-center justify-between text-base border-t border-slate-200 pt-2 mt-1">
               <span className="font-semibold text-slate-700">Total Amount</span>
-              <span className="font-bold text-lg text-credit-green">{formatCurrency(totals.total)}</span>
+              <span className="font-bold text-lg text-credit-green">{formatCurrency(netTotal)}</span>
             </div>
           </div>
         </div>

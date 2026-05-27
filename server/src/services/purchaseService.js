@@ -97,6 +97,7 @@ class PurchaseService {
 
     const run = db.transaction(() => {
       const purchase_number = purchaseRepository.getNextPurchaseNumber();
+      const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
       const purchase = purchaseRepository.create({
         purchase_number,
         ledger_id: parseInt(data.ledger_id),
@@ -104,6 +105,8 @@ class PurchaseService {
         date: data.date || new Date().toISOString().split('T')[0],
         time: data.time || '',
         ...totals,
+        total_amount: Math.round((totals.total_amount - bill_discount_val) * 100) / 100,
+        bill_discount: bill_discount_val,
         item_count: normalisedItems.length,
         notes: data.notes || '',
         items: normalisedItems,
@@ -133,12 +136,15 @@ class PurchaseService {
       applyStockDelta(existing.items, -1);
       applyStockDelta(normalisedItems, +1);
 
+      const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
       return purchaseRepository.update(id, {
         ledger_id: ledger.id,
         bill_number: data.bill_number || '',
         date: data.date || existing.date,
         time: data.time != null ? data.time : existing.time,
         ...totals,
+        total_amount: Math.round((totals.total_amount - bill_discount_val) * 100) / 100,
+        bill_discount: bill_discount_val,
         item_count: normalisedItems.length,
         notes: data.notes || '',
         items: normalisedItems,

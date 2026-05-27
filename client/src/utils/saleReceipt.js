@@ -54,9 +54,28 @@ export function buildSaleReceiptHtml({
   const items = Array.isArray(sale.items) ? sale.items : [];
 
   const totalQty = items.reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0);
-  const totalDiscount = parseFloat(sale.total_discount) || 0;
+  const totalItemDiscount = parseFloat(sale.total_discount) || 0;
+  const totalBillDiscount = parseFloat(sale.bill_discount) || 0;
   const totalGst = parseFloat(sale.total_gst) || 0;
   const totalAmount = parseFloat(sale.total_amount) || 0;
+
+  // Group GST by rate for per-slab CGST/SGST display
+  const gstSlabs = {};
+  items.forEach(l => {
+    const rate = parseFloat(l.gst_percent) || 0;
+    if (rate > 0) {
+      if (!gstSlabs[rate]) gstSlabs[rate] = 0;
+      gstSlabs[rate] += parseFloat(l.gst_amount) || 0;
+    }
+  });
+  const gstSlabRows = Object.entries(gstSlabs)
+    .sort(([a], [b]) => parseFloat(a) - parseFloat(b))
+    .map(([rate, amt]) => {
+      const halfAmt = Math.round(amt / 2 * 100) / 100;
+      const halfPct = parseFloat(rate) / 2;
+      return `<div class="row subtle"><span>CGST (${halfPct}%)</span><span>+ ${money(halfAmt)}</span></div>` +
+             `<div class="row subtle"><span>SGST (${halfPct}%)</span><span>+ ${money(halfAmt)}</span></div>`;
+    }).join('');
 
   const logoHtml = logoDataUrl
     ? `<div class="logo-wrap"><img src="${logoDataUrl}" alt="Logo"/></div>`
@@ -292,8 +311,9 @@ export function buildSaleReceiptHtml({
   <!-- Totals -->
   <div class="totals">
     <div class="row subtle"><span>Items</span><span>${items.length} · ${totalQty} qty</span></div>
-    ${totalDiscount > 0 ? `<div class="row subtle"><span>Discount</span><span>− ${money(totalDiscount)}</span></div>` : ''}
-    ${totalGst > 0 ? `<div class="row subtle"><span>GST</span><span>${money(totalGst)}</span></div>` : ''}
+    ${totalItemDiscount > 0 ? `<div class="row subtle"><span>Item Discount</span><span>− ${money(totalItemDiscount)}</span></div>` : ''}
+    ${totalBillDiscount > 0 ? `<div class="row subtle"><span>Bill Discount</span><span>− ${money(totalBillDiscount)}</span></div>` : ''}
+    ${gstSlabRows}
     <div class="grand"><span>Total</span><span>${money(totalAmount)}</span></div>
   </div>
 

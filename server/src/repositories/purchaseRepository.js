@@ -10,11 +10,11 @@ class PurchaseRepository {
     return String(row.next);
   }
 
-  create({ purchase_number, ledger_id, bill_number, date, time, total_amount, total_discount, total_gst, item_count, notes, items }) {
+  create({ purchase_number, ledger_id, bill_number, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, items }) {
     const db = getDb();
     const info = db.prepare(`
-      INSERT INTO purchases (purchase_number, ledger_id, bill_number, date, time, total_amount, total_discount, total_gst, item_count, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO purchases (purchase_number, ledger_id, bill_number, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       purchase_number,
       ledger_id,
@@ -23,6 +23,7 @@ class PurchaseRepository {
       time || '',
       total_amount,
       total_discount || 0,
+      bill_discount || 0,
       total_gst || 0,
       item_count || (items ? items.length : 0),
       notes || ''
@@ -105,12 +106,12 @@ class PurchaseRepository {
     return db.prepare('DELETE FROM purchases WHERE id = ?').run(id);
   }
 
-  update(id, { ledger_id, bill_number, date, time, total_amount, total_discount, total_gst, item_count, notes, items }) {
+  update(id, { ledger_id, bill_number, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, items }) {
     const db = getDb();
     db.prepare(`
       UPDATE purchases
       SET ledger_id = ?, bill_number = ?, date = ?, time = ?, total_amount = ?,
-          total_discount = ?, total_gst = ?, item_count = ?, notes = ?
+          total_discount = ?, bill_discount = ?, total_gst = ?, item_count = ?, notes = ?
       WHERE id = ?
     `).run(
       ledger_id,
@@ -119,6 +120,7 @@ class PurchaseRepository {
       time || '',
       total_amount,
       total_discount || 0,
+      bill_discount || 0,
       total_gst || 0,
       item_count || (items ? items.length : 0),
       notes || '',

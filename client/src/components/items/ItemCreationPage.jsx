@@ -1,4 +1,4 @@
-ï»¿import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
@@ -150,41 +150,48 @@ export default function ItemCreationPage() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="card space-y-3" noValidate>
-        <div>
-          <label className="label">Item Name *</label>
-          <input
-            autoFocus
-            ref={setFieldRef('name')}
-            type="text"
-            name="name"
-            value={form.name}
-            onChange={handleChange}
-            onKeyDown={handleFieldKeyDown('name')}
-            className={`input-field ${errors.name ? 'border-red-400' : ''}`}
-            placeholder="e.g. Surf Excel 1kg"
-          />
-          <FieldError msg={errors.name} />
+      <form onSubmit={handleSubmit} className="card space-y-4" noValidate>
+
+        <div className="flex gap-4">
+          <label className="w-28 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">Item Code</label>
+          <div className="flex-1">
+            <input
+              ref={setFieldRef('item_code')}
+              type="text"
+              name="item_code"
+              value={form.item_code}
+              onChange={handleChange}
+              onKeyDown={handleFieldKeyDown('item_code')}
+              className="input-field"
+              placeholder="Optional SKU / barcode — e.g. SX-1KG"
+            />
+            <p className="text-xs text-slate-400 mt-1">Searchable from sales &amp; purchase entry.</p>
+          </div>
         </div>
 
-        <div>
-          <label className="label">Item Code</label>
-          <input
-            ref={setFieldRef('item_code')}
-            type="text"
-            name="item_code"
-            value={form.item_code}
-            onChange={handleChange}
-            onKeyDown={handleFieldKeyDown('item_code')}
-            className="input-field"
-            placeholder="Optional SKU / barcode â€” e.g. SX-1KG"
-          />
-          <p className="text-xs text-slate-400 mt-1">Searchable from sales &amp; purchase entry.</p>
+        {/* Item Name */}
+        <div className="flex gap-4">
+          <label className="w-28 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">Item Name *</label>
+          <div className="flex-1">
+            <input
+              autoFocus
+              ref={setFieldRef('name')}
+              type="text"
+              name="name"
+              value={form.name}
+              onChange={handleChange}
+              onKeyDown={handleFieldKeyDown('name')}
+              className={`input-field ${errors.name ? 'border-red-400' : ''}`}
+              placeholder="e.g. Surf Excel 1kg"
+            />
+            <FieldError msg={errors.name} />
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label className="label">Unit</label>
+        {/* Unit */}
+        <div className="flex gap-4">
+          <label className="w-28 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">Unit</label>
+          <div className="flex-1">
             <select
               ref={setFieldRef('unit')}
               name="unit"
@@ -198,8 +205,12 @@ export default function ItemCreationPage() {
               ))}
             </select>
           </div>
-          <div>
-            <label className="label">MRP</label>
+        </div>
+
+        {/* MRP */}
+        <div className="flex gap-4">
+          <label className="w-28 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">MRP</label>
+          <div className="flex-1">
             <input
               ref={setFieldRef('mrp')}
               type="number"
@@ -213,8 +224,12 @@ export default function ItemCreationPage() {
             />
             <FieldError msg={errors.mrp} />
           </div>
-          <div>
-            <label className="label">GST %</label>
+        </div>
+
+        {/* GST % */}
+        <div className="flex gap-4">
+          <label className="w-28 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">GST %</label>
+          <div className="flex-1">
             <input
               ref={setFieldRef('gst_percent')}
               type="number"
@@ -231,9 +246,10 @@ export default function ItemCreationPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label className="label">Brand</label>
+        {/* Brand */}
+        <div className="flex gap-4">
+          <label className="w-28 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">Brand</label>
+          <div className="flex-1">
             <input
               ref={setFieldRef('brand')}
               type="text"
@@ -249,8 +265,12 @@ export default function ItemCreationPage() {
               {brands.map((b) => <option key={b} value={b} />)}
             </datalist>
           </div>
-          <div>
-            <label className="label">Category</label>
+        </div>
+
+        {/* Category */}
+        <div className="flex gap-4">
+          <label className="w-28 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">Category</label>
+          <div className="flex-1">
             <input
               ref={setFieldRef('category')}
               type="text"
@@ -277,7 +297,7 @@ export default function ItemCreationPage() {
             Cancel
           </button>
           <button ref={submitBtnRef} type="submit" disabled={saving} className="btn-primary">
-            {saving ? 'Savingâ€¦' : (isEdit ? 'Save Changes' : 'Create Item')}
+            {saving ? 'Saving…' : (isEdit ? 'Save Changes' : 'Create Item')}
           </button>
         </div>
       </form>

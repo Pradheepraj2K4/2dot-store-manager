@@ -90,20 +90,22 @@ class SaleService {
 
     const run = db.transaction(() => {
       const sale_number = saleRepository.getNextSaleNumber();
+      const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
       const sale = saleRepository.create({
         sale_number,
         ledger_id: parseInt(data.ledger_id),
         date: data.date || new Date().toISOString().split('T')[0],
         time: data.time || '',
-        total_amount: Math.round(total_amount * 100) / 100,
+        total_amount: Math.round((total_amount - bill_discount_val) * 100) / 100,
         total_discount: Math.round(total_discount * 100) / 100,
+        bill_discount: bill_discount_val,
         total_gst: Math.round(total_gst * 100) / 100,
         item_count: normalisedItems.length,
         notes: data.notes || '',
         items: normalisedItems,
       });
 
-      const delta = applyLedgerDelta(ledger.behaviour, total_amount);
+      const delta = applyLedgerDelta(ledger.behaviour, total_amount - bill_discount_val);
       ledgerRepository.updateBalance(ledger.id, ledger.current_balance + delta);
 
       // Decrement stock for every linked item line
@@ -144,8 +146,10 @@ class SaleService {
 
     const run = db.transaction(() => {
       // Reverse previous delta, apply new delta
+      const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
+      const net_total = Math.round((total_amount - bill_discount_val) * 100) / 100;
       const oldDelta = applyLedgerDelta(ledger.behaviour, existing.total_amount);
-      const newDelta = applyLedgerDelta(ledger.behaviour, total_amount);
+      const newDelta = applyLedgerDelta(ledger.behaviour, net_total);
       ledgerRepository.updateBalance(ledger.id, ledger.current_balance - oldDelta + newDelta);
 
       // Reverse previous stock impact, apply new
@@ -155,8 +159,9 @@ class SaleService {
       return saleRepository.update(id, {
         date: data.date || existing.date,
         time: data.time != null ? data.time : existing.time,
-        total_amount: Math.round(total_amount * 100) / 100,
+        total_amount: Math.round((total_amount - bill_discount_val) * 100) / 100,
         total_discount: Math.round(total_discount * 100) / 100,
+        bill_discount: bill_discount_val,
         total_gst: Math.round(total_gst * 100) / 100,
         item_count: normalisedItems.length,
         notes: data.notes || '',

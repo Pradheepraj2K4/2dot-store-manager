@@ -174,10 +174,10 @@ export default function Sidebar({ open, onClose }) {
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="text-base font-bold text-white leading-tight">
-              2Dot Store Manager
+              2Dot Billz
             </h1>
             <p className="text-[10px] text-slate-400 leading-tight">
-              Accounts Module
+              Ease your billing worries
             </p>
           </div>
           <button

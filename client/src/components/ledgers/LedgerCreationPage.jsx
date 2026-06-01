@@ -34,7 +34,6 @@ const EMPTY_FORM = {
   gst_no: '',
   state_code: '',
   igst_status: 'NO',
-  notes: '',
 };
 
 export default function LedgerCreationPage() {
@@ -54,7 +53,6 @@ export default function LedgerCreationPage() {
   const gstNoRef = useRef(null);
   const stateCodeRef = useRef(null);
   const addressRef = useRef(null);
-  const notesRef = useRef(null);
   const submitRef = useRef(null);
 
   useEffect(() => {
@@ -136,12 +134,12 @@ export default function LedgerCreationPage() {
       </div>
 
       <form onSubmit={handleSubmit} noValidate>
-        <div className="card space-y-5">
+        <div className="card space-y-4">
 
-          {/* Row 1: Ledger Type | Name */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div>
-              <label className="label">Ledger Type *</label>
+          {/* Ledger Type */}
+          <div className="flex gap-4">
+            <label className="w-32 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">Ledger Type *</label>
+            <div className="flex-1">
               <select
                 ref={ledgerTypeRef}
                 name="ledger_type_id"
@@ -159,8 +157,12 @@ export default function LedgerCreationPage() {
               </select>
               <FieldError msg={errors.ledger_type_id} />
             </div>
-            <div>
-              <label className="label">Name *</label>
+          </div>
+
+          {/* Name */}
+          <div className="flex gap-4">
+            <label className="w-32 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">Name *</label>
+            <div className="flex-1">
               <input
                 ref={nameRef}
                 type="text"
@@ -170,16 +172,15 @@ export default function LedgerCreationPage() {
                 onBlur={handleBlur}
                 onKeyDown={(e) => focusNext(e, phoneRef)}
                 className={`input-field ${errors.name ? 'border-red-400 focus:ring-red-400' : ''}`}
-                placeholder="Full name"
               />
               <FieldError msg={errors.name} />
             </div>
           </div>
 
-          {/* Row 2: Phone | Place */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div>
-              <label className="label">Phone</label>
+          {/* Phone */}
+          <div className="flex gap-4">
+            <label className="w-32 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">Phone</label>
+            <div className="flex-1">
               <input
                 ref={phoneRef}
                 type="text"
@@ -189,14 +190,17 @@ export default function LedgerCreationPage() {
                 onBlur={handleBlur}
                 onKeyDown={(e) => focusNext(e, placeRef)}
                 className={`input-field ${errors.phone ? 'border-red-400 focus:ring-red-400' : ''}`}
-                placeholder="10-digit mobile number"
                 maxLength={10}
                 inputMode="numeric"
               />
               <FieldError msg={errors.phone} />
             </div>
-            <div>
-              <label className="label">Place</label>
+          </div>
+
+          {/* Place */}
+          <div className="flex gap-4">
+            <label className="w-32 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">Place</label>
+            <div className="flex-1">
               <input
                 ref={placeRef}
                 type="text"
@@ -205,97 +209,87 @@ export default function LedgerCreationPage() {
                 onChange={handleChange}
                 onKeyDown={(e) => focusNext(e, gstFieldsEnabled ? gstNoRef : addressRef)}
                 className="input-field"
-                placeholder="City / Town"
               />
             </div>
           </div>
 
-          {/* Row 3: GST fields — shown only when enabled in dev settings */}
+          {/* GST fields — shown only when enabled in settings */}
           {gstFieldsEnabled && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-            <div>
-              <label className="label">GST Number</label>
-              <input
-                ref={gstNoRef}
-                type="text"
-                name="gst_no"
-                value={form.gst_no}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                onKeyDown={(e) => focusNext(e, stateCodeRef)}
-                className={`input-field uppercase ${errors.gst_no ? 'border-red-400 focus:ring-red-400' : ''}`}
-                placeholder="27AAAAA0000A1Z5"
-                maxLength={15}
-              />
-              <FieldError msg={errors.gst_no} />
-            </div>
-            <div>
-              <label className="label">State Code</label>
-              <input
-                ref={stateCodeRef}
-                type="text"
-                name="state_code"
-                value={form.state_code}
-                onChange={handleChange}
-                onBlur={handleBlur}
-                onKeyDown={(e) => focusNext(e, addressRef)}
-                className={`input-field ${errors.state_code ? 'border-red-400 focus:ring-red-400' : ''}`}
-                placeholder="e.g. 27"
-                maxLength={2}
-                inputMode="numeric"
-              />
-              <FieldError msg={errors.state_code} />
-            </div>
-            <div>
-              <label className="label">IGST Applicable</label>
-              <div className="flex gap-6 mt-2">
-                {['YES', 'NO'].map((opt) => (
-                  <label key={opt} className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="igst_status"
-                      value={opt}
-                      checked={form.igst_status === opt}
-                      onChange={handleChange}
-                      className="text-trust-blue focus:ring-trust-blue"
-                    />
-                    <span className="text-sm text-slate-700">{opt}</span>
-                  </label>
-                ))}
+            <>
+              <div className="flex gap-4">
+                <label className="w-32 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">GST Number</label>
+                <div className="flex-1">
+                  <input
+                    ref={gstNoRef}
+                    type="text"
+                    name="gst_no"
+                    value={form.gst_no}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    onKeyDown={(e) => focusNext(e, stateCodeRef)}
+                    className={`input-field uppercase ${errors.gst_no ? 'border-red-400 focus:ring-red-400' : ''}`}
+                    maxLength={15}
+                  />
+                  <FieldError msg={errors.gst_no} />
+                </div>
               </div>
-            </div>
-          </div>
+
+              <div className="flex gap-4">
+                <label className="w-32 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">State Code</label>
+                <div className="flex-1">
+                  <input
+                    ref={stateCodeRef}
+                    type="text"
+                    name="state_code"
+                    value={form.state_code}
+                    onChange={handleChange}
+                    onBlur={handleBlur}
+                    onKeyDown={(e) => focusNext(e, addressRef)}
+                    className={`input-field ${errors.state_code ? 'border-red-400 focus:ring-red-400' : ''}`}
+                    maxLength={2}
+                    inputMode="numeric"
+                  />
+                  <FieldError msg={errors.state_code} />
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <label className="w-32 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">IGST Applicable</label>
+                <div className="flex-1 flex gap-6 h-9 items-center">
+                  {['YES', 'NO'].map((opt) => (
+                    <label key={opt} className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="igst_status"
+                        value={opt}
+                        checked={form.igst_status === opt}
+                        onChange={handleChange}
+                        className="text-trust-blue focus:ring-trust-blue"
+                      />
+                      <span className="text-sm text-slate-700">{opt}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </>
           )}
 
-          {/* Row 4: Address (full width) */}
-          <div>
-            <label className="label">Address</label>
-            <input
-              ref={addressRef}
-              type="text"
-              name="address"
-              value={form.address}
-              onChange={handleChange}
-              onKeyDown={(e) => focusNext(e, notesRef)}
-              className="input-field"
-              placeholder="Street address"
-            />
+          {/* Address */}
+          <div className="flex gap-4">
+            <label className="w-32 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">Address</label>
+            <div className="flex-1">
+              <input
+                ref={addressRef}
+                type="text"
+                name="address"
+                value={form.address}
+                onChange={handleChange}
+                onKeyDown={(e) => focusNext(e, submitRef)}
+                className="input-field"
+              />
+            </div>
           </div>
 
-          {/* Notes (full width) */}
-          <div>
-            <label className="label">Notes</label>
-            <input
-              ref={notesRef}
-              type="text"
-              name="notes"
-              value={form.notes}
-              onChange={handleChange}
-              onKeyDown={(e) => focusNext(e, submitRef)}
-              className="input-field"
-              placeholder="Optional notes"
-            />
-          </div>
         </div>
 
         {/* Actions */}

@@ -110,6 +110,17 @@ class LedgerRepository {
     return db.prepare('DELETE FROM ledgers WHERE id = ?').run(id);
   }
 
+  findCash() {
+    const db = getDb();
+    return db.prepare(`
+      SELECT l.*, lt.name AS type_name, lt.behaviour
+      FROM ledgers l
+      JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      WHERE l.is_system = 1 AND l.name = 'CASH'
+      LIMIT 1
+    `).get();
+  }
+
   search(query) {
     const db = getDb();
     const like = `%${query}%`;

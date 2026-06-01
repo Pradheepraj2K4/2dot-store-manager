@@ -116,7 +116,7 @@ function createWindow() {
     height: 860,
     minWidth: 960,
     minHeight: 640,
-    title: '2Dot Store Manager',
+    title: '2Dot Billz',
     // Uses default Electron icon; swap in a real .ico via electron-builder config
     webPreferences: {
       contextIsolation: true,
@@ -157,7 +157,7 @@ app.whenReady().then(async () => {
     createWindow();
   } catch (err) {
     dialog.showErrorBox(
-      '2Dot Store Manager — Startup Error',
+      '2Dot Billz — Startup Error',
       `The backend server failed to start.\n\n${err.message}\n\nPlease check that port ${PORT} is not already in use.`
     );
     stopServer();

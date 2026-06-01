@@ -70,7 +70,7 @@ export default function AppLayout({ children }) {
           <div className="flex h-7 w-7 items-center justify-center rounded-md bg-trust-blue text-white font-bold text-xs">
             2D
           </div>
-          <span className="text-sm font-semibold text-white">2Dot Store Manager</span>
+          <span className="text-sm font-semibold text-white">2Dot Billz</span>
         </div>
       </div>
 

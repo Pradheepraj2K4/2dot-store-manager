@@ -3,19 +3,41 @@ const { getDb } = require('../db/database');
 class ItemRepository {
   getAll({ search } = {}) {
     const db = getDb();
+    // Subquery: last purchase rate + GST per item (latest purchase date, then latest id)
+    const lpJoin = `
+      LEFT JOIN (
+        SELECT pi.item_id,
+               pi.rate        AS last_purchase_rate,
+               pi.gst_percent AS last_purchase_gst,
+               ROW_NUMBER() OVER (
+                 PARTITION BY pi.item_id
+                 ORDER BY p.date DESC, p.id DESC, pi.id DESC
+               ) AS rn
+        FROM purchase_items pi
+        INNER JOIN purchases p ON p.id = pi.purchase_id
+        WHERE pi.item_id IS NOT NULL
+      ) lp ON lp.item_id = i.id AND lp.rn = 1
+    `;
     if (search) {
       const q = `%${search.toLowerCase()}%`;
       return db.prepare(`
-        SELECT * FROM items
-        WHERE status = 'active'
-          AND (LOWER(name) LIKE ?
-            OR LOWER(brand) LIKE ?
-            OR LOWER(category) LIKE ?
-            OR LOWER(item_code) LIKE ?)
-        ORDER BY name ASC
+        SELECT i.*, lp.last_purchase_rate, lp.last_purchase_gst
+        FROM items i
+        ${lpJoin}
+        WHERE i.status = 'active'
+          AND (LOWER(i.name) LIKE ?
+            OR LOWER(i.brand) LIKE ?
+            OR LOWER(i.category) LIKE ?
+            OR LOWER(i.item_code) LIKE ?)
+        ORDER BY i.name ASC
       `).all(q, q, q, q);
     }
-    return db.prepare(`SELECT * FROM items ORDER BY name ASC`).all();
+    return db.prepare(`
+      SELECT i.*, lp.last_purchase_rate, lp.last_purchase_gst
+      FROM items i
+      ${lpJoin}
+      ORDER BY i.name ASC
+    `).all();
   }
 
   getById(id) {

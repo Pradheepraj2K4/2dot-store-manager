@@ -95,6 +95,10 @@ class LedgerService {
     }
     return results;
   }
+
+  getCashLedger() {
+    return ledgerRepository.findCash();
+  }
 }
 
 module.exports = new LedgerService();

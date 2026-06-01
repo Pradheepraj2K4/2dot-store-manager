@@ -5,14 +5,13 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import { itemApi } from '../../api';
 import { ITEM_UNITS, DEFAULT_ITEM_UNIT } from '../../utils/itemConstants';
 import LoadingSpinner from '../ui/LoadingSpinner';
+import GstSelect from '../ui/GstSelect';
 
 function validate(form) {
   const errors = {};
   if (!form.name || !form.name.trim()) errors.name = 'Item name is required.';
   if (form.mrp !== '' && isNaN(parseFloat(form.mrp))) errors.mrp = 'MRP must be a number.';
   else if (form.mrp !== '' && parseFloat(form.mrp) < 0) errors.mrp = 'MRP cannot be negative.';
-  if (form.gst_percent !== '' && isNaN(parseFloat(form.gst_percent))) errors.gst_percent = 'GST % must be a number.';
-  else if (form.gst_percent !== '' && parseFloat(form.gst_percent) < 0) errors.gst_percent = 'GST % cannot be negative.';
   return errors;
 }
 
@@ -163,7 +162,6 @@ export default function ItemCreationPage() {
               onChange={handleChange}
               onKeyDown={handleFieldKeyDown('item_code')}
               className="input-field"
-              placeholder="Optional SKU / barcode — e.g. SX-1KG"
             />
             <p className="text-xs text-slate-400 mt-1">Searchable from sales &amp; purchase entry.</p>
           </div>
@@ -182,7 +180,6 @@ export default function ItemCreationPage() {
               onChange={handleChange}
               onKeyDown={handleFieldKeyDown('name')}
               className={`input-field ${errors.name ? 'border-red-400' : ''}`}
-              placeholder="e.g. Surf Excel 1kg"
             />
             <FieldError msg={errors.name} />
           </div>
@@ -220,7 +217,6 @@ export default function ItemCreationPage() {
               onChange={handleChange}
               onKeyDown={handleFieldKeyDown('mrp')}
               className={`input-field ${errors.mrp ? 'border-red-400' : ''}`}
-              placeholder="0.00"
             />
             <FieldError msg={errors.mrp} />
           </div>
@@ -230,19 +226,16 @@ export default function ItemCreationPage() {
         <div className="flex gap-4">
           <label className="w-28 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">GST %</label>
           <div className="flex-1">
-            <input
-              ref={setFieldRef('gst_percent')}
-              type="number"
-              step="0.01"
-              min="0"
-              name="gst_percent"
+            <GstSelect
+              registerRef={(ref) => { fieldRefs.current['gst_percent'] = ref?.current ?? ref; }}
               value={form.gst_percent}
-              onChange={handleChange}
-              onKeyDown={handleFieldKeyDown('gst_percent')}
-              className={`input-field ${errors.gst_percent ? 'border-red-400' : ''}`}
-              placeholder="e.g. 18"
+              onChange={(v) => {
+                setForm((p) => ({ ...p, gst_percent: v }));
+                const next = fieldRefs.current['brand'];
+                setTimeout(() => { next?.focus(); if (next?.select) next.select(); }, 0);
+              }}
+              onKeyEnter={() => handleFieldKeyDown('gst_percent')({ key: 'Enter', preventDefault: () => {}, target: { tagName: 'INPUT' } })}
             />
-            <FieldError msg={errors.gst_percent} />
           </div>
         </div>
 
@@ -259,7 +252,6 @@ export default function ItemCreationPage() {
               onKeyDown={handleFieldKeyDown('brand')}
               list="item-brand-list"
               className="input-field"
-              placeholder="e.g. HUL"
             />
             <datalist id="item-brand-list">
               {brands.map((b) => <option key={b} value={b} />)}
@@ -280,7 +272,6 @@ export default function ItemCreationPage() {
               onKeyDown={handleFieldKeyDown('category')}
               list="item-category-list"
               className="input-field"
-              placeholder="e.g. Detergent"
             />
             <datalist id="item-category-list">
               {categories.map((c) => <option key={c} value={c} />)}
@@ -297,7 +288,7 @@ export default function ItemCreationPage() {
             Cancel
           </button>
           <button ref={submitBtnRef} type="submit" disabled={saving} className="btn-primary">
-            {saving ? 'Saving…' : (isEdit ? 'Save Changes' : 'Create Item')}
+            {saving ? 'Savingï¿½' : (isEdit ? 'Save Changes' : 'Create Item')}
           </button>
         </div>
       </form>

@@ -15,6 +15,7 @@ export const ledgerApi = {
   getOutstandingByType: (typeId) => api.get(`/ledgers/outstanding/type/${typeId}`),
   getPendingInterest: () => api.get('/ledgers/pending-interest'),
   bulkCreate: (ledgers) => api.post('/ledgers/bulk', { ledgers }),
+  getCash: () => api.get('/ledgers/cash'),
 };
 
 export const ledgerTypeApi = {

@@ -6,6 +6,7 @@ router.get('/outstanding',             (req, res, next) => ledgerController.getO
 router.get('/outstanding/type/:typeId',(req, res, next) => ledgerController.getOutstandingByType(req, res, next));
 router.get('/pending-interest',        (req, res, next) => ledgerController.getPendingInterest(req, res, next));
 router.get('/counts',                  (req, res, next) => ledgerController.getCounts(req, res, next));
+router.get('/cash',                    (req, res, next) => ledgerController.getCash(req, res, next));
 router.get('/:id',                     (req, res, next) => ledgerController.getById(req, res, next));
 router.get('/',                        (req, res, next) => ledgerController.getAll(req, res, next));
 router.post('/bulk',                   (req, res, next) => ledgerController.bulkCreate(req, res, next));

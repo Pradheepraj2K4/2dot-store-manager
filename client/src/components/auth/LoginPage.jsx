@@ -46,7 +46,7 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-trust-blue/10 border-2 border-trust-blue/20 mb-4">
             <LockClosedIcon className="h-8 w-8 text-trust-blue" />
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">2Dot Store Manager</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">2Dot Billz</h1>
           <p className="text-slate-400">Accounts Module</p>
         </div>
 

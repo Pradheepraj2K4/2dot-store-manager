@@ -81,6 +81,16 @@ class LedgerController {
     }
   }
 
+  getCash(req, res, next) {
+    try {
+      const cash = ledgerService.getCashLedger();
+      if (!cash) return res.status(404).json({ success: false, message: 'CASH ledger not found' });
+      res.json({ success: true, data: cash });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   getOutstanding(req, res, next) {
     try {
       const ledgers = ledgerService.getAllWithOutstanding();

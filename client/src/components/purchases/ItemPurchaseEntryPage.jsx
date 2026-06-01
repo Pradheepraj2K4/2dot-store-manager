@@ -11,6 +11,7 @@ import { ITEM_UNITS, DEFAULT_ITEM_UNIT } from '../../utils/itemConstants';
 import { formatCurrency, todayISO } from '../../utils/helpers';
 import LedgerAutocomplete from '../ui/LedgerAutocomplete';
 import LoadingSpinner from '../ui/LoadingSpinner';
+import GstSelect from '../ui/GstSelect';
 
 const FIELD_ORDER = ['itemName', 'unit', 'qty', 'rate', 'discount', 'gst'];
 
@@ -147,7 +148,7 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
             position: 'fixed',
             top: anchorRect.bottom + 4,
             left: anchorRect.left,
-            width: Math.max(anchorRect.width, 320),
+            minWidth: 760,
             zIndex: 1000,
           }}
           className="bg-white rounded-lg border border-slate-200 shadow-lg max-h-60 overflow-y-auto"
@@ -167,23 +168,18 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
                   idx === highlight ? 'bg-trust-blue/10' : ''
                 }`}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium text-slate-800 truncate">
-                    {it.item_code ? (
-                      <span className="mr-1.5 inline-block rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600 align-middle">
-                        {it.item_code}
-                      </span>
-                    ) : null}
-                    {it.name}
-                  </span>
-                  <span className="text-[10px] font-mono text-slate-500">#{it.id}</span>
-                </div>
-                <div className="text-xs text-slate-500 truncate flex items-center justify-between">
-                  <span>{[it.brand, it.category].filter(Boolean).join(' · ') || '—'}</span>
-                  <span className="ml-2 text-slate-400">
-                    Stock: <span className={Number(it.current_stock) < 0 ? 'text-debit-red' : 'text-credit-green'}>
-                      {Number(it.current_stock || 0)}
+                <div className="flex items-center gap-4 whitespace-nowrap">
+                  <span className="text-[10px] font-mono text-slate-400">#{it.id}</span>
+                  {it.item_code ? (
+                    <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600">
+                      {it.item_code}
                     </span>
+                  ) : null}
+                  <span className="font-medium text-slate-800">{it.name}</span>
+                  <span className="text-xs text-slate-400">{[it.brand, it.category].filter(Boolean).join(' · ')}</span>
+                  <span className="text-xs text-slate-500">{formatCurrency(it.mrp)}</span>
+                  <span className="text-xs">
+                    Stock: <span className={Number(it.current_stock) < 0 ? 'text-debit-red font-medium' : 'text-credit-green font-medium'}>{Number(it.current_stock || 0)}</span>
                   </span>
                 </div>
               </button>
@@ -497,18 +493,18 @@ export default function ItemPurchaseEntryPage() {
         <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 sticky top-0 z-10">
-                <th className="px-3 py-2 text-left font-semibold text-slate-600 w-12">S.no</th>
-                <th className="px-3 py-2 text-left font-semibold text-slate-600 w-20">Item ID</th>
-                <th className="px-3 py-2 text-left font-semibold text-slate-600 min-w-[18rem]">Item Name</th>
-                <th className="px-3 py-2 text-left font-semibold text-slate-600 w-28">Unit</th>
-                <th className="px-3 py-2 text-right font-semibold text-slate-600 w-20">In Stock</th>
-                <th className="px-3 py-2 text-right font-semibold text-slate-600 w-24">MRP</th>
-                <th className="px-3 py-2 text-right font-semibold text-slate-600 w-28">Cost Rate</th>
-                <th className="px-3 py-2 text-right font-semibold text-slate-600 w-24">Qty</th>
-                <th className="px-3 py-2 text-right font-semibold text-slate-600 w-24">Disc %</th>
-                <th className="px-3 py-2 text-right font-semibold text-slate-600 w-24">GST %</th>
-                <th className="px-3 py-2 text-right font-semibold text-slate-600 w-28">Amount</th>
+              <tr className="bg-indigo-600 sticky top-0 z-10">
+                <th className="px-3 py-2 text-left font-semibold text-white w-12">S.no</th>
+                <th className="px-3 py-2 text-left font-semibold text-white w-20">Item ID</th>
+                <th className="px-3 py-2 text-left font-semibold text-white min-w-[18rem]">Item Name</th>
+                <th className="px-3 py-2 text-left font-semibold text-white w-28">Unit</th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-20">In Stock</th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-24">MRP</th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-28">Cost Rate</th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-24">Qty</th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-24">Disc %</th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-24">GST %</th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-28">Amount</th>
                 <th className="px-3 py-2 w-10"></th>
               </tr>
             </thead>
@@ -599,18 +595,11 @@ export default function ItemPurchaseEntryPage() {
                       />
                     </td>
                     <td className="px-3 py-2">
-                      <input
-                        ref={(el) => setCellRef(idx, 'gst', { current: el })}
-                        type="number"
-                        step="0.01"
-                        min="0"
+                      <GstSelect
+                        registerRef={(ref) => setCellRef(idx, 'gst', ref)}
                         value={line.gst_percent}
-                        onChange={(e) => updateLine(idx, { gst_percent: e.target.value })}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'gst'); }
-                        }}
-                        className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
-                        placeholder="0"
+                        onChange={(v) => updateLine(idx, { gst_percent: v })}
+                        onKeyEnter={() => handleCellEnter(idx, 'gst')}
                       />
                     </td>
                     <td className="px-3 py-2 text-right font-semibold text-slate-800">
@@ -642,9 +631,6 @@ export default function ItemPurchaseEntryPage() {
             <PlusIcon className="h-4 w-4" />
             Add row
           </button>
-          <p className="text-xs text-slate-500">
-            Tip: press <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px]">Enter</kbd> to move between cells. Enter on the last cell adds a new row.
-          </p>
         </div>
       </div>
 
@@ -685,6 +671,23 @@ export default function ItemPurchaseEntryPage() {
                   className="w-28 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm text-amber-700 font-medium focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
                 />
               </div>
+              {ledger?.igst_status === 'YES' ? (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-500">IGST</span>
+                  <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal)}</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500">CGST</span>
+                    <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal / 2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500">SGST</span>
+                    <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal / 2)}</span>
+                  </div>
+                </>
+              )}
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-500">Total GST</span>
                 <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal)}</span>

@@ -3,11 +3,12 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   ArrowLeftIcon,
+  Cog6ToothIcon,
   PlusIcon,
   PrinterIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
-import { itemApi, saleApi, settingsApi } from '../../api';
+import { itemApi, saleApi, settingsApi, ledgerApi } from '../../api';
 import { ITEM_UNITS, DEFAULT_ITEM_UNIT } from '../../utils/itemConstants';
 import { formatCurrency, todayISO } from '../../utils/helpers';
 import { buildSaleReceiptHtml } from '../../utils/saleReceipt';
@@ -15,6 +16,7 @@ import { fetchLogoDataUrl } from '../../utils/interestReceipt';
 import LedgerAutocomplete from '../ui/LedgerAutocomplete';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import Modal from '../ui/Modal';
+import GstSelect from '../ui/GstSelect';
 
 const FIELD_ORDER = ['itemName', 'unit', 'qty', 'rate', 'discount', 'gst'];
 
@@ -165,7 +167,7 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
             position: 'fixed',
             top: anchorRect.bottom + 4,
             left: anchorRect.left,
-            width: Math.max(anchorRect.width, 320),
+            minWidth: 760,
             zIndex: 1000,
           }}
           className="bg-white rounded-lg border border-slate-200 shadow-lg max-h-60 overflow-y-auto"
@@ -185,26 +187,18 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
                   idx === highlight ? 'bg-trust-blue/10' : ''
                 }`}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium text-slate-800 truncate">
-                    {it.item_code ? (
-                      <span className="mr-1.5 inline-block rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600 align-middle">
-                        {it.item_code}
-                      </span>
-                    ) : null}
-                    {it.name}
-                  </span>
-                  <span className="text-[10px] font-mono text-slate-500">#{it.id}</span>
-                </div>
-                <div className="text-xs text-slate-500 truncate flex items-center justify-between">
-                  <span className="truncate">
-                    {[it.brand, it.category].filter(Boolean).join(' · ') || '—'}
-                    <span className="ml-2 text-slate-400">{formatCurrency(it.mrp)}</span>
-                  </span>
-                  <span className="ml-2 whitespace-nowrap">
-                    Stock: <span className={Number(it.current_stock) <= 0 ? 'text-debit-red font-medium' : 'text-credit-green font-medium'}>
-                      {Number(it.current_stock || 0)}
+                <div className="flex items-center gap-4 whitespace-nowrap">
+                  <span className="text-[10px] font-mono text-slate-400">#{it.id}</span>
+                  {it.item_code ? (
+                    <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600">
+                      {it.item_code}
                     </span>
+                  ) : null}
+                  <span className="font-medium text-slate-800">{it.name}</span>
+                  <span className="text-xs text-slate-400">{[it.brand, it.category].filter(Boolean).join(' · ')}</span>
+                  <span className="text-xs text-slate-500">{formatCurrency(it.mrp)}</span>
+                  <span className="text-xs">
+                    Stock: <span className={Number(it.current_stock) <= 0 ? 'text-debit-red font-medium' : 'text-credit-green font-medium'}>{Number(it.current_stock || 0)}</span>
                   </span>
                 </div>
               </button>
@@ -232,6 +226,31 @@ export default function ItemSalesEntryPage() {
   const [lines, setLines] = useState([emptyLine()]);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
+
+  // ── Row focus tracking for cost-rate tag ────────────────────────
+  const [focusedRow, setFocusedRow] = useState(null);
+  const [stockLock, setStockLock] = useState(() => {
+    const v = localStorage.getItem('sales_stock_lock');
+    return v === null ? true : v === 'true';
+  });
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const toggleStockLock = (val) => {
+    setStockLock(val);
+    localStorage.setItem('sales_stock_lock', String(val));
+  };
+
+  // Ctrl+I opens settings dialog
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.ctrlKey && e.key === 'i') {
+        e.preventDefault();
+        setSettingsOpen((o) => !o);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // ── Receipt / print state ─────────────────────────────────────────────
   const [store, setStore] = useState({});
@@ -287,6 +306,7 @@ export default function ItemSalesEntryPage() {
     refreshItems();
     if (!isEdit) {
       saleApi.getNextNumber().then((r) => setSaleNumber(r.data?.sale_number || '')).catch(() => {});
+      ledgerApi.getCash().then((r) => { if (r.data) setLedger(r.data); }).catch(() => {});
     }
   }, [refreshItems, isEdit]);
 
@@ -396,7 +416,7 @@ export default function ItemSalesEntryPage() {
 
   const handleSelectItem = (idx, item) => {
     const stock = Number(item.current_stock ?? 0);
-    if (stock <= 0) {
+    if (stockLock && stock <= 0) {
       toast.error(`"${item.name}" is out of stock`);
       return;
     }
@@ -417,7 +437,7 @@ export default function ItemSalesEntryPage() {
     const line = lines[idx];
     const max = maxQtyFor(line);
     const num = parseFloat(value);
-    if (!isNaN(num) && num > max) {
+    if (stockLock && !isNaN(num) && num > max) {
       toast.error(`Only ${max} ${line.unit || ''} available in stock`);
       updateLine(idx, { quantity: String(max) });
       return;
@@ -466,6 +486,18 @@ export default function ItemSalesEntryPage() {
 
   const netTotal = Math.max(0, totals.total - (parseFloat(billDiscount) || 0));
 
+  // Derives cost info for the currently focused item row (from last purchase)
+  const focusedCostInfo = useMemo(() => {
+    if (focusedRow == null) return null;
+    const line = lines[focusedRow];
+    if (!line?.item_id) return null;
+    const item = items.find((it) => it.id === line.item_id);
+    if (!item || item.last_purchase_rate == null) return null;
+    const gst = item.last_purchase_gst || 0;
+    const costRate = item.last_purchase_rate * (1 + gst / 100);
+    return { costRate, gst, baseRate: item.last_purchase_rate };
+  }, [focusedRow, lines, items]);
+
   const handleSave = async () => {
     if (!ledger) { toast.error('Select a customer ledger'); return; }
     const validLines = lines.filter((l) => l.item_name && l.item_name.trim());
@@ -481,25 +513,25 @@ export default function ItemSalesEntryPage() {
 
     // Stock check — aggregate quantities per item and ensure they don't
     // exceed each item's available stock (plus this sale's original quantity
-    // if editing).
-    const perItem = new Map();
-    for (const l of validLines) {
-      if (!l.item_id) continue;
-      const entry = perItem.get(l.item_id) || {
-        name: l.item_name,
-        qty: 0,
-        available: (Number(l.current_stock) || 0) + (Number(l.original_quantity) || 0),
-        unit: l.unit,
-      };
-      entry.qty += parseFloat(l.quantity) || 0;
-      // current_stock/original_quantity are per-line snapshots; if multiple
-      // rows share an item, keep the first row's available value.
-      perItem.set(l.item_id, entry);
-    }
-    for (const [, info] of perItem) {
-      if (info.qty > info.available) {
-        toast.error(`Quantity for "${info.name}" exceeds available stock (${info.available} ${info.unit || ''})`);
-        return;
+    // if editing). Skipped when Stock Lock is disabled.
+    if (stockLock) {
+      const perItem = new Map();
+      for (const l of validLines) {
+        if (!l.item_id) continue;
+        const entry = perItem.get(l.item_id) || {
+          name: l.item_name,
+          qty: 0,
+          available: (Number(l.current_stock) || 0) + (Number(l.original_quantity) || 0),
+          unit: l.unit,
+        };
+        entry.qty += parseFloat(l.quantity) || 0;
+        perItem.set(l.item_id, entry);
+      }
+      for (const [, info] of perItem) {
+        if (info.qty > info.available) {
+          toast.error(`Quantity for "${info.name}" exceeds available stock (${info.available} ${info.unit || ''})`);
+          return;
+        }
       }
     }
 
@@ -608,6 +640,14 @@ export default function ItemSalesEntryPage() {
               Print
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="ml-1 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+            title="Sales settings (Ctrl+I)"
+          >
+            <Cog6ToothIcon className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Top-right: customer ledger + date + time */}
@@ -647,23 +687,35 @@ export default function ItemSalesEntryPage() {
         <div className="overflow-x-auto overflow-y-auto flex-1 min-h-0">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 sticky top-0 z-10">
-                <th className="px-3 py-2 text-left font-semibold text-slate-600 w-12">S.no</th>
-                <th className="px-3 py-2 text-left font-semibold text-slate-600 w-20">Item ID</th>
-                <th className="px-3 py-2 text-left font-semibold text-slate-600 min-w-[18rem]">Item Name</th>
-                <th className="px-3 py-2 text-left font-semibold text-slate-600 w-28">Unit</th>
-                <th className="px-3 py-2 text-right font-semibold text-slate-600 w-24">MRP</th>
-                <th className="px-3 py-2 text-right font-semibold text-slate-600 w-28">Rate</th>
-                <th className="px-3 py-2 text-right font-semibold text-slate-600 w-24">Qty</th>
-                <th className="px-3 py-2 text-right font-semibold text-slate-600 w-24">Disc %</th>
-                <th className="px-3 py-2 text-right font-semibold text-slate-600 w-24">GST %</th>
-                <th className="px-3 py-2 text-right font-semibold text-slate-600 w-28">Amount</th>
+              <tr className="bg-trust-blue sticky top-0 z-10">
+                <th className="px-3 py-2 text-left font-semibold text-white w-12">S.no</th>
+                <th className="px-3 py-2 text-left font-semibold text-white w-20">Item ID</th>
+                <th className="px-3 py-2 text-left font-semibold text-white min-w-[18rem]">Item Name</th>
+                <th className="px-3 py-2 text-left font-semibold text-white w-28">Unit</th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-24">MRP</th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-28">Rate</th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-24">Qty</th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-24">Disc %</th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-24">GST %</th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-28">Amount</th>
                 <th className="px-3 py-2 w-10"></th>
               </tr>
             </thead>
             <tbody>
               {lines.map((line, idx) => (
-                <tr key={idx} className="border-b border-slate-100">
+                <tr
+                  key={idx}
+                  className="border-b border-slate-100"
+                  onFocus={() => setFocusedRow(idx)}
+                  onBlur={(e) => {
+                    const row = e.currentTarget;
+                    setTimeout(() => {
+                      if (!row.contains(document.activeElement)) {
+                        setFocusedRow(null);
+                      }
+                    }, 150);
+                  }}
+                >
                   <td className="px-3 py-2 text-slate-500">{idx + 1}</td>
                   <td className="px-3 py-2 font-mono text-xs text-slate-600">
                     {line.item_id || '—'}
@@ -742,18 +794,11 @@ export default function ItemSalesEntryPage() {
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <input
-                      ref={(el) => setCellRef(idx, 'gst', { current: el })}
-                      type="number"
-                      step="0.01"
-                      min="0"
+                    <GstSelect
+                      registerRef={(ref) => setCellRef(idx, 'gst', ref)}
                       value={line.gst_percent}
-                      onChange={(e) => updateLine(idx, { gst_percent: e.target.value })}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'gst'); }
-                      }}
-                      className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
-                      placeholder="0"
+                      onChange={(v) => updateLine(idx, { gst_percent: v })}
+                      onKeyEnter={() => handleCellEnter(idx, 'gst')}
                     />
                   </td>
                   <td className="px-3 py-2 text-right font-semibold text-slate-800">
@@ -784,9 +829,6 @@ export default function ItemSalesEntryPage() {
             <PlusIcon className="h-4 w-4" />
             Add row
           </button>
-          <p className="text-xs text-slate-500">
-            Tip: press <kbd className="px-1.5 py-0.5 bg-white border border-slate-300 rounded text-[10px]">Enter</kbd> to move between cells. Enter on the last cell adds a new row.
-          </p>
         </div>
       </div>
 
@@ -824,6 +866,23 @@ export default function ItemSalesEntryPage() {
                   className="w-28 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm text-amber-700 font-medium focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
                 />
               </div>
+              {ledger?.igst_status === 'YES' ? (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-500">IGST</span>
+                  <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal)}</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500">CGST</span>
+                    <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal / 2)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500">SGST</span>
+                    <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal / 2)}</span>
+                  </div>
+                </>
+              )}
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-500">Total GST</span>
                 <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal)}</span>
@@ -850,6 +909,66 @@ export default function ItemSalesEntryPage() {
           </button>
         </div>
       </div>
+
+      {/* Cost rate tag — shown when a row with a purchased item is focused */}
+      {focusedCostInfo && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+          <div className="flex items-center gap-2 rounded-full bg-slate-800/90 px-4 py-1.5 text-xs shadow-xl backdrop-blur-sm">
+            <span className="text-slate-400 font-medium">Purchase Cost</span>
+            <span className="font-bold text-white">{formatCurrency(focusedCostInfo.costRate)}</span>
+            {focusedCostInfo.gst > 0 && (
+              <span className="text-slate-400">
+                ({formatCurrency(focusedCostInfo.baseRate)} + {focusedCostInfo.gst}% GST)
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Cost rate tag — shown when a row with a purchased item is focused */}
+      {focusedCostInfo && (
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+          <div className="flex items-center gap-2 rounded-full bg-slate-800/90 px-4 py-1.5 text-xs shadow-xl backdrop-blur-sm">
+            <span className="text-slate-400 font-medium">Purchase Cost</span>
+            <span className="font-bold text-white">{formatCurrency(focusedCostInfo.costRate)}</span>
+            {focusedCostInfo.gst > 0 && (
+              <span className="text-slate-400">
+                ({formatCurrency(focusedCostInfo.baseRate)} + {focusedCostInfo.gst}% GST)
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Item Sales Settings dialog */}
+      <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} title="Item Sales Settings">
+        <div className="space-y-4 py-1">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-slate-700">Stock Lock</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                When enabled, sales are blocked if quantity exceeds available stock.
+                Disable to allow sales even when stock is zero or negative.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={stockLock}
+              onClick={() => toggleStockLock(!stockLock)}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-trust-blue focus:ring-offset-2 ${
+                stockLock ? 'bg-trust-blue' : 'bg-slate-200'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  stockLock ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Receipt Preview Modal */}
       <Modal open={previewModal.open} onClose={closePreview} title="Sale Receipt Preview" size="lg">

@@ -95,11 +95,11 @@ export default function LedgerAutocomplete({ value, onChange, placeholder = 'Sea
   return (
     <div className="relative">
       {value ? (
-        <div className="relative input-field pr-8">
-          <p className="font-medium text-slate-800 truncate">{value.name}</p>
-          <p className="text-xs text-slate-400 truncate">
-            {value.type_name || ''} · {value.place || 'No location'}
-          </p>
+        <div className="relative input-field pr-8 flex items-center gap-1.5 min-w-0">
+          <span className="font-medium text-slate-800 truncate">{value.name}</span>
+          <span className="text-xs text-slate-400 truncate shrink-0">
+            {value.place || value.type_name || ''}
+          </span>
           <button
             type="button"
             onClick={handleClear}

@@ -612,9 +612,9 @@ export default function ItemSalesEntryPage() {
   if (loading) return <LoadingSpinner className="py-20" size="lg" />;
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+    <div className="flex flex-col flex-1 min-h-0">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 flex-shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 flex-shrink-0">
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate(-1)}
@@ -651,8 +651,8 @@ export default function ItemSalesEntryPage() {
         </div>
 
         {/* Top-right: customer ledger + date + time */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:w-auto w-full">
-          <div className="sm:w-64">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="w-52">
             <label className="text-xs text-slate-500">Customer Ledger *</label>
             <LedgerAutocomplete
               value={ledger}
@@ -661,7 +661,7 @@ export default function ItemSalesEntryPage() {
               placeholder="Search customer…"
             />
           </div>
-          <div>
+          <div className="w-40">
             <label className="text-xs text-slate-500">Date</label>
             <input
               type="date"
@@ -670,7 +670,7 @@ export default function ItemSalesEntryPage() {
               className="input-field"
             />
           </div>
-          <div>
+          <div className="w-36">
             <label className="text-xs text-slate-500">Time</label>
             <input
               type="time"
@@ -840,17 +840,19 @@ export default function ItemSalesEntryPage() {
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={3}
+              rows={2}
               className="input-field resize-none"
               placeholder="Optional remarks for this sale"
             />
-          </div>
-          <div className="flex flex-col justify-between gap-2 bg-slate-50 rounded-lg px-4 py-3 border border-slate-100">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-3 mt-1">
+              <div className="flex items-center gap-2 rounded-lg bg-slate-50 border border-slate-100 px-3 py-1.5 text-sm">
                 <span className="text-slate-500">Items</span>
                 <span className="font-medium text-slate-700">{totals.lineCount}</span>
               </div>
+            </div>
+          </div>
+          <div className="flex flex-col justify-between gap-2 bg-slate-50 rounded-lg px-4 py-2 border border-slate-100">
+            <div className="space-y-1">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-500">Total Item Discount</span>
                 <span className="font-medium text-amber-700">{formatCurrency(totals.discountTotal)}</span>
@@ -895,7 +897,7 @@ export default function ItemSalesEntryPage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-100">
+        <div className="flex items-center justify-end gap-2 px-4 py-2 border-t border-slate-100">
           <button type="button" onClick={() => navigate('/item-sales')} className="btn-secondary">
             Cancel
           </button>

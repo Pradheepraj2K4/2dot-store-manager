@@ -431,8 +431,8 @@ export default function ItemPurchaseEntryPage() {
   if (loading) return <LoadingSpinner className="py-20" size="lg" />;
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 flex-shrink-0">
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 flex-shrink-0">
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigate(-1)}
@@ -449,8 +449,8 @@ export default function ItemPurchaseEntryPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 sm:w-auto w-full">
-          <div className="sm:w-56">
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="w-52">
             <label className="text-xs text-slate-500">Supplier / Ledger *</label>
             <LedgerAutocomplete
               value={ledger}
@@ -458,7 +458,7 @@ export default function ItemPurchaseEntryPage() {
               placeholder="Search ledger…"
             />
           </div>
-          <div>
+          <div className="w-36">
             <label className="text-xs text-slate-500">Bill #</label>
             <input
               type="text"
@@ -468,7 +468,7 @@ export default function ItemPurchaseEntryPage() {
               placeholder="Supplier invoice no."
             />
           </div>
-          <div>
+          <div className="w-40">
             <label className="text-xs text-slate-500">Date</label>
             <input
               type="date"
@@ -477,7 +477,7 @@ export default function ItemPurchaseEntryPage() {
               className="input-field"
             />
           </div>
-          <div>
+          <div className="w-36">
             <label className="text-xs text-slate-500">Time</label>
             <input
               type="time"
@@ -495,10 +495,10 @@ export default function ItemPurchaseEntryPage() {
             <thead>
               <tr className="bg-indigo-600 sticky top-0 z-10">
                 <th className="px-3 py-2 text-left font-semibold text-white w-12">S.no</th>
-                <th className="px-3 py-2 text-left font-semibold text-white w-20">Item ID</th>
+                <th className="px-3 py-2 text-left font-semibold text-white w-20 whitespace-nowrap">Item ID</th>
                 <th className="px-3 py-2 text-left font-semibold text-white min-w-[18rem]">Item Name</th>
                 <th className="px-3 py-2 text-left font-semibold text-white w-28">Unit</th>
-                <th className="px-3 py-2 text-right font-semibold text-white w-20">In Stock</th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-20 whitespace-nowrap">In Stock</th>
                 <th className="px-3 py-2 text-right font-semibold text-white w-24">MRP</th>
                 <th className="px-3 py-2 text-right font-semibold text-white w-28">Cost Rate</th>
                 <th className="px-3 py-2 text-right font-semibold text-white w-24">Qty</th>
@@ -635,27 +635,29 @@ export default function ItemPurchaseEntryPage() {
       </div>
 
       <div className="flex-shrink-0 rounded-xl border border-slate-200 bg-white shadow-sm mt-3">
-        <div className="px-4 pt-4 pb-3 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="px-4 pt-3 pb-2 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2 flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">Notes</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={3}
+              rows={2}
               className="input-field resize-none"
               placeholder="Optional remarks for this purchase"
             />
-          </div>
-          <div className="flex flex-col justify-between gap-2 bg-slate-50 rounded-lg px-4 py-3 border border-slate-100">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-3 mt-1">
+              <div className="flex items-center gap-2 rounded-lg bg-slate-50 border border-slate-100 px-3 py-1.5 text-sm">
                 <span className="text-slate-500">Items</span>
                 <span className="font-medium text-slate-700">{totals.lineCount}</span>
               </div>
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2 rounded-lg bg-slate-50 border border-slate-100 px-3 py-1.5 text-sm">
                 <span className="text-slate-500">Total Qty</span>
                 <span className="font-medium text-slate-700">{totals.qtyTotal}</span>
               </div>
+            </div>
+          </div>
+          <div className="flex flex-col justify-between gap-2 bg-slate-50 rounded-lg px-4 py-2 border border-slate-100">
+            <div className="space-y-1">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-500">Total Item Discount</span>
                 <span className="font-medium text-amber-700">{formatCurrency(totals.discountTotal)}</span>
@@ -700,7 +702,7 @@ export default function ItemPurchaseEntryPage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t border-slate-100">
+        <div className="flex items-center justify-end gap-2 px-4 py-2 border-t border-slate-100">
           <button type="button" onClick={() => navigate('/item-purchases')} className="btn-secondary">
             Cancel
           </button>

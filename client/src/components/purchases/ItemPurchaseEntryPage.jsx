@@ -20,14 +20,15 @@ function nowHHMM() {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function computeAmount({ rate, quantity, discount_percent, gst_percent }) {
+function computeAmount({ rate, quantity, discount_percent }) {
   const r = parseFloat(rate) || 0;
   const q = parseFloat(quantity) || 1;
   const d = parseFloat(discount_percent) || 0;
-  const g = parseFloat(gst_percent) || 0;
-  const taxable = r * q * (1 - d / 100);
-  const gst = taxable * g / 100;
-  return Math.round((taxable + gst) * 100) / 100;
+  // GST is inclusive: the rate already contains tax, so the line amount is
+  // simply the (discounted) rate × quantity. The tax portion is extracted
+  // separately for display in the GST total.
+  const amount = r * q * (1 - d / 100);
+  return Math.round(amount * 100) / 100;
 }
 
 function emptyLine() {
@@ -148,7 +149,7 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
             position: 'fixed',
             top: anchorRect.bottom + 4,
             left: anchorRect.left,
-            minWidth: 760,
+            minWidth: 420,
             zIndex: 1000,
           }}
           className="bg-white rounded-lg border border-slate-200 shadow-lg max-h-60 overflow-y-auto"
@@ -178,9 +179,6 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
                   <span className="font-medium text-slate-800">{it.name}</span>
                   <span className="text-xs text-slate-400">{[it.brand, it.category].filter(Boolean).join(' · ')}</span>
                   <span className="text-xs text-slate-500">{formatCurrency(it.mrp)}</span>
-                  <span className="text-xs">
-                    Stock: <span className={Number(it.current_stock) < 0 ? 'text-debit-red font-medium' : 'text-credit-green font-medium'}>{Number(it.current_stock || 0)}</span>
-                  </span>
                 </div>
               </button>
             ))
@@ -328,6 +326,12 @@ export default function ItemPurchaseEntryPage() {
   };
 
   const addLine = () => {
+    const hasEmptyRow = lines.some((l) => !l.item_id);
+    if (hasEmptyRow) {
+      const emptyIdx = lines.findIndex((l) => !l.item_id);
+      focusCell(emptyIdx, 'itemName');
+      return;
+    }
     setLines((prev) => [...prev, emptyLine()]);
     setTimeout(() => focusCell(lines.length, 'itemName'), 0);
   };
@@ -352,8 +356,14 @@ export default function ItemPurchaseEntryPage() {
     } else {
       const isLastRow = rowIdx === lines.length - 1;
       if (isLastRow) {
-        setLines((prev) => [...prev, emptyLine()]);
-        setTimeout(() => focusCell(rowIdx + 1, 'itemName'), 0);
+        const hasEmptyRow = lines.some((l) => !l.item_id);
+        if (hasEmptyRow) {
+          const emptyIdx = lines.findIndex((l) => !l.item_id);
+          focusCell(emptyIdx, 'itemName');
+        } else {
+          setLines((prev) => [...prev, emptyLine()]);
+          setTimeout(() => focusCell(rowIdx + 1, 'itemName'), 0);
+        }
       } else {
         focusCell(rowIdx + 1, 'itemName');
       }
@@ -367,8 +377,10 @@ export default function ItemPurchaseEntryPage() {
       const q = parseFloat(l.quantity) || 1;
       const d = parseFloat(l.discount_percent) || 0;
       const g = parseFloat(l.gst_percent) || 0;
-      const taxable = r * q * (1 - d / 100);
-      return s + Math.round(taxable * g / 100 * 100) / 100;
+      // GST is inclusive — extract the embedded tax from the gross amount.
+      const inclusive = r * q * (1 - d / 100);
+      const gst = inclusive - inclusive / (1 + g / 100);
+      return s + Math.round(gst * 100) / 100;
     }, 0);
     const discountTotal = lines.reduce((s, l) => {
       const gross = (parseFloat(l.rate) || 0) * (parseFloat(l.quantity) || 1);
@@ -475,11 +487,23 @@ export default function ItemPurchaseEntryPage() {
         <div className="flex flex-wrap items-end gap-2">
           <div className="w-52">
             <label className="text-xs text-slate-500">Supplier / Ledger *</label>
-            <LedgerAutocomplete
-              value={ledger}
-              onChange={setLedger}
-              placeholder="Search ledger…"
-            />
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                title="Create new ledger"
+                onClick={() => navigate('/ledger-creation?returnTo=' + encodeURIComponent(location.pathname + location.search))}
+                className="flex h-9 w-7 shrink-0 items-center justify-center rounded bg-trust-blue/10 text-trust-blue hover:bg-trust-blue/20 transition-colors"
+              >
+                <PlusIcon className="h-4 w-4" />
+              </button>
+              <div className="flex-1">
+                <LedgerAutocomplete
+                  value={ledger}
+                  onChange={setLedger}
+                  placeholder="Search ledger…"
+                />
+              </div>
+            </div>
           </div>
           <div className="w-36">
             <label className="text-xs text-slate-500">Bill #</label>
@@ -617,13 +641,8 @@ export default function ItemPurchaseEntryPage() {
                         placeholder="0"
                       />
                     </td>
-                    <td className="px-3 py-2">
-                      <GstSelect
-                        registerRef={(ref) => setCellRef(idx, 'gst', ref)}
-                        value={line.gst_percent}
-                        onChange={(v) => updateLine(idx, { gst_percent: v })}
-                        onKeyEnter={() => handleCellEnter(idx, 'gst')}
-                      />
+                    <td className="px-3 py-2 text-sm text-center text-slate-600">
+                      {line.gst_percent ? `${line.gst_percent}%` : '—'}
                     </td>
                     <td className="px-3 py-2 text-right font-semibold text-slate-800">
                       {formatCurrency(line.amount || 0)}

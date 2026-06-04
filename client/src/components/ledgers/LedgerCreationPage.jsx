@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ledgerApi, ledgerTypeApi, settingsApi } from '../../api';
 import toast from 'react-hot-toast';
 import { BookOpenIcon, CheckCircleIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
@@ -38,6 +38,8 @@ const EMPTY_FORM = {
 
 export default function LedgerCreationPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
   const [form, setForm] = useState(EMPTY_FORM);
   const [errors, setErrors] = useState({});
   const [touched, setTouched] = useState({});
@@ -102,10 +104,14 @@ export default function LedgerCreationPage() {
       });
       toast.success('Ledger created successfully');
       const newId = res.data?.id || res.data?.ledger?.id;
+      if (returnTo) {
+        navigate(returnTo);
+      } else {
         setForm(EMPTY_FORM);
         setErrors({});
         setTouched({});
         nameRef.current?.focus();
+      }
     } catch (err) {
       toast.error(err.message || 'Failed to create ledger');
     } finally {

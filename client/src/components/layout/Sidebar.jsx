@@ -206,7 +206,7 @@ export default function Sidebar({ open, onClose }) {
                         [item.name]: !isExpanded,
                       }))
                     }
-                    className={`w-full group flex items-center gap-2 rounded-md px-2.5 py-2 text-xs font-medium transition-colors ${
+                    className={`w-full group flex items-center gap-2 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors ${
                       isGroupActive
                         ? "text-white"
                         : "text-slate-300 hover:bg-sidebar-hover hover:text-white"
@@ -227,7 +227,7 @@ export default function Sidebar({ open, onClose }) {
                           end={child.end}
                           onClick={onClose}
                           className={({ isActive }) =>
-                            `group flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[11px] font-medium transition-colors ${
+                            `group flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
                               isActive
                                 ? "bg-trust-blue text-white shadow-sm shadow-trust-blue/25"
                                 : "text-slate-400 hover:bg-sidebar-hover hover:text-slate-200"
@@ -254,7 +254,7 @@ export default function Sidebar({ open, onClose }) {
                   to={item.href}
                   onClick={onClose}
                   className={() =>
-                    `group flex items-center gap-2 rounded-md px-2.5 py-2 text-xs font-medium transition-colors ${
+                    `group flex items-center gap-2 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors ${
                       isActive
                         ? "bg-trust-blue text-white shadow-sm shadow-trust-blue/25"
                         : "text-slate-300 hover:bg-sidebar-hover hover:text-white"
@@ -273,7 +273,7 @@ export default function Sidebar({ open, onClose }) {
                 end={item.href === "/"}
                 onClick={onClose}
                 className={({ isActive }) =>
-                  `group flex items-center gap-2 rounded-md px-2.5 py-2 text-xs font-medium transition-colors ${
+                  `group flex items-center gap-2 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors ${
                     isActive
                       ? "bg-trust-blue text-white shadow-sm shadow-trust-blue/25"
                       : "text-slate-300 hover:bg-sidebar-hover hover:text-white"
@@ -288,35 +288,32 @@ export default function Sidebar({ open, onClose }) {
         </nav>
 
         {/* Footer */}
-        <div className="border-t border-slate-700 px-3 py-3 space-y-2">
-          {/* Back / Forward history navigation */}
-          <div className="flex items-center gap-2">
+        <div className="border-t border-slate-700 px-3 py-2">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={() => navigate(-1)}
               title="Go back"
-              className="flex-1 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors text-slate-300 hover:bg-sidebar-hover hover:text-white"
+              className="flex items-center justify-center rounded-md p-1.5 transition-colors text-slate-300 hover:bg-sidebar-hover hover:text-white"
             >
               <ChevronLeftIcon className="h-4 w-4 flex-shrink-0" />
             </button>
-            <div className="w-px h-5 bg-slate-700" />
             <button
               onClick={() => navigate(1)}
               title="Go forward"
-              className="flex-1 flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors text-slate-300 hover:bg-sidebar-hover hover:text-white"
+              className="flex items-center justify-center rounded-md p-1.5 transition-colors text-slate-300 hover:bg-sidebar-hover hover:text-white"
             >
               <ChevronRightIcon className="h-4 w-4 flex-shrink-0" />
             </button>
+            <button
+              onClick={handleLogout}
+              title="Logout"
+              className="flex-1 flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors text-slate-300 hover:bg-red-500/10 hover:text-red-400"
+            >
+              <ArrowLeftOnRectangleIcon className="h-4 w-4 flex-shrink-0" />
+              Logout
+            </button>
+            <span className="text-[10px] text-slate-500 whitespace-nowrap">v1.0.0</span>
           </div>
-          <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-slate-300 hover:bg-red-500/10 hover:text-red-400"
-          >
-            <ArrowLeftOnRectangleIcon className="h-5 w-5 flex-shrink-0" />
-            Logout
-          </button>
-          <p className="text-xs text-slate-500 text-center">
-            v1.0.0 — Offline Ready
-          </p>
         </div>
       </aside>
     </>

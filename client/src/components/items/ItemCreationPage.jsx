@@ -33,6 +33,7 @@ export default function ItemCreationPage() {
     item_code: '',
     unit: DEFAULT_ITEM_UNIT,
     mrp: '',
+    sales_rate: '',
     gst_percent: '',
     brand: '',
     category: '',
@@ -59,6 +60,7 @@ export default function ItemCreationPage() {
           item_code: it.item_code || '',
           unit: it.unit || DEFAULT_ITEM_UNIT,
           mrp: it.mrp != null ? String(it.mrp) : '',
+          sales_rate: it.sales_rate != null ? String(it.sales_rate) : '',
           gst_percent: it.gst_percent != null && it.gst_percent !== 0 ? String(it.gst_percent) : '',
           brand: it.brand || '',
           category: it.category || '',
@@ -74,7 +76,7 @@ export default function ItemCreationPage() {
   };
 
   // Enter-key navigation between form fields
-  const FIELD_ORDER = ['name', 'item_code', 'unit', 'mrp', 'gst_percent', 'brand', 'category'];
+  const FIELD_ORDER = ['name', 'item_code', 'unit', 'mrp', 'sales_rate', 'gst_percent', 'brand', 'category'];
   const fieldRefs = useRef({});
   const setFieldRef = (name) => (el) => { fieldRefs.current[name] = el; };
   const submitBtnRef = useRef(null);
@@ -106,6 +108,7 @@ export default function ItemCreationPage() {
         item_code: form.item_code.trim(),
         unit: form.unit,
         mrp: parseFloat(form.mrp) || 0,
+        sales_rate: form.sales_rate !== '' ? parseFloat(form.sales_rate) : null,
         gst_percent: parseFloat(form.gst_percent) || 0,
         brand: form.brand.trim(),
         category: form.category.trim(),
@@ -219,6 +222,25 @@ export default function ItemCreationPage() {
               className={`input-field ${errors.mrp ? 'border-red-400' : ''}`}
             />
             <FieldError msg={errors.mrp} />
+          </div>
+        </div>
+
+        {/* Sales Rate */}
+        <div className="flex gap-4">
+          <label className="w-28 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">Sales Rate</label>
+          <div className="flex-1">
+            <input
+              ref={setFieldRef('sales_rate')}
+              type="number"
+              step="0.01"
+              name="sales_rate"
+              value={form.sales_rate}
+              onChange={handleChange}
+              onKeyDown={handleFieldKeyDown('sales_rate')}
+              placeholder="Defaults to MRP if blank"
+              className="input-field"
+            />
+            <p className="text-xs text-slate-400 mt-1">Used as the default rate in Sales Entry. Leave blank to use MRP.</p>
           </div>
         </div>
 

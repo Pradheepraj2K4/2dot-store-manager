@@ -26,10 +26,15 @@ export default function AppLayout({ children }) {
         e.preventDefault();
         setFinderOpen(true);
       }
+      if (e.key === 'Escape' && !finderOpen) {
+        // Skip if a modal/dialog is currently open — it handles its own Escape.
+        if (document.querySelector('[role="dialog"]')) return;
+        navigate(-1);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [navigate]);
+  }, [navigate, finderOpen]);
 
   // Globally prevent mouse-wheel from changing focused number inputs
   useEffect(() => {

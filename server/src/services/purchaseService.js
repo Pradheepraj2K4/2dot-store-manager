@@ -7,19 +7,22 @@ const { getDb } = require('../db/database');
 /**
  * Purchase service.
  *
- * Purchases mirror sales structurally (header + line items, GST, discount)
- * but intentionally DO NOT touch ledger balances — they are pure stock-in
- * documents. The selected ledger is recorded for reporting / supplier
- * traceability only.
+ * Purchases mirror sales structurally (header + line items, GST, discount).
+ * A purchase also posts to the selected ledger — it credits the supplier
+ * (increasing what we owe them), acting as a receipt against that ledger.
+ * The CASH ledger is excluded: cash purchases settle immediately and must
+ * not accrue a running balance.
  */
 function computeLineAmounts(line) {
   const rate = parseFloat(line.rate) || 0;
   const qty  = parseFloat(line.quantity) || 1;
   const disc = parseFloat(line.discount_percent) || 0;
   const gst  = parseFloat(line.gst_percent) || 0;
-  const taxable    = rate * qty * (1 - disc / 100);
-  const gst_amount = Math.round(taxable * gst / 100 * 100) / 100;
-  const amount     = Math.round((taxable + gst_amount) * 100) / 100;
+  // GST inclusive: rate already contains tax. The line amount is the gross
+  // (discounted) value and the GST portion is extracted from it.
+  const gross      = rate * qty * (1 - disc / 100);
+  const gst_amount = Math.round((gross - gross / (1 + gst / 100)) * 100) / 100;
+  const amount     = Math.round(gross * 100) / 100;
   return { gst_amount, amount };
 }
 
@@ -30,6 +33,20 @@ function applyStockDelta(items, sign) {
     if (!qty) continue;
     itemRepository.adjustStock(line.item_id, sign * qty);
   }
+}
+
+/** The CASH ledger never carries a running balance. */
+function isCashLedger(ledger) {
+  return ledger && ledger.name === 'CASH';
+}
+
+/**
+ * Ledger movement for a purchase (the inverse of a sale):
+ *   supplier ledger — purchase increases what we owe them (+delta)
+ *   customer ledger — purchase reduces what they owe us (-delta)
+ */
+function applyLedgerDelta(behaviour, delta) {
+  return behaviour === 'customer' ? -delta : delta;
 }
 
 class PurchaseService {
@@ -112,6 +129,12 @@ class PurchaseService {
         items: normalisedItems,
       });
 
+      // Credit the supplier ledger (skip CASH — settled immediately)
+      if (!isCashLedger(ledger)) {
+        const delta = applyLedgerDelta(ledger.behaviour, purchase.total_amount);
+        ledgerRepository.updateBalance(ledger.id, ledger.current_balance + delta);
+      }
+
       // Stock-in: every linked item's stock goes up
       applyStockDelta(normalisedItems, +1);
       return purchase;
@@ -131,19 +154,34 @@ class PurchaseService {
     const normalisedItems = this._normalise(data.items);
     const totals = this._totals(normalisedItems);
 
+    const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
+    const net_total = Math.round((totals.total_amount - bill_discount_val) * 100) / 100;
+
     const run = db.transaction(() => {
       // Reverse the prior stock-in, then apply the new one
       applyStockDelta(existing.items, -1);
       applyStockDelta(normalisedItems, +1);
 
-      const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
+      // Reverse the prior ledger movement and apply the new one (skip CASH).
+      // The old purchase may have used a different ledger, so reverse on that.
+      const oldLedger = ledgerRepository.findById(existing.ledger_id);
+      if (oldLedger && !isCashLedger(oldLedger)) {
+        const oldDelta = applyLedgerDelta(oldLedger.behaviour, existing.total_amount);
+        ledgerRepository.updateBalance(oldLedger.id, oldLedger.current_balance - oldDelta);
+      }
+      if (!isCashLedger(ledger)) {
+        const fresh = ledgerRepository.findById(ledger.id);
+        const newDelta = applyLedgerDelta(fresh.behaviour, net_total);
+        ledgerRepository.updateBalance(fresh.id, fresh.current_balance + newDelta);
+      }
+
       return purchaseRepository.update(id, {
         ledger_id: ledger.id,
         bill_number: data.bill_number || '',
         date: data.date || existing.date,
         time: data.time != null ? data.time : existing.time,
         ...totals,
-        total_amount: Math.round((totals.total_amount - bill_discount_val) * 100) / 100,
+        total_amount: net_total,
         bill_discount: bill_discount_val,
         item_count: normalisedItems.length,
         notes: data.notes || '',
@@ -157,7 +195,13 @@ class PurchaseService {
     const db = getDb();
     const existing = purchaseRepository.getById(id);
     if (!existing) throw new AppError('Purchase not found', 404);
+    const ledger = ledgerRepository.findById(existing.ledger_id);
     const run = db.transaction(() => {
+      // Reverse the ledger movement introduced by this purchase (skip CASH)
+      if (ledger && !isCashLedger(ledger)) {
+        const oldDelta = applyLedgerDelta(ledger.behaviour, existing.total_amount);
+        ledgerRepository.updateBalance(ledger.id, ledger.current_balance - oldDelta);
+      }
       // Reverse the stock-in introduced by this purchase
       applyStockDelta(existing.items, -1);
       purchaseRepository.delete(id);

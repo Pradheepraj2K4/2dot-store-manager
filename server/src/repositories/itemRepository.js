@@ -45,15 +45,16 @@ class ItemRepository {
     return db.prepare('SELECT * FROM items WHERE id = ?').get(id);
   }
 
-  create({ name, unit, mrp, brand, category, gst_percent, item_code }) {
+  create({ name, unit, mrp, sales_rate, brand, category, gst_percent, item_code }) {
     const db = getDb();
     const info = db.prepare(`
-      INSERT INTO items (name, unit, mrp, brand, category, gst_percent, item_code)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO items (name, unit, mrp, sales_rate, brand, category, gst_percent, item_code)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name.trim(),
       (unit || 'Nos').trim(),
       parseFloat(mrp) || 0,
+      sales_rate != null && sales_rate !== '' ? parseFloat(sales_rate) : null,
       (brand || '').trim(),
       (category || '').trim(),
       parseFloat(gst_percent) || 0,
@@ -62,11 +63,11 @@ class ItemRepository {
     return this.getById(info.lastInsertRowid);
   }
 
-  update(id, { name, unit, mrp, brand, category, gst_percent, item_code, status }) {
+  update(id, { name, unit, mrp, sales_rate, brand, category, gst_percent, item_code, status }) {
     const db = getDb();
     db.prepare(`
       UPDATE items
-      SET name = ?, unit = ?, mrp = ?, brand = ?, category = ?, gst_percent = ?,
+      SET name = ?, unit = ?, mrp = ?, sales_rate = ?, brand = ?, category = ?, gst_percent = ?,
           item_code = ?,
           status = COALESCE(?, status),
           updated_at = datetime('now', 'localtime')
@@ -75,6 +76,7 @@ class ItemRepository {
       name.trim(),
       (unit || 'Nos').trim(),
       parseFloat(mrp) || 0,
+      sales_rate != null && sales_rate !== '' ? parseFloat(sales_rate) : null,
       (brand || '').trim(),
       (category || '').trim(),
       parseFloat(gst_percent) || 0,

@@ -16,18 +16,30 @@ function applyStockDelta(items, sign) {
 
 /**
  * Compute per-line amounts.
- * taxable = rate * qty * (1 - disc/100)
- * gst_amount = taxable * gst_percent / 100
- * amount (line total) = taxable + gst_amount
+ *
+ * Two rate treatments are supported via `line.rate_tax_mode`:
+ *   'taxable'   — rate is the pre-tax value; GST is added on top.
+ *                 gross = rate * qty * (1 - disc/100)
+ *                 gst_amount = gross * gst_percent / 100
+ *                 amount = gross + gst_amount
+ *   'inclusive' — rate already includes GST (default).
+ *                 gross = rate * qty * (1 - disc/100)
+ *                 gst_amount = gross - gross / (1 + gst_percent/100)
+ *                 amount = gross
  */
 function computeLineAmounts(line) {
   const rate = parseFloat(line.rate) || 0;
   const qty  = parseFloat(line.quantity) || 1;
   const disc = parseFloat(line.discount_percent) || 0;
   const gst  = parseFloat(line.gst_percent) || 0;
-  const taxable   = rate * qty * (1 - disc / 100);
-  const gst_amount = Math.round(taxable * gst / 100 * 100) / 100;
-  const amount     = Math.round((taxable + gst_amount) * 100) / 100;
+  const gross = rate * qty * (1 - disc / 100);
+  if (line.rate_tax_mode === 'taxable') {
+    const gst_amount = Math.round(gross * gst / 100 * 100) / 100;
+    const amount     = Math.round((gross + gst_amount) * 100) / 100;
+    return { gst_amount, amount };
+  }
+  const gst_amount = Math.round((gross - gross / (1 + gst / 100)) * 100) / 100;
+  const amount     = Math.round(gross * 100) / 100;
   return { gst_amount, amount };
 }
 
@@ -104,6 +116,7 @@ class SaleService {
         notes: data.notes || '',
         customer_name: data.customer_name || '',
         customer_mobile: data.customer_mobile || '',
+        customer_place: data.customer_place || '',
         items: normalisedItems,
       });
 
@@ -169,6 +182,7 @@ class SaleService {
         notes: data.notes || '',
         customer_name: data.customer_name || '',
         customer_mobile: data.customer_mobile || '',
+        customer_place: data.customer_place || '',
         items: normalisedItems,
       });
     });

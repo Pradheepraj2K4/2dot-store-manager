@@ -18,21 +18,24 @@ import LoadingSpinner from '../ui/LoadingSpinner';
 import Modal from '../ui/Modal';
 import GstSelect from '../ui/GstSelect';
 
-const FIELD_ORDER = ['itemName', 'unit', 'rate', 'qty', 'discount', 'gst'];
+const FIELD_ORDER = ['itemName', 'unit', 'rate', 'qty', 'discount'];
 
 function nowHHMM() {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function computeAmount({ rate, quantity, discount_percent, gst_percent }) {
+function computeAmount({ rate, quantity, discount_percent, gst_percent }, taxMode = 'inclusive') {
   const r = parseFloat(rate) || 0;
   const q = parseFloat(quantity) || 1;
   const d = parseFloat(discount_percent) || 0;
   const g = parseFloat(gst_percent) || 0;
-  const taxable = r * q * (1 - d / 100);
-  const gst = taxable * g / 100;
-  return Math.round((taxable + gst) * 100) / 100;
+  const gross = r * q * (1 - d / 100);
+  // 'taxable'  : the rate is the pre-tax value, so GST is added on top.
+  // 'inclusive': the rate already contains GST, so the amount is the gross
+  //              and the tax portion is extracted for display only.
+  const amount = taxMode === 'taxable' ? gross * (1 + g / 100) : gross;
+  return Math.round(amount * 100) / 100;
 }
 
 function emptyLine() {
@@ -167,7 +170,7 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
             position: 'fixed',
             top: anchorRect.bottom + 4,
             left: anchorRect.left,
-            minWidth: 760,
+            minWidth: 420,
             zIndex: 1000,
           }}
           className="bg-white rounded-lg border border-slate-200 shadow-lg max-h-60 overflow-y-auto"
@@ -197,9 +200,6 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
                   <span className="font-medium text-slate-800">{it.name}</span>
                   <span className="text-xs text-slate-400">{[it.brand, it.category].filter(Boolean).join(' · ')}</span>
                   <span className="text-xs text-slate-500">{formatCurrency(it.mrp)}</span>
-                  <span className="text-xs">
-                    Stock: <span className={Number(it.current_stock) <= 0 ? 'text-debit-red font-medium' : 'text-credit-green font-medium'}>{Number(it.current_stock || 0)}</span>
-                  </span>
                 </div>
               </button>
             ))
@@ -224,6 +224,7 @@ export default function ItemSalesEntryPage() {
   const [notes, setNotes] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [customerMobile, setCustomerMobile] = useState('');
+  const [customerPlace, setCustomerPlace] = useState('');
   const [billDiscount, setBillDiscount] = useState('0');
   const [lines, setLines] = useState([emptyLine()]);
   const [loading, setLoading] = useState(isEdit);
@@ -244,6 +245,18 @@ export default function ItemSalesEntryPage() {
   const toggleStockLock = (val) => {
     setStockLock(val);
     localStorage.setItem('sales_stock_lock', String(val));
+  };
+
+  // Rate tax treatment: 'inclusive' (rate includes GST) or 'taxable' (rate is
+  // pre-tax and GST is added on top). Defaults to inclusive.
+  const [rateTaxMode, setRateTaxMode] = useState(() => {
+    const v = localStorage.getItem('sales_rate_tax_mode');
+    return v === 'taxable' ? 'taxable' : 'inclusive';
+  });
+
+  const setRateTaxModePersist = (val) => {
+    setRateTaxMode(val);
+    localStorage.setItem('sales_rate_tax_mode', val);
   };
 
   // Ctrl+I opens settings dialog; F10 → purchase report
@@ -353,6 +366,7 @@ export default function ItemSalesEntryPage() {
         setNotes(sale.notes || '');
         setCustomerName(sale.customer_name || '');
         setCustomerMobile(sale.customer_mobile || '');
+        setCustomerPlace(sale.customer_place || '');
         setBillDiscount(sale.bill_discount != null ? String(sale.bill_discount) : '0');
         setLedger({ id: sale.ledger_id, name: sale.ledger_name, behaviour: 'customer' });
         setLines(
@@ -394,21 +408,27 @@ export default function ItemSalesEntryPage() {
           item_name: newItem.name,
           unit: newItem.unit || DEFAULT_ITEM_UNIT,
           mrp: newItem.mrp || 0,
-          rate: String(newItem.mrp || ''),
+          rate: String(newItem.sales_rate != null ? newItem.sales_rate : (newItem.mrp || '')),
           quantity: '1',
           gst_percent: newItem.gst_percent ? String(newItem.gst_percent) : '',
-          amount: computeAmount({ rate: newItem.mrp, quantity: 1, discount_percent: 0, gst_percent: newItem.gst_percent || 0 }),
+          amount: computeAmount({ rate: newItem.sales_rate != null ? newItem.sales_rate : newItem.mrp, quantity: 1, discount_percent: 0, gst_percent: newItem.gst_percent || 0 }, rateTaxMode),
         };
         return next;
       });
     } catch (_) { /* noop */ }
   }, [location.key, refreshItems]);
 
+  // Recompute every line amount when the rate tax treatment changes so the
+  // grid reflects the newly selected inclusive / taxable behaviour.
+  useEffect(() => {
+    setLines((prev) => prev.map((l) => ({ ...l, amount: computeAmount(l, rateTaxMode) })));
+  }, [rateTaxMode]);
+
   const updateLine = (idx, patch) => {
     setLines((prev) => {
       const next = [...prev];
       const merged = { ...next[idx], ...patch };
-      merged.amount = computeAmount(merged);
+      merged.amount = computeAmount(merged, rateTaxMode);
       next[idx] = merged;
       return next;
     });
@@ -422,6 +442,12 @@ export default function ItemSalesEntryPage() {
   };
 
   const addLine = () => {
+    const hasEmptyRow = lines.some((l) => !l.item_id);
+    if (hasEmptyRow) {
+      const emptyIdx = lines.findIndex((l) => !l.item_id);
+      focusCell(emptyIdx, 'itemName');
+      return;
+    }
     setLines((prev) => [...prev, emptyLine()]);
     setTimeout(() => focusCell(lines.length, 'itemName'), 0);
   };
@@ -432,12 +458,13 @@ export default function ItemSalesEntryPage() {
       toast.error(`"${item.name}" is out of stock`);
       return;
     }
+    const defaultRate = item.sales_rate != null ? item.sales_rate : (item.mrp || 0);
     updateLine(idx, {
       item_id: item.id,
       item_name: item.name,
       unit: item.unit || DEFAULT_ITEM_UNIT,
       mrp: item.mrp || 0,
-      rate: String(item.mrp || ''),
+      rate: String(defaultRate),
       quantity: '1',
       gst_percent: item.gst_percent ? String(item.gst_percent) : '',
       current_stock: stock,
@@ -465,8 +492,14 @@ export default function ItemSalesEntryPage() {
       // Last field (discount) — add new row and focus its item name
       const isLastRow = rowIdx === lines.length - 1;
       if (isLastRow) {
-        setLines((prev) => [...prev, emptyLine()]);
-        setTimeout(() => focusCell(rowIdx + 1, 'itemName'), 0);
+        const hasEmptyRow = lines.some((l) => !l.item_id);
+        if (hasEmptyRow) {
+          const emptyIdx = lines.findIndex((l) => !l.item_id);
+          focusCell(emptyIdx, 'itemName');
+        } else {
+          setLines((prev) => [...prev, emptyLine()]);
+          setTimeout(() => focusCell(rowIdx + 1, 'itemName'), 0);
+        }
       } else {
         focusCell(rowIdx + 1, 'itemName');
       }
@@ -484,8 +517,12 @@ export default function ItemSalesEntryPage() {
       const q = parseFloat(l.quantity) || 1;
       const d = parseFloat(l.discount_percent) || 0;
       const g = parseFloat(l.gst_percent) || 0;
-      const taxable = r * q * (1 - d / 100);
-      return s + Math.round(taxable * g / 100 * 100) / 100;
+      const gross = r * q * (1 - d / 100);
+      // 'taxable': GST added on top; 'inclusive': GST embedded in the gross.
+      const gst = rateTaxMode === 'taxable'
+        ? gross * g / 100
+        : gross - gross / (1 + g / 100);
+      return s + Math.round(gst * 100) / 100;
     }, 0);
     const discountTotal = lines.reduce((s, l) => {
       const gross = (parseFloat(l.rate) || 0) * (parseFloat(l.quantity) || 1);
@@ -494,7 +531,7 @@ export default function ItemSalesEntryPage() {
     }, 0);
     const lineCount = lines.filter((l) => l.item_name && l.item_name.trim()).length;
     return { total, discountTotal, gstTotal, lineCount };
-  }, [lines]);
+  }, [lines, rateTaxMode]);
 
   const netTotal = Math.max(0, totals.total - (parseFloat(billDiscount) || 0));
 
@@ -564,6 +601,7 @@ export default function ItemSalesEntryPage() {
         notes,
         customer_name: isCashLedger ? customerName.trim() : '',
         customer_mobile: isCashLedger ? customerMobile.trim() : '',
+        customer_place: isCashLedger ? customerPlace.trim() : '',
         bill_discount: parseFloat(billDiscount) || 0,
         items: validLines.map((l) => ({
           item_id: l.item_id,
@@ -575,6 +613,7 @@ export default function ItemSalesEntryPage() {
           discount_percent: parseFloat(l.discount_percent) || 0,
           gst_percent: parseFloat(l.gst_percent) || 0,
           amount: parseFloat(l.amount) || 0,
+          rate_tax_mode: rateTaxMode,
         })),
       };
       const res = isEdit
@@ -591,6 +630,7 @@ export default function ItemSalesEntryPage() {
         setNotes('');
         setCustomerName('');
         setCustomerMobile('');
+        setCustomerPlace('');
         setBillDiscount('0');
         setLines([emptyLine()]);
         saleApi.getNextNumber()
@@ -687,12 +727,24 @@ export default function ItemSalesEntryPage() {
         <div className="flex flex-wrap items-end gap-2">
           <div className="w-52">
             <label className="text-xs text-slate-500">Customer Ledger *</label>
-            <LedgerAutocomplete
-              value={ledger}
-              onChange={setLedger}
-              behaviour="customer"
-              placeholder="Search customer…"
-            />
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                title="Create new ledger"
+                onClick={() => navigate('/ledger-creation?returnTo=' + encodeURIComponent(location.pathname + location.search))}
+                className="flex h-9 w-7 shrink-0 items-center justify-center rounded bg-trust-blue/10 text-trust-blue hover:bg-trust-blue/20 transition-colors"
+              >
+                <PlusIcon className="h-4 w-4" />
+              </button>
+              <div className="flex-1">
+                <LedgerAutocomplete
+                  value={ledger}
+                  onChange={setLedger}
+                  behaviour="customer"
+                  placeholder="Search customer…"
+                />
+              </div>
+            </div>
           </div>
           <div className="w-40">
             <label className="text-xs text-slate-500">Date</label>
@@ -726,7 +778,7 @@ export default function ItemSalesEntryPage() {
                 <th className="px-3 py-2 text-left font-semibold text-white min-w-[18rem]">Item Name</th>
                 <th className="px-3 py-2 text-left font-semibold text-white w-28">Unit</th>
                 <th className="px-3 py-2 text-right font-semibold text-white w-24">MRP</th>
-                <th className="px-3 py-2 text-right font-semibold text-white w-28">Rate</th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-28">{rateTaxMode === 'taxable' ? 'Taxable rate' : 'Rate(Inc. tax)'}</th>
                 <th className="px-3 py-2 text-right font-semibold text-white w-24">Qty</th>
                 <th className="px-3 py-2 text-right font-semibold text-white w-24">Disc %</th>
                 <th className="px-3 py-2 text-right font-semibold text-white w-24">GST %</th>
@@ -826,13 +878,8 @@ export default function ItemSalesEntryPage() {
                       placeholder="0"
                     />
                   </td>
-                  <td className="px-3 py-2">
-                    <GstSelect
-                      registerRef={(ref) => setCellRef(idx, 'gst', ref)}
-                      value={line.gst_percent}
-                      onChange={(v) => updateLine(idx, { gst_percent: v })}
-                      onKeyEnter={() => handleCellEnter(idx, 'gst')}
-                    />
+                  <td className="px-3 py-2 text-sm text-center text-slate-600">
+                    {line.gst_percent ? `${line.gst_percent}%` : '—'}
                   </td>
                   <td className="px-3 py-2 text-right font-semibold text-slate-800">
                     {formatCurrency(line.amount || 0)}
@@ -878,7 +925,7 @@ export default function ItemSalesEntryPage() {
               placeholder="Optional remarks for this sale"
             />
             {isCashLedger && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-slate-500">Customer Name</label>
                   <input
@@ -897,6 +944,16 @@ export default function ItemSalesEntryPage() {
                     onChange={(e) => setCustomerMobile(e.target.value)}
                     className="input-field"
                     placeholder="Mobile number"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-slate-500">Customer Place</label>
+                  <input
+                    type="text"
+                    value={customerPlace}
+                    onChange={(e) => setCustomerPlace(e.target.value)}
+                    className="input-field"
+                    placeholder="Place / location"
                   />
                 </div>
               </div>
@@ -1025,6 +1082,33 @@ export default function ItemSalesEntryPage() {
                 }`}
               />
             </button>
+          </div>
+
+          <div className="border-t border-slate-100 pt-4">
+            <p className="text-sm font-medium text-slate-700">Rate Tax Treatment</p>
+            <p className="text-xs text-slate-500 mt-0.5 mb-2">
+              Choose whether the entered rate already includes GST, or is the
+              pre-tax (taxable) value with GST added on top.
+            </p>
+            <div className="flex gap-2">
+              {[
+                { val: 'inclusive', label: 'Inclusive of tax' },
+                { val: 'taxable', label: 'Taxable rate' },
+              ].map((opt) => (
+                <button
+                  key={opt.val}
+                  type="button"
+                  onClick={() => setRateTaxModePersist(opt.val)}
+                  className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                    rateTaxMode === opt.val
+                      ? 'bg-trust-blue text-white border-trust-blue'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </Modal>

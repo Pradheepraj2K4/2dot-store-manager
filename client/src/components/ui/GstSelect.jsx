@@ -107,7 +107,7 @@ export default function GstSelect({ value, onChange, registerRef, onKeyEnter }) 
         onFocus={() => { setOpen(true); setQuery(''); }}
         onKeyDown={handleKeyDown}
         placeholder="0"
-        className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
+        className="w-full px-2 py-1.5 text-sm text-left border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
         autoComplete="off"
       />
 
@@ -132,7 +132,7 @@ export default function GstSelect({ value, onChange, registerRef, onKeyEnter }) 
                 key={rate}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => commit(rate)}
-                className={`w-full px-3 py-2 text-right text-sm border-b border-slate-100 last:border-0 hover:bg-slate-50 ${
+                className={`w-full px-3 py-2 text-left text-sm border-b border-slate-100 last:border-0 hover:bg-slate-50 ${
                   idx === highlight ? 'bg-trust-blue/10' : ''
                 } ${String(value) === String(rate) ? 'font-semibold text-trust-blue' : 'text-slate-700'}`}
               >

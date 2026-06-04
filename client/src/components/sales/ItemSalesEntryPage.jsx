@@ -18,7 +18,7 @@ import LoadingSpinner from '../ui/LoadingSpinner';
 import Modal from '../ui/Modal';
 import GstSelect from '../ui/GstSelect';
 
-const FIELD_ORDER = ['itemName', 'unit', 'qty', 'rate', 'discount', 'gst'];
+const FIELD_ORDER = ['itemName', 'unit', 'rate', 'qty', 'discount', 'gst'];
 
 function nowHHMM() {
   const d = new Date();
@@ -222,10 +222,16 @@ export default function ItemSalesEntryPage() {
   const [date, setDate] = useState(todayISO());
   const [time, setTime] = useState(nowHHMM());
   const [notes, setNotes] = useState('');
+  const [customerName, setCustomerName] = useState('');
+  const [customerMobile, setCustomerMobile] = useState('');
   const [billDiscount, setBillDiscount] = useState('0');
   const [lines, setLines] = useState([emptyLine()]);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
+
+  // CASH walk-in sales capture the buyer's name/mobile inline since they are
+  // all billed against the shared system CASH ledger.
+  const isCashLedger = ledger?.name === 'CASH';
 
   // ── Row focus tracking for cost-rate tag ────────────────────────
   const [focusedRow, setFocusedRow] = useState(null);
@@ -240,17 +246,21 @@ export default function ItemSalesEntryPage() {
     localStorage.setItem('sales_stock_lock', String(val));
   };
 
-  // Ctrl+I opens settings dialog
+  // Ctrl+I opens settings dialog; F10 → purchase report
   useEffect(() => {
     const handler = (e) => {
       if (e.ctrlKey && e.key === 'i') {
         e.preventDefault();
         setSettingsOpen((o) => !o);
       }
+      if (e.key === 'F10') {
+        e.preventDefault();
+        navigate('/purchase-report');
+      }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, []);
+  }, [navigate]);
 
   // ── Receipt / print state ─────────────────────────────────────────────
   const [store, setStore] = useState({});
@@ -341,6 +351,8 @@ export default function ItemSalesEntryPage() {
         setDate(sale.date);
         setTime(sale.time || '');
         setNotes(sale.notes || '');
+        setCustomerName(sale.customer_name || '');
+        setCustomerMobile(sale.customer_mobile || '');
         setBillDiscount(sale.bill_discount != null ? String(sale.bill_discount) : '0');
         setLedger({ id: sale.ledger_id, name: sale.ledger_name, behaviour: 'customer' });
         setLines(
@@ -486,16 +498,24 @@ export default function ItemSalesEntryPage() {
 
   const netTotal = Math.max(0, totals.total - (parseFloat(billDiscount) || 0));
 
-  // Derives cost info for the currently focused item row (from last purchase)
-  const focusedCostInfo = useMemo(() => {
+  // Derives stock + cost info for the currently focused item row.
+  const focusedItemInfo = useMemo(() => {
     if (focusedRow == null) return null;
     const line = lines[focusedRow];
     if (!line?.item_id) return null;
     const item = items.find((it) => it.id === line.item_id);
-    if (!item || item.last_purchase_rate == null) return null;
-    const gst = item.last_purchase_gst || 0;
-    const costRate = item.last_purchase_rate * (1 + gst / 100);
-    return { costRate, gst, baseRate: item.last_purchase_rate };
+    if (!item) return null;
+    const stock = Number(item.current_stock ?? line.current_stock ?? 0);
+    let cost = null;
+    if (item.last_purchase_rate != null) {
+      const gst = item.last_purchase_gst || 0;
+      cost = {
+        costRate: item.last_purchase_rate * (1 + gst / 100),
+        gst,
+        baseRate: item.last_purchase_rate,
+      };
+    }
+    return { name: item.name || line.item_name, unit: line.unit, stock, cost };
   }, [focusedRow, lines, items]);
 
   const handleSave = async () => {
@@ -542,6 +562,8 @@ export default function ItemSalesEntryPage() {
         date,
         time,
         notes,
+        customer_name: isCashLedger ? customerName.trim() : '',
+        customer_mobile: isCashLedger ? customerMobile.trim() : '',
         bill_discount: parseFloat(billDiscount) || 0,
         items: validLines.map((l) => ({
           item_id: l.item_id,
@@ -560,9 +582,20 @@ export default function ItemSalesEntryPage() {
         : await saleApi.create(payload);
       toast.success(isEdit ? 'Sale updated' : `Sale #${res.data.sale_number} saved`);
       if (res.data) {
-        openSalePreview(res.data, ledger?.name, true);
-      } else {
-        navigate('/item-sales');
+        openSalePreview(res.data, ledger?.name, false);
+      }
+      if (!isEdit) {
+        setLedger(null);
+        setDate(todayISO());
+        setTime(nowHHMM());
+        setNotes('');
+        setCustomerName('');
+        setCustomerMobile('');
+        setBillDiscount('0');
+        setLines([emptyLine()]);
+        saleApi.getNextNumber()
+          .then((r) => setSaleNumber(r.data?.sale_number || ''))
+          .catch(() => {});
       }
     } catch (err) {
       toast.error(err.message);
@@ -837,13 +870,37 @@ export default function ItemSalesEntryPage() {
         <div className="px-4 pt-4 pb-3 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2 flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">Notes</label>
-            <textarea
+            <input
+              type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="input-field resize-none"
+              className="input-field"
               placeholder="Optional remarks for this sale"
             />
+            {isCashLedger && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-slate-500">Customer Name</label>
+                  <input
+                    type="text"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    className="input-field"
+                    placeholder="Walk-in customer name"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-slate-500">Customer Mobile</label>
+                  <input
+                    type="tel"
+                    value={customerMobile}
+                    onChange={(e) => setCustomerMobile(e.target.value)}
+                    className="input-field"
+                    placeholder="Mobile number"
+                  />
+                </div>
+              </div>
+            )}
             <div className="flex items-center gap-3 mt-1">
               <div className="flex items-center gap-2 rounded-lg bg-slate-50 border border-slate-100 px-3 py-1.5 text-sm">
                 <span className="text-slate-500">Items</span>
@@ -897,50 +954,50 @@ export default function ItemSalesEntryPage() {
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 px-4 py-2 border-t border-slate-100">
-          <button type="button" onClick={() => navigate('/item-sales')} className="btn-secondary">
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className="btn-primary"
-          >
-            {saving ? 'Saving…' : (isEdit ? 'Update Sale' : 'Save Sale')}
-          </button>
+        <div className="flex items-center justify-between gap-2 px-4 py-2 border-t border-slate-100">
+          {/* Footer info — shows stock + cost rate of the focused item row */}
+          <div className="flex items-center gap-4 text-xs min-h-[1.5rem]">
+            {focusedItemInfo && (
+              <>
+                <span className="font-medium text-slate-600 truncate max-w-[160px]" title={focusedItemInfo.name}>
+                  {focusedItemInfo.name}
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="text-slate-400">Stock:</span>
+                  <span className={`font-bold ${focusedItemInfo.stock <= 0 ? 'text-debit-red' : 'text-credit-green'}`}>
+                    {focusedItemInfo.stock}
+                  </span>
+                  {focusedItemInfo.unit && <span className="text-slate-400">{focusedItemInfo.unit}</span>}
+                </span>
+                {focusedItemInfo.cost && (
+                  <span className="flex items-center gap-1">
+                    <span className="text-slate-400">Cost Rate:</span>
+                    <span className="font-bold text-slate-700">{formatCurrency(focusedItemInfo.cost.costRate)}</span>
+                    {focusedItemInfo.cost.gst > 0 && (
+                      <span className="text-slate-400">
+                        ({formatCurrency(focusedItemInfo.cost.baseRate)} + {focusedItemInfo.cost.gst}% GST)
+                      </span>
+                    )}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={() => navigate('/item-sales')} className="btn-secondary">
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="btn-primary"
+            >
+              {saving ? 'Saving…' : (isEdit ? 'Update Sale' : 'Save Sale')}
+            </button>
+          </div>
         </div>
       </div>
-
-      {/* Cost rate tag — shown when a row with a purchased item is focused */}
-      {focusedCostInfo && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-          <div className="flex items-center gap-2 rounded-full bg-slate-800/90 px-4 py-1.5 text-xs shadow-xl backdrop-blur-sm">
-            <span className="text-slate-400 font-medium">Purchase Cost</span>
-            <span className="font-bold text-white">{formatCurrency(focusedCostInfo.costRate)}</span>
-            {focusedCostInfo.gst > 0 && (
-              <span className="text-slate-400">
-                ({formatCurrency(focusedCostInfo.baseRate)} + {focusedCostInfo.gst}% GST)
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Cost rate tag — shown when a row with a purchased item is focused */}
-      {focusedCostInfo && (
-        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
-          <div className="flex items-center gap-2 rounded-full bg-slate-800/90 px-4 py-1.5 text-xs shadow-xl backdrop-blur-sm">
-            <span className="text-slate-400 font-medium">Purchase Cost</span>
-            <span className="font-bold text-white">{formatCurrency(focusedCostInfo.costRate)}</span>
-            {focusedCostInfo.gst > 0 && (
-              <span className="text-slate-400">
-                ({formatCurrency(focusedCostInfo.baseRate)} + {focusedCostInfo.gst}% GST)
-              </span>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Item Sales Settings dialog */}
       <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} title="Item Sales Settings">

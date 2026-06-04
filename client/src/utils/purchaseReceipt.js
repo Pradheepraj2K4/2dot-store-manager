@@ -1,12 +1,12 @@
 /**
- * Sale / Invoice Receipt printer
+ * Purchase Voucher Receipt printer
  *
- * Generates a print-ready HTML page for an item sale.
+ * Generates a print-ready HTML page for an item purchase.
  * `format`: 'a5' | 'a4' | 'thermal'
  *
- *  - thermal : 80mm POS roll, monospaced, stacked line layout
- *  - a4 / a5 : standard monochrome tax invoice with two-column header,
- *              Bill-To block, ruled items table and totals panel
+ *  - thermal : 80mm POS roll, monospaced
+ *  - a4 / a5 : standard monochrome purchase voucher with two-column header,
+ *              Supplier block, ruled items table and totals panel
  */
 
 function fmt(date) {
@@ -37,11 +37,10 @@ function escapeHtml(s) {
   })[c]);
 }
 
-// Convert paise integer-rounded amount to Indian-style words.
 function amountInWords(n) {
-  const num = Math.round((parseFloat(n) || 0) * 100) / 100;
-  const rupees = Math.floor(num);
-  const paise = Math.round((num - rupees) * 100);
+  const x0 = Math.round((parseFloat(n) || 0) * 100) / 100;
+  const rupees = Math.floor(x0);
+  const paise = Math.round((x0 - rupees) * 100);
   const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine',
     'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
   const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
@@ -74,29 +73,26 @@ const PAGE_SIZES = {
   thermal: { cssSize: '80mm auto', width: '76mm'  },
 };
 
-export function buildSaleReceiptHtml({
-  sale,
-  ledgerName, // unused for non-CASH; customer comes from sale.customer_name
+export function buildPurchaseReceiptHtml({
+  purchase,
   store = {},
   logoDataUrl = null,
   format = 'thermal',
 }) {
   const ps = PAGE_SIZES[format] || PAGE_SIZES.thermal;
-  const isThermal = format === 'thermal';
-
-  if (isThermal) return buildThermal({ sale, ledgerName, store, logoDataUrl, ps });
-  return buildPaper({ sale, store, logoDataUrl, ps, format });
+  if (format === 'thermal') return buildThermal({ purchase, store, logoDataUrl, ps });
+  return buildPaper({ purchase, store, logoDataUrl, ps, format });
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Thermal (80mm) — POS-style monospaced receipt
+// Thermal (80mm) — POS-style monospaced voucher
 // ───────────────────────────────────────────────────────────────────────────
-function buildThermal({ sale, ledgerName, store, logoDataUrl, ps }) {
-  const items = Array.isArray(sale.items) ? sale.items : [];
+function buildThermal({ purchase, store, logoDataUrl, ps }) {
+  const items = Array.isArray(purchase.items) ? purchase.items : [];
   const totalQty          = items.reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0);
-  const totalItemDiscount = parseFloat(sale.total_discount) || 0;
-  const totalBillDiscount = parseFloat(sale.bill_discount) || 0;
-  const totalAmount       = parseFloat(sale.total_amount) || 0;
+  const totalItemDiscount = parseFloat(purchase.total_discount) || 0;
+  const totalBillDiscount = parseFloat(purchase.bill_discount) || 0;
+  const totalAmount       = parseFloat(purchase.total_amount) || 0;
 
   const subtotal = items.reduce((s, l) => {
     const rate = parseFloat(l.rate) || 0;
@@ -108,9 +104,7 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps }) {
   const gstSlabs = {};
   items.forEach(l => {
     const rate = parseFloat(l.gst_percent) || 0;
-    if (rate > 0) {
-      gstSlabs[rate] = (gstSlabs[rate] || 0) + (parseFloat(l.gst_amount) || 0);
-    }
+    if (rate > 0) gstSlabs[rate] = (gstSlabs[rate] || 0) + (parseFloat(l.gst_amount) || 0);
   });
   const gstSlabRows = Object.entries(gstSlabs)
     .sort(([a], [b]) => parseFloat(a) - parseFloat(b))
@@ -125,9 +119,6 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps }) {
     ? `<div class="logo-wrap"><img src="${logoDataUrl}" alt="Logo"/></div>`
     : '';
 
-  // Compact monospaced item rows. Each item:
-  //   1. Item Name                                  2,499.00
-  //      2 Nos x 1,250.00  disc 5%  gst 12%
   const itemsHtml = `
     <div class="items">
       <div class="items-head">
@@ -163,7 +154,7 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps }) {
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Invoice ${sale.sale_number || ''}</title>
+  <title>Purchase ${purchase.purchase_number || ''}</title>
   <style>
     @page { size: ${ps.cssSize}; margin: 3mm 2mm; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -184,12 +175,10 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps }) {
     .logo-wrap { text-align: center; margin-bottom: 1.5mm; }
     .logo-wrap img { max-height: 12mm; max-width: 100%; object-fit: contain; filter: grayscale(100%) contrast(1.15); }
 
-    /* ── Centered store header ── */
     .header { text-align: center; }
     .store-name { font-size: 13pt; font-weight: 900; letter-spacing: 0.5px; }
     .store-meta { font-size: 8pt; margin-top: 0.8mm; line-height: 1.35; }
 
-    /* ── Title banner ── */
     .title-band {
       text-align: center;
       font-weight: 800;
@@ -202,26 +191,16 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps }) {
       border-bottom: 1px solid #000;
     }
 
-    /* ── Rules ── */
     .rule-dash  { border-top: 1px dashed #000; margin: 1mm 0; }
     .rule-solid { border-top: 1px solid #000;  margin: 0.8mm 0; }
-    .rule-dbl   { border-top: 3px double #000; margin: 1mm 0; }
 
-    /* ── Generic key/value rows (used for meta + totals) ── */
-    .row {
-      display: flex;
-      justify-content: space-between;
-      gap: 2mm;
-      font-size: 9pt;
-    }
+    .row { display: flex; justify-content: space-between; gap: 2mm; font-size: 9pt; }
     .row .lbl { color: #000; }
     .row .val { font-weight: 700; text-align: right; }
 
-    /* Meta block: tighter, two narrow rows */
     .meta { margin: 0.5mm 0; }
     .meta .row { padding: 0.2mm 0; font-size: 8.5pt; }
 
-    /* Items */
     .items { margin: 0.5mm 0; }
     .items-head { display: flex; justify-content: space-between; font-weight: 800; font-size: 8.5pt; padding: 0.5mm 0; }
     .ih-item { flex: 1; }
@@ -231,9 +210,7 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps }) {
     .i-name { flex: 1; word-break: break-word; padding-right: 2mm; }
     .i-amt  { white-space: nowrap; }
     .item-meta { font-size: 8pt; padding-bottom: 0.6mm; }
-    .item-meta span { color: #000; }
 
-    /* Totals */
     .totals { margin-top: 0.5mm; }
     .totals .row { padding: 0.4mm 0; }
     .totals .grand {
@@ -267,14 +244,13 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps }) {
       font-size: 8.5pt;
       line-height: 1.4;
     }
-    .thanks { font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; }
+    .stamp { font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; }
     .system-tag { margin-top: 1mm; font-size: 7pt; letter-spacing: 1px; }
   </style>
 </head>
 <body>
 <div class="page">
 
-  <!-- Header -->
   <div class="header">
     ${logoHtml}
     <div class="store-name">${escapeHtml(store.store_name || 'Store')}</div>
@@ -285,20 +261,19 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps }) {
     </div>
   </div>
 
-  <div class="title-band">Tax Invoice</div>
+  <div class="title-band">Purchase Voucher</div>
 
-  <!-- Meta -->
   <div class="meta">
-    <div class="row"><span class="lbl">Bill No.</span><span class="val">${escapeHtml(sale.sale_number || '—')}</span></div>
-    <div class="row"><span class="lbl">Date</span><span class="val">${fmt(sale.date)}${sale.time ? '  ' + escapeHtml(sale.time) : ''}</span></div>
-    ${sale.customer_name && sale.customer_name.trim() ? `<div class="row"><span class="lbl">Customer</span><span class="val">${escapeHtml(sale.customer_name.trim())}</span></div>` : ''}
+    <div class="row"><span class="lbl">Voucher No.</span><span class="val">${escapeHtml(purchase.purchase_number || '—')}</span></div>
+    <div class="row"><span class="lbl">Date</span><span class="val">${fmt(purchase.date)}${purchase.time ? '  ' + escapeHtml(purchase.time) : ''}</span></div>
+    <div class="row"><span class="lbl">Supplier</span><span class="val">${escapeHtml(purchase.ledger_name || '—')}</span></div>
+    ${purchase.bill_number ? `<div class="row"><span class="lbl">Bill No.</span><span class="val">${escapeHtml(purchase.bill_number)}</span></div>` : ''}
   </div>
 
   <div class="rule-dash"></div>
 
   ${itemsHtml}
 
-  <!-- Totals -->
   <div class="totals">
     <div class="row"><span class="lbl">Qty / Items</span><span class="val">${num(totalQty, totalQty % 1 === 0 ? 0 : 2)} / ${items.length}</span></div>
     <div class="row"><span class="lbl">Subtotal</span><span class="val">${money(subtotal)}</span></div>
@@ -310,10 +285,10 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps }) {
 
   <div class="words">${escapeHtml(amountInWords(totalAmount))}</div>
 
-  ${sale.notes ? `<div class="notes"><span class="lbl">Notes:</span> ${escapeHtml(sale.notes)}</div>` : ''}
+  ${purchase.notes ? `<div class="notes"><span class="lbl">Notes:</span> ${escapeHtml(purchase.notes)}</div>` : ''}
 
   <div class="footer">
-    <div class="thanks">Thank you · Visit again</div>
+    <div class="stamp">Stock In — Internal Record</div>
     <div class="system-tag">* * *</div>
   </div>
 
@@ -323,17 +298,16 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps }) {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// A4 / A5 — standard monochrome tax invoice
+// A4 / A5 — standard monochrome purchase voucher
 // ───────────────────────────────────────────────────────────────────────────
-function buildPaper({ sale, store, logoDataUrl, ps, format }) {
+function buildPaper({ purchase, store, logoDataUrl, ps, format }) {
   const isA5 = format === 'a5';
-  const items = Array.isArray(sale.items) ? sale.items : [];
+  const items = Array.isArray(purchase.items) ? purchase.items : [];
 
-  const totalItemDiscount = parseFloat(sale.total_discount) || 0;
-  const totalBillDiscount = parseFloat(sale.bill_discount) || 0;
-  const totalAmount       = parseFloat(sale.total_amount) || 0;
+  const totalItemDiscount = parseFloat(purchase.total_discount) || 0;
+  const totalBillDiscount = parseFloat(purchase.bill_discount) || 0;
+  const totalAmount       = parseFloat(purchase.total_amount) || 0;
 
-  // Subtotal before tax = sum of (rate * qty * (1 - disc/100)) per line
   const subtotal = items.reduce((s, l) => {
     const rate = parseFloat(l.rate) || 0;
     const qty  = parseFloat(l.quantity) || 0;
@@ -344,9 +318,7 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
   const gstSlabs = {};
   items.forEach(l => {
     const rate = parseFloat(l.gst_percent) || 0;
-    if (rate > 0) {
-      gstSlabs[rate] = (gstSlabs[rate] || 0) + (parseFloat(l.gst_amount) || 0);
-    }
+    if (rate > 0) gstSlabs[rate] = (gstSlabs[rate] || 0) + (parseFloat(l.gst_amount) || 0);
   });
   const gstSlabRows = Object.entries(gstSlabs)
     .sort(([a], [b]) => parseFloat(a) - parseFloat(b))
@@ -359,13 +331,6 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
 
   const logoHtml = logoDataUrl
     ? `<img class="logo" src="${logoDataUrl}" alt="Logo"/>`
-    : '';
-
-  const customerBlock = sale.customer_name && sale.customer_name.trim()
-    ? `<div class="party">
-         <div class="party-title">Bill To</div>
-         <div class="party-name">${escapeHtml(sale.customer_name.trim())}</div>
-       </div>`
     : '';
 
   const itemsRows = items.map((l, i) => {
@@ -389,18 +354,16 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
     `;
   }).join('');
 
-  // Font sizes scaled for paper
   const baseFs   = isA5 ? '9pt'  : '10.5pt';
   const titleFs  = isA5 ? '15pt' : '20pt';
   const headFs   = isA5 ? '8.5pt' : '9.5pt';
   const grandFs  = isA5 ? '12pt' : '14pt';
-  const padPage  = isA5 ? '0' : '0';
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Invoice ${sale.sale_number || ''}</title>
+  <title>Purchase ${purchase.purchase_number || ''}</title>
   <style>
     @page { size: ${ps.cssSize}; margin: ${isA5 ? '8mm' : '14mm'}; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -413,20 +376,16 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
       width: ${ps.width};
     }
     @media screen { html, body { width: 100%; max-width: 100%; overflow-x: hidden; } }
-    .page { width: 100%; padding: ${padPage}; }
+    .page { width: 100%; }
 
-    /* ── Outer document frame ── */
     .doc { border: 1px solid #000; }
 
-    /* ── Header band ── */
     .head {
       display: grid;
       grid-template-columns: 1fr 1fr;
       border-bottom: 1px solid #000;
     }
-    .head .left, .head .right {
-      padding: ${isA5 ? '4mm' : '6mm'};
-    }
+    .head .left, .head .right { padding: ${isA5 ? '4mm' : '6mm'}; }
     .head .right {
       border-left: 1px solid #000;
       text-align: right;
@@ -454,7 +413,6 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
     .doc-meta .val { font-weight: 700; }
     .doc-meta div { display: flex; justify-content: space-between; gap: 4mm; }
 
-    /* ── Party (Bill To) ── */
     .party {
       padding: ${isA5 ? '3mm 4mm' : '4mm 6mm'};
       border-bottom: 1px solid #000;
@@ -462,11 +420,7 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
     .party-title { font-size: ${headFs}; font-weight: 700; text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 1mm; }
     .party-name { font-size: ${isA5 ? '10.5pt' : '12pt'}; font-weight: 700; }
 
-    /* ── Items table ── */
-    .items {
-      width: 100%;
-      border-collapse: collapse;
-    }
+    .items { width: 100%; border-collapse: collapse; }
     .items th, .items td {
       padding: ${isA5 ? '1.8mm 2mm' : '2.4mm 2.5mm'};
       border-right: 1px solid #000;
@@ -489,7 +443,6 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
     .items .r { text-align: right; }
     .items td:nth-child(2) { font-weight: 600; }
 
-    /* Hand-build column widths — keeps tabular alignment tidy at A4/A5 */
     .items col.col-no    { width: ${isA5 ? '8mm'  : '10mm'}; }
     .items col.col-name  { width: auto; }
     .items col.col-unit  { width: ${isA5 ? '12mm' : '15mm'}; }
@@ -500,7 +453,6 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
     .items col.col-tax   { width: ${isA5 ? '22mm' : '26mm'}; }
     .items col.col-amt   { width: ${isA5 ? '24mm' : '30mm'}; }
 
-    /* ── Summary band: words on left, totals table on right ── */
     .summary {
       display: grid;
       grid-template-columns: 1fr ${isA5 ? '60mm' : '80mm'};
@@ -518,7 +470,6 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
     .words .notes { margin-top: 3mm; font-size: ${isA5 ? '8pt' : '9pt'}; }
     .words .notes .lbl { font-style: normal; }
 
-    .summary .totals { padding: 0; }
     .totals-table { width: 100%; border-collapse: collapse; }
     .totals-table td {
       padding: ${isA5 ? '1.6mm 3mm' : '2mm 4mm'};
@@ -538,16 +489,13 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
     }
     .totals-table tr:last-child td { border-bottom: none; }
 
-    /* ── Footer / signature ── */
     .foot {
       display: grid;
       grid-template-columns: 1fr 1fr;
       border-top: 1px solid #000;
       font-size: ${isA5 ? '8pt' : '9pt'};
     }
-    .foot .col {
-      padding: ${isA5 ? '4mm' : '6mm'};
-    }
+    .foot .col { padding: ${isA5 ? '4mm' : '6mm'}; }
     .foot .col + .col { border-left: 1px solid #000; text-align: right; }
     .foot .lbl { text-transform: uppercase; letter-spacing: 1.2px; font-weight: 700; }
     .foot .sig-line {
@@ -574,7 +522,6 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
 <div class="page">
   <div class="doc">
 
-    <!-- Header -->
     <div class="head">
       <div class="left">
         <div class="store-row">
@@ -591,18 +538,21 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
         </div>
       </div>
       <div class="right">
-        <div class="doc-title">Tax Invoice</div>
+        <div class="doc-title">Purchase Voucher</div>
         <div class="doc-meta">
-          <div><span class="lbl">Invoice No.</span><span class="val">${escapeHtml(sale.sale_number || '—')}</span></div>
-          <div><span class="lbl">Invoice Date</span><span class="val">${fmt(sale.date)}${sale.time ? ' · ' + escapeHtml(sale.time) : ''}</span></div>
+          <div><span class="lbl">Voucher No.</span><span class="val">${escapeHtml(purchase.purchase_number || '—')}</span></div>
+          <div><span class="lbl">Date</span><span class="val">${fmt(purchase.date)}${purchase.time ? ' · ' + escapeHtml(purchase.time) : ''}</span></div>
+          ${purchase.bill_number ? `<div><span class="lbl">Supplier Bill #</span><span class="val">${escapeHtml(purchase.bill_number)}</span></div>` : ''}
           <div><span class="lbl">Items</span><span class="val">${items.length}</span></div>
         </div>
       </div>
     </div>
 
-    ${customerBlock}
+    <div class="party">
+      <div class="party-title">Supplier</div>
+      <div class="party-name">${escapeHtml(purchase.ledger_name || '—')}</div>
+    </div>
 
-    <!-- Items -->
     <table class="items">
       <colgroup>
         <col class="col-no"/>
@@ -633,14 +583,13 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
       </tbody>
     </table>
 
-    <!-- Summary: words + totals -->
     <div class="summary">
       <div class="words">
         <div>
           <div class="lbl">Amount in Words</div>
           <div class="val">${escapeHtml(amountInWords(totalAmount))}</div>
         </div>
-        ${sale.notes ? `<div class="notes"><span class="lbl">Notes:</span> ${escapeHtml(sale.notes)}</div>` : ''}
+        ${purchase.notes ? `<div class="notes"><span class="lbl">Notes:</span> ${escapeHtml(purchase.notes)}</div>` : ''}
       </div>
       <div class="totals">
         <table class="totals-table">
@@ -655,12 +604,10 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
       </div>
     </div>
 
-    <!-- Footer: terms + signature -->
     <div class="foot">
       <div class="col terms">
-        <span class="lbl">Terms &amp; Conditions</span>
-        Goods once sold will not be taken back or exchanged.
-        All disputes are subject to local jurisdiction.
+        <span class="lbl">Notes</span>
+        Internal stock-in record. Verify quantities and supplier bill against entry before filing.
       </div>
       <div class="col">
         <span class="lbl">For ${escapeHtml(store.store_name || 'Store')}</span>
@@ -668,19 +615,10 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
       </div>
     </div>
 
-    <div class="thanks">Thank you for your business</div>
+    <div class="thanks">Stock In — Internal Record</div>
 
   </div>
 </div>
 </body>
 </html>`;
-}
-
-export function printSaleReceipt(opts) {
-  const html = buildSaleReceiptHtml(opts);
-  const win = window.open('', '_blank', 'width=420,height=700');
-  if (win) {
-    win.document.write(html);
-    win.document.close();
-  }
 }

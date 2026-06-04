@@ -102,6 +102,8 @@ class SaleService {
         total_gst: Math.round(total_gst * 100) / 100,
         item_count: normalisedItems.length,
         notes: data.notes || '',
+        customer_name: data.customer_name || '',
+        customer_mobile: data.customer_mobile || '',
         items: normalisedItems,
       });
 
@@ -165,6 +167,8 @@ class SaleService {
         total_gst: Math.round(total_gst * 100) / 100,
         item_count: normalisedItems.length,
         notes: data.notes || '',
+        customer_name: data.customer_name || '',
+        customer_mobile: data.customer_mobile || '',
         items: normalisedItems,
       });
     });

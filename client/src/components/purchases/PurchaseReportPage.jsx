@@ -1,9 +1,10 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   MagnifyingGlassIcon,
   PencilSquareIcon,
+  PrinterIcon,
   TrashIcon,
   ChevronRightIcon,
   ChevronDownIcon,
@@ -12,8 +13,10 @@ import {
   XMarkIcon,
   ArrowPathIcon,
 } from "@heroicons/react/24/outline";
-import { purchaseApi } from "../../api";
+import { purchaseApi, settingsApi } from "../../api";
 import { formatCurrency, formatDate } from "../../utils/helpers";
+import { buildPurchaseReceiptHtml } from "../../utils/purchaseReceipt";
+import { fetchLogoDataUrl } from "../../utils/interestReceipt";
 import LoadingSpinner from "../ui/LoadingSpinner";
 import EmptyState from "../ui/EmptyState";
 import Modal from "../ui/Modal";
@@ -52,6 +55,44 @@ export default function PurchaseReportPage() {
 
   const [expanded, setExpanded] = useState({});
   const [deleteModal, setDeleteModal] = useState({ open: false, purchase: null });
+
+  // Print / preview state
+  const [store, setStore] = useState({});
+  const [logoDataUrl, setLogoDataUrl] = useState(null);
+  const [receiptFormat, setReceiptFormat] = useState('thermal');
+  const [previewModal, setPreviewModal] = useState({ open: false, html: '', purchase: null });
+
+  useEffect(() => {
+    (async () => {
+      const [profileRes, configRes] = await Promise.all([
+        settingsApi.getStoreProfile().catch(() => ({ data: {} })),
+        settingsApi.getReceiptConfig().catch(() => ({ data: {} })),
+      ]);
+      const profile = profileRes.data || {};
+      setStore(profile);
+      const fmt = (configRes.data && configRes.data.format) || 'thermal';
+      setReceiptFormat(['a4', 'a5', 'thermal'].includes(fmt) ? fmt : 'thermal');
+      if (profile.logo_path) {
+        const dl = await fetchLogoDataUrl(profile.logo_path);
+        setLogoDataUrl(dl);
+      }
+    })();
+  }, []);
+
+  const handlePrint = async (id) => {
+    try {
+      const res = await purchaseApi.getById(id);
+      const html = buildPurchaseReceiptHtml({
+        purchase: res.data,
+        store,
+        logoDataUrl,
+        format: receiptFormat,
+      });
+      setPreviewModal({ open: true, html, purchase: res.data });
+    } catch (err) {
+      toast.error(err.message || 'Failed to load receipt');
+    }
+  };
 
   const fetchPurchases = async () => {
     try {
@@ -324,6 +365,13 @@ export default function PurchaseReportPage() {
                             <PencilSquareIcon className="w-4 h-4" />
                           </button>
                           <button
+                            onClick={() => handlePrint(p.id)}
+                            className="text-slate-400 hover:text-blue-600 transition-colors"
+                            title="Print voucher"
+                          >
+                            <PrinterIcon className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => setDeleteModal({ open: true, purchase: p })}
                             className="text-slate-400 hover:text-red-600 transition-colors"
                             title="Delete purchase"
@@ -429,6 +477,79 @@ export default function PurchaseReportPage() {
           <button onClick={handleDelete} className="btn-danger">Delete</button>
         </div>
       </Modal>
+
+      {/* Receipt Preview Modal */}
+      <Modal
+        open={previewModal.open}
+        onClose={() => setPreviewModal({ open: false, html: '', purchase: null })}
+        title={`Purchase Voucher${previewModal.purchase ? ' #' + previewModal.purchase.purchase_number : ''}`}
+        size="lg"
+      >
+        <PurchaseReceiptPreview
+          html={previewModal.html}
+          format={receiptFormat}
+          onFormatChange={(f) => {
+            setReceiptFormat(f);
+            if (previewModal.purchase) {
+              const html = buildPurchaseReceiptHtml({
+                purchase: previewModal.purchase,
+                store,
+                logoDataUrl,
+                format: f,
+              });
+              setPreviewModal((prev) => ({ ...prev, html }));
+            }
+          }}
+          onClose={() => setPreviewModal({ open: false, html: '', purchase: null })}
+        />
+      </Modal>
+    </div>
+  );
+}
+
+function PurchaseReceiptPreview({ html, format, onFormatChange, onClose }) {
+  const iframeRef = useRef(null);
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-slate-500">Format:</span>
+        {['thermal', 'a5', 'a4'].map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => onFormatChange(f)}
+            className={`rounded-md px-2.5 py-1 text-xs font-medium border ${
+              format === f
+                ? 'bg-blue-600 text-white border-blue-600'
+                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            {f === 'thermal' ? 'Thermal 80mm' : f.toUpperCase()}
+          </button>
+        ))}
+      </div>
+      <iframe
+        ref={iframeRef}
+        srcDoc={html}
+        title="Purchase Voucher Preview"
+        className="w-full border border-slate-200 rounded bg-white"
+        style={{ minHeight: 380, maxHeight: 600, overflowX: 'hidden' }}
+        onLoad={(e) => {
+          const doc = e.target.contentDocument;
+          if (doc) e.target.style.height = Math.min(doc.body.scrollHeight + 8, 600) + 'px';
+        }}
+      />
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onClose} className="btn-secondary">Close</button>
+        <button
+          type="button"
+          onClick={() => iframeRef.current?.contentWindow?.print()}
+          className="btn-primary inline-flex items-center gap-1.5"
+        >
+          <PrinterIcon className="h-4 w-4" />
+          Print
+        </button>
+      </div>
     </div>
   );
 }

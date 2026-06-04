@@ -13,7 +13,7 @@ import LedgerAutocomplete from '../ui/LedgerAutocomplete';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import GstSelect from '../ui/GstSelect';
 
-const FIELD_ORDER = ['itemName', 'unit', 'qty', 'rate', 'discount', 'gst'];
+const FIELD_ORDER = ['itemName', 'unit', 'rate', 'qty', 'discount', 'gst'];
 
 function nowHHMM() {
   const d = new Date();
@@ -269,6 +269,18 @@ export default function ItemPurchaseEntryPage() {
       .finally(() => setLoading(false));
   }, [isEdit, purchaseIdParam]);
 
+  // F10 → purchase report
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'F10') {
+        e.preventDefault();
+        navigate('/purchase-report');
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [navigate]);
+
   // After returning from item creation
   useEffect(() => {
     const raw = sessionStorage.getItem('lastCreatedItem');
@@ -411,7 +423,18 @@ export default function ItemPurchaseEntryPage() {
         ? await purchaseApi.update(purchaseIdParam, payload)
         : await purchaseApi.create(payload);
       toast.success(isEdit ? 'Purchase updated' : `Purchase #${res.data.purchase_number} saved`);
-      navigate('/item-purchases');
+      if (!isEdit) {
+        setLedger(null);
+        setBillNumber('');
+        setDate(todayISO());
+        setTime(nowHHMM());
+        setNotes('');
+        setBillDiscount('0');
+        setLines([emptyLine()]);
+        purchaseApi.getNextNumber()
+          .then((r) => setPurchaseNumber(r.data?.purchase_number || ''))
+          .catch(() => {});
+      }
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -638,11 +661,11 @@ export default function ItemPurchaseEntryPage() {
         <div className="px-4 pt-3 pb-2 grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="md:col-span-2 flex flex-col gap-1">
             <label className="text-xs font-medium text-slate-500">Notes</label>
-            <textarea
+            <input
+              type="text"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              rows={2}
-              className="input-field resize-none"
+              className="input-field"
               placeholder="Optional remarks for this purchase"
             />
             <div className="flex items-center gap-3 mt-1">

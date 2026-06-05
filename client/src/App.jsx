@@ -64,7 +64,11 @@ export default function App() {
                   path="/statement-of-account"
                   element={<StatementOfAccountPage />}
                 />
-                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/settings" element={
+                  <ProtectedRoute permission="manage_settings">
+                    <SettingsPage />
+                  </ProtectedRoute>
+                } />
                 <Route
                   path="/developer-settings"
                   element={<DeveloperSettingsPage />}

@@ -159,7 +159,7 @@ export default function ItemNameCell({
                     ) : null}
                     {it.name}
                   </span>
-                  <span className="text-[10px] font-mono text-slate-500">#{it.id}</span>
+                  <span className="text-[10px] font-mono text-slate-500">{it.id}</span>
                 </div>
                 <div className="text-xs text-slate-500 truncate flex items-center justify-between">
                   <span className="truncate">

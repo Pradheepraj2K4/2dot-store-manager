@@ -105,7 +105,7 @@ export default function LedgerCreationPage() {
       toast.success('Ledger created successfully');
       const newId = res.data?.id || res.data?.ledger?.id;
       if (returnTo) {
-        navigate(returnTo);
+        navigate(returnTo, { state: { newLedgerId: newId } });
       } else {
         setForm(EMPTY_FORM);
         setErrors({});

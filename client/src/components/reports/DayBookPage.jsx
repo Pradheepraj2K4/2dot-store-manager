@@ -82,7 +82,7 @@ export default function DayBookPage() {
         type: 'sale',
         sortKey: s.id,
         date: s.date,
-        details: `${s.ledger_name} — Sale #${s.sale_number}`,
+        details: `${s.ledger_name} — Sale ${s.sale_number}`,
         voucherNo: `SAL-${String(s.sale_number).padStart(5, '0')}`,
         debit: 0,
         credit: s.total_amount,
@@ -96,7 +96,7 @@ export default function DayBookPage() {
           type: 'purchase',
           sortKey: p.id,
           date: p.date,
-          details: `${p.ledger_name} — Purchase #${p.purchase_number}${billRef}`,
+          details: `${p.ledger_name} — Purchase ${p.purchase_number}${billRef}`,
           voucherNo: `PUR-${String(p.purchase_number).padStart(5, '0')}`,
           debit: p.total_amount,
           credit: 0,
@@ -105,13 +105,13 @@ export default function DayBookPage() {
 
       // Sales Returns → Debit (reduces income)
       const srEntries = salesRets.map((r) => {
-        const ref = r.sale_number ? ` [Sale #${r.sale_number}]` : '';
+        const ref = r.sale_number ? ` [Sale ${r.sale_number}]` : '';
         return {
           id: `sr-${r.id}`,
           type: 'sales_return',
           sortKey: r.id,
           date: r.date,
-          details: `${r.ledger_name} — Sales Return #${r.return_number}${ref}`,
+          details: `${r.ledger_name} — Sales Return ${r.return_number}${ref}`,
           voucherNo: `SR-${String(r.return_number).padStart(5, '0')}`,
           debit: r.total_amount,
           credit: 0,
@@ -122,13 +122,13 @@ export default function DayBookPage() {
       const prEntries = purchRets.map((r) => {
         const ref = r.bill_number
           ? ` [Bill: ${r.bill_number}]`
-          : r.purchase_number ? ` [Purchase #${r.purchase_number}]` : '';
+          : r.purchase_number ? ` [Purchase ${r.purchase_number}]` : '';
         return {
           id: `pr-${r.id}`,
           type: 'purchase_return',
           sortKey: r.id,
           date: r.date,
-          details: `${r.ledger_name} — Purchase Return #${r.return_number}${ref}`,
+          details: `${r.ledger_name} — Purchase Return ${r.return_number}${ref}`,
           voucherNo: `PR-${String(r.return_number).padStart(5, '0')}`,
           debit: 0,
           credit: r.total_amount,

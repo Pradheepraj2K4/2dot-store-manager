@@ -26,7 +26,7 @@ import {
   ArchiveBoxIcon,
   CalculatorIcon,
 } from "@heroicons/react/24/outline";
-import { logout } from "../../utils/auth";
+import { logout, hasPermission } from "../../utils/auth";
 import { interestApi, expenseApi } from "../../api";
 import toast from "react-hot-toast";
 
@@ -61,18 +61,24 @@ const baseNavigation = [
     ],
   },
   {
-    name: "Payment Entry",
-    href: "/payment-entry?type=payment",
-    matchPath: "/payment-entry",
-    matchSearch: "type=payment",
-    icon: ArrowUpCircleIcon,
-  },
-  {
-    name: "Receipt Entry",
-    href: "/payment-entry?type=receipt",
-    matchPath: "/payment-entry",
-    matchSearch: "type=receipt",
-    icon: ArrowDownCircleIcon,
+    name: "Account Transaction",
+    icon: BanknotesIcon,
+    children: [
+      {
+        name: "Payment Entry",
+        href: "/payment-entry?type=payment",
+        matchPath: "/payment-entry",
+        matchSearch: "type=payment",
+        icon: ArrowUpCircleIcon,
+      },
+      {
+        name: "Receipt Entry",
+        href: "/payment-entry?type=receipt",
+        matchPath: "/payment-entry",
+        matchSearch: "type=receipt",
+        icon: ArrowDownCircleIcon,
+      },
+    ],
   },
   {
     name: "Accounts Reports",
@@ -87,12 +93,12 @@ const baseNavigation = [
   { name: "Settings", href: "/settings", icon: Cog6ToothIcon },
 ];
 
-export default function Sidebar({ open, onClose }) {
+export default function Sidebar({ open, onClose, collapsed = false, onToggleCollapse }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [interestEnabled, setInterestEnabled] = useState(false);
   const [expenseEnabled, setExpenseEnabled] = useState(false);
-  const [expandedGroups, setExpandedGroups] = useState({ Master: true });
+  const [expandedGroup, setExpandedGroup] = useState("Master");
 
   useEffect(() => {
     interestApi
@@ -132,18 +138,33 @@ export default function Sidebar({ open, onClose }) {
       ];
     }
     if (expenseEnabled) {
-      // Insert Expenses and Expense Reports before Settings
-      const settingsIdx = nav.findIndex((n) => n.href === "/settings");
-      nav = [
-        ...nav.slice(0, settingsIdx),
-        { name: "Expenses", href: "/expenses", icon: BanknotesIcon },
-        {
-          name: "Expense Reports",
-          href: "/expense-reports",
-          icon: DocumentChartBarIcon,
-        },
-        ...nav.slice(settingsIdx),
-      ];
+      // Add Expense Entry under "Account Transaction" and Expense Reports
+      // under "Accounts Reports".
+      nav = nav.map((item) => {
+        if (item.name === "Account Transaction") {
+          return {
+            ...item,
+            children: [
+              ...item.children,
+              { name: "Expense Entry", href: "/expenses", icon: BanknotesIcon },
+            ],
+          };
+        }
+        if (item.name === "Accounts Reports") {
+          return {
+            ...item,
+            children: [
+              ...item.children,
+              { name: "Expense Reports", href: "/expense-reports", icon: DocumentChartBarIcon },
+            ],
+          };
+        }
+        return item;
+      });
+    }
+    // Hide Settings for users without the manage-settings permission
+    if (!hasPermission("manage_settings")) {
+      nav = nav.filter((item) => item.name !== "Settings");
     }
     return nav;
   })();
@@ -153,6 +174,20 @@ export default function Sidebar({ open, onClose }) {
     toast.success("Logged out successfully");
     navigate("/login", { replace: true });
   };
+
+  // Auto-expand the group that contains the active route (keeping single-open).
+  useEffect(() => {
+    const activeGroup = baseNavigation.find(
+      (item) =>
+        item.children &&
+        item.children.some((c) =>
+          c.matchPath
+            ? location.pathname === c.matchPath
+            : location.pathname.startsWith(c.href),
+        ),
+    );
+    if (activeGroup) setExpandedGroup(activeGroup.name);
+  }, [location.pathname, location.search]);
 
   return (
     <>
@@ -165,7 +200,7 @@ export default function Sidebar({ open, onClose }) {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-sidebar transition-transform duration-300 md:translate-x-0 md:z-30 ${open ? "translate-x-0" : "-translate-x-full"}`}
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-sidebar transition-transform duration-300 md:z-30 ${open ? "translate-x-0" : "-translate-x-full"} ${collapsed ? "md:-translate-x-full" : "md:translate-x-0"}`}
       >
         {/* Logo / Brand */}
         <div className="flex h-16 items-center gap-2 px-6 border-b border-slate-700">
@@ -186,6 +221,13 @@ export default function Sidebar({ open, onClose }) {
           >
             <XMarkIcon className="h-5 w-5" />
           </button>
+          <button
+            onClick={onToggleCollapse}
+            title="Collapse sidebar"
+            className="hidden md:flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
+          >
+            <ChevronLeftIcon className="h-4 w-4" />
+          </button>
         </div>
 
         {/* Navigation */}
@@ -193,18 +235,20 @@ export default function Sidebar({ open, onClose }) {
           {navigation.map((item) => {
             if (item.children) {
               const isGroupActive = item.children.some((c) =>
-                location.pathname.startsWith(c.href),
+                c.matchPath
+                  ? location.pathname === c.matchPath &&
+                    location.search === `?${c.matchSearch}`
+                  : location.pathname.startsWith(c.href),
               );
-              const isExpanded = expandedGroups[item.name] ?? isGroupActive;
+              const isExpanded = expandedGroup === item.name;
               return (
                 <div key={item.name}>
                   <button
                     type="button"
                     onClick={() =>
-                      setExpandedGroups((p) => ({
-                        ...p,
-                        [item.name]: !isExpanded,
-                      }))
+                      setExpandedGroup((prev) =>
+                        prev === item.name ? null : item.name,
+                      )
                     }
                     className={`w-full group flex items-center gap-2 rounded-md px-2.5 py-2 text-[13px] font-medium transition-colors ${
                       isGroupActive
@@ -218,28 +262,38 @@ export default function Sidebar({ open, onClose }) {
                       className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`}
                     />
                   </button>
-                  {isExpanded && (
-                    <div className="mt-0.5 ml-2 space-y-0.5 border-l border-slate-700 pl-2">
-                      {item.children.map((child) => (
-                        <NavLink
-                          key={child.name}
-                          to={child.href}
-                          end={child.end}
-                          onClick={onClose}
-                          className={({ isActive }) =>
-                            `group flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                              isActive
-                                ? "bg-trust-blue text-white shadow-sm shadow-trust-blue/25"
-                                : "text-slate-400 hover:bg-sidebar-hover hover:text-slate-200"
-                            }`
-                          }
-                        >
-                          <child.icon className="h-3.5 w-3.5 flex-shrink-0" />
-                          {child.name}
-                        </NavLink>
-                      ))}
+                  <div
+                    className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isExpanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"}`}
+                  >
+                    <div className="overflow-hidden">
+                      <div className="mt-0.5 ml-2 space-y-0.5 border-l border-slate-700 pl-2">
+                        {item.children.map((child) => {
+                          const childActive = child.matchPath
+                            ? location.pathname === child.matchPath &&
+                              location.search === `?${child.matchSearch}`
+                            : undefined;
+                          return (
+                          <NavLink
+                            key={child.name}
+                            to={child.href}
+                            end={child.end}
+                            onClick={onClose}
+                            className={({ isActive }) =>
+                              `group flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                                (childActive ?? isActive)
+                                  ? "bg-trust-blue text-white shadow-sm shadow-trust-blue/25"
+                                  : "text-slate-400 hover:bg-sidebar-hover hover:text-slate-200"
+                              }`
+                            }
+                          >
+                            <child.icon className="h-3.5 w-3.5 flex-shrink-0" />
+                            {child.name}
+                          </NavLink>
+                          );
+                        })}
+                      </div>
                     </div>
-                  )}
+                  </div>
                 </div>
               );
             }
@@ -316,6 +370,18 @@ export default function Sidebar({ open, onClose }) {
           </div>
         </div>
       </aside>
+
+      {/* Floating expand button — only visible when the sidebar is collapsed */}
+      {collapsed && (
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          title="Expand sidebar"
+          className="hidden md:flex fixed bottom-3 left-3 z-40 h-8 w-8 items-center justify-center rounded-full bg-sidebar text-slate-300 shadow-md transition-colors hover:text-white"
+        >
+          <ChevronRightIcon className="h-4 w-4" />
+        </button>
+      )}
     </>
   );
 }

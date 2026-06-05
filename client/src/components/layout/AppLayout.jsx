@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { Toaster } from 'react-hot-toast';
 import GlobalFinder from '../ui/GlobalFinder';
+import { hasPermission } from '../../utils/auth';
 import { Bars3Icon } from '@heroicons/react/24/outline';
 
 export default function AppLayout({ children }) {
@@ -10,6 +11,7 @@ export default function AppLayout({ children }) {
   const location = useLocation();
   const [finderOpen, setFinderOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Close sidebar on route change (mobile)
   useEffect(() => {
@@ -47,8 +49,16 @@ export default function AppLayout({ children }) {
     return () => document.removeEventListener('wheel', handleWheel);
   }, []);
 
+  // Permission-driven CSS classes — hide modify/delete/create UI app-wide for
+  // users who lack the corresponding permission. Admin / developer always pass.
+  const permClasses = [
+    hasPermission('modify') ? '' : 'perm-no-modify',
+    hasPermission('delete') ? '' : 'perm-no-delete',
+    hasPermission('create') ? '' : 'perm-no-create',
+  ].filter(Boolean).join(' ');
+
   return (
-    <div className="flex min-h-screen">
+    <div className={`flex min-h-screen ${permClasses}`}>
       <Toaster
         position="top-right"
         toastOptions={{
@@ -61,7 +71,12 @@ export default function AppLayout({ children }) {
           },
         }}
       />
-      <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((c) => !c)}
+      />
 
       {/* Mobile header */}
       <div className="fixed top-0 left-0 right-0 z-30 flex items-center gap-3 bg-sidebar px-4 py-3 md:hidden">
@@ -79,7 +94,7 @@ export default function AppLayout({ children }) {
         </div>
       </div>
 
-      <main className="flex-1 flex flex-col h-screen overflow-y-auto p-4 pt-16 md:ml-64 md:p-6 md:pt-6 lg:p-8">
+      <main className={`flex-1 flex flex-col h-screen overflow-y-auto p-4 pt-16 md:p-6 md:pt-6 lg:p-8 transition-[margin] duration-300 ${sidebarCollapsed ? 'md:ml-0' : 'md:ml-64'}`}>
         {children}
       </main>
       <GlobalFinder open={finderOpen} onClose={() => setFinderOpen(false)} />

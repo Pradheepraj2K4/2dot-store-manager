@@ -150,7 +150,7 @@ export default function SalesReturnEntryPage() {
       const res = isEdit
         ? await salesReturnApi.update(returnIdParam, payload)
         : await salesReturnApi.create(payload);
-      toast.success(isEdit ? 'Sales return updated' : `Sales return #${res.data.return_number} saved`);
+      toast.success(isEdit ? 'Sales return updated' : `Sales return ${res.data.return_number} saved`);
       navigate('/sales-returns');
     } catch (err) {
       toast.error(err.message);
@@ -174,7 +174,7 @@ export default function SalesReturnEntryPage() {
           </button>
           <div>
             <h1 className="page-title">{isEdit ? 'Edit Sales Return' : 'Sales Return Entry'}</h1>
-            <p className="text-sm text-slate-500">Return # {returnNumber || '—'}</p>
+            <p className="text-sm text-slate-500">Return {returnNumber || '—'}</p>
           </div>
         </div>
 

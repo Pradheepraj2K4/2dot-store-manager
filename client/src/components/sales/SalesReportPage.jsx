@@ -380,7 +380,7 @@ export default function SalesReportPage() {
                         </button>
                       </td>
                       <td className="px-4 py-2.5 font-mono text-xs text-slate-600">
-                        #{s.sale_number}
+                        {s.sale_number}
                       </td>
                       <td className="px-4 py-2.5">
                         <button
@@ -469,7 +469,7 @@ export default function SalesReportPage() {
                                     {line.item_name}
                                     {line.item_id && (
                                       <span className="ml-2 font-mono text-[10px] text-slate-400">
-                                        #{line.item_id}
+                                        {line.item_id}
                                       </span>
                                     )}
                                   </td>
@@ -547,7 +547,7 @@ export default function SalesReportPage() {
         size="sm"
       >
         <p className="text-sm text-slate-600 mb-6">
-          Delete sale <strong>#{deleteModal.sale?.sale_number}</strong>? The
+          Delete sale <strong>{deleteModal.sale?.sale_number}</strong>? The
           customer's balance will be reduced by{" "}
           {formatCurrency(deleteModal.sale?.total_amount || 0)}.
         </p>
@@ -568,7 +568,7 @@ export default function SalesReportPage() {
       <Modal
         open={previewModal.open}
         onClose={() => setPreviewModal({ open: false, html: '', sale: null })}
-        title={`Sale Receipt${previewModal.sale ? ' #' + previewModal.sale.sale_number : ''}`}
+        title={`Sale Receipt${previewModal.sale ? ' ' + previewModal.sale.sale_number : ''}`}
         size="lg"
       >
         <SaleReceiptPreview

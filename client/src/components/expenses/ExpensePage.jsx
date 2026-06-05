@@ -199,40 +199,82 @@ function ExpenseNameInput({ value, onChange, inputRef, onEnterKey }) {
   );
 }
 
-/* ─── Expense Entry Form ─────────────────────────────────────────── */
+/* ─── Expense Entry Form (multi-row voucher) ─────────────────────── */
 function ExpenseForm({ categories, onCreated, onCategoryCreated }) {
-  const [form, setForm] = useState({
-    expense_name: '',
-    expense_category_id: null,
-    amount: '',
-    date: todayISO(),
-    notes: '',
-  });
+  const emptyLine = () => ({ expense_name: '', expense_category_id: null, amount: '', notes: '' });
+  const [date, setDate] = useState(todayISO());
+  const [lines, setLines] = useState([emptyLine()]);
+  const [voucherNumber, setVoucherNumber] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const nameRef = useRef(null);
-  const categoryRef = useRef(null);
-  const amountRef = useRef(null);
-  const dateRef = useRef(null);
-  const notesRef = useRef(null);
-  const submitRef = useRef(null);
-  const creatingCategoryRef = useRef(false);
+
+  // Stable per-row/field ref objects keyed by `${rowIdx}:${field}`
+  const refStore = useRef({});
+  const getRef = (row, field) => {
+    const key = `${row}:${field}`;
+    if (!refStore.current[key]) refStore.current[key] = { current: null };
+    return refStore.current[key];
+  };
+  const focusCell = (row, field) => {
+    setTimeout(() => getRef(row, field).current?.focus(), 0);
+  };
+
+  const loadVoucher = useCallback(async () => {
+    try {
+      const res = await expenseApi.getNextVoucher();
+      setVoucherNumber(res.data?.voucher_number || '');
+    } catch {
+      /* ignore — voucher is informational */
+    }
+  }, []);
+
+  useEffect(() => { loadVoucher(); }, [loadVoucher]);
+
+  const updateLine = (idx, patch) =>
+    setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
+
+  const isLineEmpty = (l) => !l.expense_name.trim() && !String(l.amount).trim() && !(l.notes || '').trim();
+
+  const addLine = () =>
+    setLines((prev) => (isLineEmpty(prev[prev.length - 1]) ? prev : [...prev, emptyLine()]));
+
+  const removeLine = (idx) =>
+    setLines((prev) => (prev.length === 1 ? prev : prev.filter((_, i) => i !== idx)));
+
+  // After the last cell of a row, move to next row (or create one)
+  const handleRowEnd = (idx) => {
+    if (idx === lines.length - 1) {
+      if (isLineEmpty(lines[idx])) { focusCell(idx, 'name'); return; }
+      addLine();
+      focusCell(idx + 1, 'name');
+    } else {
+      focusCell(idx + 1, 'name');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.expense_name.trim()) { toast.error('Expense name is required'); return; }
-    if (!form.amount || Number(form.amount) <= 0) { toast.error('Enter a valid amount'); return; }
+    const validLines = lines.filter((l) => l.expense_name.trim() || String(l.amount).trim());
+    if (validLines.length === 0) { toast.error('Add at least one expense row'); return; }
+    for (let i = 0; i < validLines.length; i++) {
+      if (!validLines[i].expense_name.trim()) { toast.error(`Row ${i + 1}: expense name is required`); return; }
+      if (!validLines[i].amount || Number(validLines[i].amount) <= 0) { toast.error(`Row ${i + 1}: enter a valid amount`); return; }
+    }
     try {
       setSubmitting(true);
-      await expenseApi.create({
-        expense_name: form.expense_name.trim(),
-        expense_category_id: form.expense_category_id || null,
-        amount: parseFloat(form.amount),
-        date: form.date,
-        notes: form.notes.trim(),
+      await expenseApi.createBatch({
+        date,
+        lines: validLines.map((l) => ({
+          expense_name: l.expense_name.trim(),
+          expense_category_id: l.expense_category_id || null,
+          amount: parseFloat(l.amount),
+          notes: (l.notes || '').trim(),
+        })),
       });
-      toast.success('Expense recorded');
-      setForm({ expense_name: '', expense_category_id: null, amount: '', date: todayISO(), notes: '' });
-      nameRef.current?.focus();
+      toast.success('Expense voucher recorded');
+      setLines([emptyLine()]);
+      refStore.current = {};
+      await loadVoucher();
+      focusCell(0, 'name');
       onCreated();
     } catch (err) {
       toast.error(err.message);
@@ -241,75 +283,126 @@ function ExpenseForm({ categories, onCreated, onCategoryCreated }) {
     }
   };
 
+  const total = lines.reduce((s, l) => s + (parseFloat(l.amount) || 0), 0);
+
   return (
-    <form onSubmit={handleSubmit} className="card py-3">
-      <div className="flex flex-wrap items-end gap-2">
-        <div className="flex-[2] min-w-[160px]">
-          <label className="label">Expense Name *</label>
-          <ExpenseNameInput
-            value={form.expense_name}
-            onChange={(v) => setForm((p) => ({ ...p, expense_name: v }))}
-            inputRef={nameRef}
-            onEnterKey={() => categoryRef.current?.focus()}
-          />
+    <form onSubmit={handleSubmit} className="card py-3 space-y-3">
+      {/* Voucher + Date header */}
+      <div className="flex flex-wrap items-end gap-4">
+        <div>
+          <label className="label">Voucher No.</label>
+          <div className="px-3 py-2 rounded-lg bg-orange-50 text-orange-700 font-semibold text-sm min-w-[80px] text-center">
+            {voucherNumber || '—'}
+          </div>
         </div>
-        <div className="flex-[1.5] min-w-[180px]">
-          <label className="label">Category</label>
-          <CategorySelect
-            categories={categories}
-            value={form.expense_category_id}
-            onChange={(v) => setForm((p) => ({ ...p, expense_category_id: v }))}
-            onCategoryCreated={onCategoryCreated}
-            selectRef={categoryRef}
-            onEnterKey={() => amountRef.current?.focus()}
-            onCreatingChange={(val) => { creatingCategoryRef.current = val; }}
-          />
-        </div>
-        <div className="w-32 shrink-0">
-          <label className="label">Amount *</label>
-          <input
-            ref={amountRef}
-            type="number"
-            min="0.01"
-            step="0.01"
-            value={form.amount}
-            onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); dateRef.current?.focus(); } }}
-            className="input-field"
-            placeholder="0.00"
-          />
-        </div>
-        <div className="w-36 shrink-0">
+        <div className="w-40">
           <label className="label">Date</label>
           <input
-            ref={dateRef}
             type="date"
-            value={form.date}
-            onChange={(e) => setForm((p) => ({ ...p, date: e.target.value }))}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); notesRef.current?.focus(); } }}
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
             className="input-field"
           />
         </div>
-        <div className="flex-1 min-w-[120px]">
-          <label className="label">Notes</label>
-          <input
-            ref={notesRef}
-            type="text"
-            value={form.notes}
-            onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitRef.current?.click(); } }}
-            className="input-field"
-            placeholder="Optional"
-          />
-        </div>
-        <div className="shrink-0">
+      </div>
+
+      {/* Rows table */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-slate-500">
+              <th className="w-8 px-2 py-1 font-medium">#</th>
+              <th className="px-2 py-1 font-medium">Expense Name *</th>
+              <th className="px-2 py-1 font-medium">Category</th>
+              <th className="w-32 px-2 py-1 font-medium">Amount *</th>
+              <th className="px-2 py-1 font-medium">Notes</th>
+              <th className="w-8 px-2 py-1"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {lines.map((line, idx) => (
+              <tr key={idx} className="align-top">
+                <td className="px-2 py-1 text-slate-400 pt-3">{idx + 1}</td>
+                <td className="px-2 py-1 min-w-[160px]">
+                  <ExpenseNameInput
+                    value={line.expense_name}
+                    onChange={(v) => updateLine(idx, { expense_name: v })}
+                    inputRef={getRef(idx, 'name')}
+                    onEnterKey={() => focusCell(idx, 'category')}
+                  />
+                </td>
+                <td className="px-2 py-1 min-w-[180px]">
+                  <CategorySelect
+                    categories={categories}
+                    value={line.expense_category_id}
+                    onChange={(v) => updateLine(idx, { expense_category_id: v })}
+                    onCategoryCreated={onCategoryCreated}
+                    selectRef={getRef(idx, 'category')}
+                    onEnterKey={() => focusCell(idx, 'amount')}
+                  />
+                </td>
+                <td className="px-2 py-1">
+                  <input
+                    ref={getRef(idx, 'amount')}
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={line.amount}
+                    onChange={(e) => updateLine(idx, { amount: e.target.value })}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); focusCell(idx, 'notes'); } }}
+                    className="input-field"
+                    placeholder="0.00"
+                  />
+                </td>
+                <td className="px-2 py-1 min-w-[120px]">
+                  <input
+                    ref={getRef(idx, 'notes')}
+                    type="text"
+                    value={line.notes}
+                    onChange={(e) => updateLine(idx, { notes: e.target.value })}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleRowEnd(idx); } }}
+                    className="input-field"
+                    placeholder="Optional"
+                  />
+                </td>
+                <td className="px-2 py-1 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => removeLine(idx)}
+                    disabled={lines.length === 1}
+                    className="text-slate-400 hover:text-red-600 disabled:opacity-30 disabled:hover:text-slate-400 transition-colors"
+                    title="Remove row"
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Footer actions */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={addLine}
+          disabled={isLineEmpty(lines[lines.length - 1])}
+          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-sm font-medium text-orange-700 bg-orange-50 hover:bg-orange-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          <PlusIcon className="h-4 w-4" />
+          Add Row
+        </button>
+        <div className="flex items-center gap-4">
+          <span className="text-sm font-semibold text-slate-700">
+            Total: {formatCurrency(total)}
+          </span>
           <button
-            ref={submitRef}
             type="submit"
             disabled={submitting}
             className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 disabled:bg-orange-300 transition-colors whitespace-nowrap"
           >
-            {submitting ? 'Saving…' : 'Record Expense'}
+            {submitting ? 'Saving…' : 'Record Expenses'}
           </button>
         </div>
       </div>
@@ -564,6 +657,7 @@ export default function ExpensePage() {
             <table className="w-full text-sm table-zebra">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50">
+                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Voucher</th>
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Date</th>
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Expense Name</th>
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Category</th>
@@ -575,6 +669,7 @@ export default function ExpensePage() {
               <tbody>
                 {expenses.map((exp) => (
                   <tr key={exp.id} className="border-b border-slate-100">
+                    <td className="px-4 py-2.5 text-slate-500 font-medium">{exp.voucher_number || '—'}</td>
                     <td className="px-4 py-2.5 text-slate-600">{formatDate(exp.date)}</td>
                     <td className="px-4 py-2.5 font-medium text-slate-800">{exp.expense_name}</td>
                     <td className="px-4 py-2.5">

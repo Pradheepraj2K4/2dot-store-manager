@@ -1,10 +1,13 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { login } from '../../utils/auth';
+import { loginUser, ADMIN_USERNAME } from '../../utils/auth';
+import { userApi } from '../../api';
 import { LockClosedIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
 export default function LoginPage() {
+  const [username, setUsername] = useState(ADMIN_USERNAME);
+  const [users, setUsers] = useState([]);
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -12,6 +15,13 @@ export default function LoginPage() {
   const passwordRef = useRef(null);
 
   const from = location.state?.from?.pathname || '/';
+
+  useEffect(() => {
+    userApi
+      .getLoginList()
+      .then((res) => setUsers(res.data || []))
+      .catch(() => setUsers([]));
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -21,13 +31,14 @@ export default function LoginPage() {
     }
 
     setLoading(true);
-    
+
     try {
-      if (await login(password)) {
+      const result = await loginUser(username, password);
+      if (result.ok) {
         toast.success('Login successful');
         navigate(from, { replace: true });
       } else {
-        toast.error('Invalid password');
+        toast.error(result.error || 'Invalid credentials');
         setPassword('');
         passwordRef.current?.focus();
       }
@@ -53,8 +64,23 @@ export default function LoginPage() {
         {/* Login Card */}
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           <h2 className="text-xl font-semibold text-slate-800 mb-6">Sign In</h2>
-          
+
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="label">User</label>
+              <select
+                value={username}
+                onChange={(e) => { setUsername(e.target.value); setPassword(''); setTimeout(() => passwordRef.current?.focus(), 0); }}
+                className="input-field"
+                disabled={loading}
+              >
+                <option value={ADMIN_USERNAME}>Admin</option>
+                {users.map((u) => (
+                  <option key={u.id} value={u.username}>{u.username}</option>
+                ))}
+              </select>
+            </div>
+
             <div>
               <label className="label">Password</label>
               <input
@@ -80,7 +106,7 @@ export default function LoginPage() {
 
           <div className="mt-6 pt-6 border-t border-slate-200">
             <p className="text-xs text-slate-500 text-center">
-              Default admin password changes daily based on the current date
+              Admin uses the custom password set in Settings. Other users sign in with their own password.
             </p>
           </div>
         </div>

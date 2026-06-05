@@ -76,7 +76,7 @@ export default function ItemCreationPage() {
   };
 
   // Enter-key navigation between form fields
-  const FIELD_ORDER = ['name', 'item_code', 'unit', 'mrp', 'sales_rate', 'gst_percent', 'brand', 'category'];
+  const FIELD_ORDER = ['item_code', 'name', 'unit', 'mrp', 'sales_rate', 'gst_percent', 'brand', 'category'];
   const fieldRefs = useRef({});
   const setFieldRef = (name) => (el) => { fieldRefs.current[name] = el; };
   const submitBtnRef = useRef(null);
@@ -147,7 +147,7 @@ export default function ItemCreationPage() {
         <div>
           <h1 className="page-title">{isEdit ? 'Edit Item' : 'New Item'}</h1>
           <p className="text-sm text-slate-500">
-            {isEdit ? `Item #${id}` : 'Item ID is auto-generated on save.'}
+            {isEdit ? `Item ${id}` : 'Item ID is auto-generated on save.'}
           </p>
         </div>
       </div>
@@ -158,6 +158,7 @@ export default function ItemCreationPage() {
           <label className="w-28 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">Item Code</label>
           <div className="flex-1">
             <input
+              autoFocus
               ref={setFieldRef('item_code')}
               type="text"
               name="item_code"
@@ -175,7 +176,6 @@ export default function ItemCreationPage() {
           <label className="w-28 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">Item Name *</label>
           <div className="flex-1">
             <input
-              autoFocus
               ref={setFieldRef('name')}
               type="text"
               name="name"

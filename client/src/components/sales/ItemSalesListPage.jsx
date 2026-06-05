@@ -173,7 +173,7 @@ export default function ItemSalesListPage() {
                             {isOpen ? <ChevronDownIcon className="h-4 w-4" /> : <ChevronRightIcon className="h-4 w-4" />}
                           </button>
                         </td>
-                        <td className="px-4 py-2.5 font-mono text-xs text-slate-600">#{s.sale_number}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{s.sale_number}</td>
                         <td className="px-4 py-2.5">
                           <button
                             onClick={() => navigate(`/ledger/${s.ledger_id}`)}
@@ -236,7 +236,7 @@ export default function ItemSalesListPage() {
                                     <td className="px-2 py-1 text-slate-500">{idx + 1}</td>
                                     <td className="px-2 py-1 text-slate-700">
                                       {line.item_name}
-                                      {line.item_id && <span className="ml-2 font-mono text-[10px] text-slate-400">#{line.item_id}</span>}
+                                      {line.item_id && <span className="ml-2 font-mono text-[10px] text-slate-400">{line.item_id}</span>}
                                     </td>
                                     <td className="px-2 py-1 text-slate-600">{line.unit}</td>
                                     <td className="px-2 py-1 text-right text-slate-600">{formatCurrency(line.mrp)}</td>
@@ -269,7 +269,7 @@ export default function ItemSalesListPage() {
         size="sm"
       >
         <p className="text-sm text-slate-600 mb-6">
-          Delete sale <strong>#{deleteModal.sale?.sale_number}</strong>? The customer's
+          Delete sale <strong>{deleteModal.sale?.sale_number}</strong>? The customer's
           balance will be reduced by {formatCurrency(deleteModal.sale?.total_amount || 0)}.
         </p>
         <div className="flex justify-end gap-3">
@@ -284,7 +284,7 @@ export default function ItemSalesListPage() {
       <Modal
         open={previewModal.open}
         onClose={() => setPreviewModal({ open: false, html: '', sale: null })}
-        title={`Sale Receipt${previewModal.sale ? ' #' + previewModal.sale.sale_number : ''}`}
+        title={`Sale Receipt${previewModal.sale ? ' ' + previewModal.sale.sale_number : ''}`}
         size="lg"
       >
         <SaleReceiptPreview

@@ -332,7 +332,7 @@ export default function PurchaseReportPage() {
                           {isOpen ? <ChevronDownIcon className="h-4 w-4" /> : <ChevronRightIcon className="h-4 w-4" />}
                         </button>
                       </td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-slate-600">#{p.purchase_number}</td>
+                      <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{p.purchase_number}</td>
                       <td className="px-4 py-2.5">
                         <button
                           onClick={() => navigate(`/ledger/${p.ledger_id}`)}
@@ -408,7 +408,7 @@ export default function PurchaseReportPage() {
                                   <td className="px-2 py-1 text-slate-700">
                                     {line.item_name}
                                     {line.item_id && (
-                                      <span className="ml-2 font-mono text-[10px] text-slate-400">#{line.item_id}</span>
+                                      <span className="ml-2 font-mono text-[10px] text-slate-400">{line.item_id}</span>
                                     )}
                                   </td>
                                   <td className="px-2 py-1 text-slate-600">{line.unit}</td>
@@ -464,7 +464,7 @@ export default function PurchaseReportPage() {
         size="sm"
       >
         <p className="text-sm text-slate-600 mb-6">
-          Delete purchase <strong>#{deleteModal.purchase?.purchase_number}</strong>?
+          Delete purchase <strong>{deleteModal.purchase?.purchase_number}</strong>?
           The stock added by this purchase will be reversed.
         </p>
         <div className="flex justify-end gap-3">
@@ -482,7 +482,7 @@ export default function PurchaseReportPage() {
       <Modal
         open={previewModal.open}
         onClose={() => setPreviewModal({ open: false, html: '', purchase: null })}
-        title={`Purchase Voucher${previewModal.purchase ? ' #' + previewModal.purchase.purchase_number : ''}`}
+        title={`Purchase Voucher${previewModal.purchase ? ' ' + previewModal.purchase.purchase_number : ''}`}
         size="lg"
       >
         <PurchaseReceiptPreview

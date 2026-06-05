@@ -1099,7 +1099,7 @@ export default function LedgerPage() {
                             className="inline-flex items-center gap-1 hover:text-slate-900"
                           >
                             {isOpen ? <ChevronDownIcon className="h-3.5 w-3.5" /> : <ChevronRightIcon className="h-3.5 w-3.5" />}
-                            #{sale.sale_number}
+                            {sale.sale_number}
                           </button>
                         </td>
                         <td className="px-4 py-2.5">
@@ -1164,7 +1164,7 @@ export default function LedgerPage() {
                                     <td className="px-2 py-1 text-slate-500">{idx + 1}</td>
                                     <td className="px-2 py-1 text-slate-700">
                                       {line.item_name}
-                                      {line.item_id && <span className="ml-2 font-mono text-[10px] text-slate-400">#{line.item_id}</span>}
+                                      {line.item_id && <span className="ml-2 font-mono text-[10px] text-slate-400">{line.item_id}</span>}
                                     </td>
                                     <td className="px-2 py-1 text-slate-600">{line.unit}</td>
                                     <td className="px-2 py-1 text-right text-slate-600">{formatCurrency(line.mrp)}</td>
@@ -1494,7 +1494,7 @@ export default function LedgerPage() {
         {deleteSaleModal.sale && (
           <>
             <p className="text-sm text-slate-600 mb-6">
-              Delete sale <strong>#{deleteSaleModal.sale.sale_number}</strong> of{' '}
+              Delete sale <strong>{deleteSaleModal.sale.sale_number}</strong> of{' '}
               <strong>{formatCurrency(deleteSaleModal.sale.total_amount)}</strong>? This will reverse the balance effect.
             </p>
             <div className="flex justify-end gap-3">

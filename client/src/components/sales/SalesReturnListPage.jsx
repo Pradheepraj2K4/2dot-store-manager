@@ -129,13 +129,13 @@ export default function SalesReturnListPage() {
                           {isOpen ? <ChevronDownIcon className="h-4 w-4" /> : <ChevronRightIcon className="h-4 w-4" />}
                         </button>
                       </td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-slate-600">#{r.return_number}</td>
+                      <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{r.return_number}</td>
                       <td className="px-4 py-2.5">
                         <button onClick={() => navigate(`/ledger/${r.ledger_id}`)} className="font-medium text-trust-blue hover:underline">
                           {r.ledger_name}
                         </button>
                       </td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{r.sale_number ? `#${r.sale_number}` : '—'}</td>
+                      <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{r.sale_number ? `${r.sale_number}` : '—'}</td>
                       <td className="px-4 py-2.5 text-slate-600">{formatDate(r.date)}</td>
                       <td className="px-4 py-2.5 text-right text-slate-600">{r.item_count}</td>
                       <td className="px-4 py-2.5 text-right font-semibold text-credit-green">{formatCurrency(r.total_amount)}</td>
@@ -195,7 +195,7 @@ export default function SalesReturnListPage() {
 
       <Modal open={deleteModal.open} onClose={() => setDeleteModal({ open: false, row: null })} title="Delete Sales Return" size="sm">
         <p className="text-sm text-slate-600 mb-6">
-          Delete return <strong>#{deleteModal.row?.return_number}</strong>? The customer's balance will be increased by {formatCurrency(deleteModal.row?.total_amount || 0)} and stock will be reduced.
+          Delete return <strong>{deleteModal.row?.return_number}</strong>? The customer's balance will be increased by {formatCurrency(deleteModal.row?.total_amount || 0)} and stock will be reduced.
         </p>
         <div className="flex justify-end gap-3">
           <button onClick={() => setDeleteModal({ open: false, row: null })} className="btn-secondary">Cancel</button>

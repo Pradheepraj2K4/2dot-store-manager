@@ -70,6 +70,23 @@ class ExpenseController {
     }
   }
 
+  getNextVoucher(req, res, next) {
+    try {
+      res.json({ success: true, data: { voucher_number: expenseService.getNextVoucherNumber() } });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  createBatch(req, res, next) {
+    try {
+      const result = expenseService.createBatch(req.body);
+      res.status(201).json({ success: true, data: result });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   update(req, res, next) {
     try {
       const expense = expenseService.update(parseInt(req.params.id), req.body);

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { ledgerApi, ledgerTypeApi, interestApi } from "../../api";
 import { formatCurrency, todayISO } from "../../utils/helpers";
+import { exportToExcel, exportToPDF } from "../../utils/exportUtils";
 import { validatePassword } from "../../utils/auth";
 import Modal from "../ui/Modal";
 import LoadingSpinner from "../ui/LoadingSpinner";
@@ -14,6 +15,8 @@ import {
   TrashIcon,
   BookOpenIcon,
   LockClosedIcon,
+  TableCellsIcon,
+  DocumentArrowDownIcon,
 } from "@heroicons/react/24/outline";
 
 const GST_REGEX = /^\d{2}[A-Z]{5}\d{4}[A-Z]{1}[A-Z0-9]{1}Z[A-Z0-9]{1}$/;
@@ -194,6 +197,42 @@ export default function LedgerListPage() {
     return matchesSearch && matchesType;
   });
 
+  // Exportable rows exclude the system CASH ledger
+  const exportable = filtered.filter((l) => l.name !== "CASH");
+
+  const handleExportExcel = () => {
+    if (exportable.length === 0) {
+      toast.error("No ledgers to export");
+      return;
+    }
+    const columns = [
+      { header: "Name", key: "name", width: 25 },
+      { header: "Type", key: "type_name", width: 18 },
+      { header: "Phone", key: "phone", width: 15 },
+      { header: "Place", key: "place", width: 18 },
+      { header: "Balance", key: "current_balance", width: 15 },
+      { header: "Status", key: "status", width: 12 },
+    ];
+    exportToExcel(exportable, columns, "Ledgers");
+  };
+
+  const handleExportPDF = () => {
+    if (exportable.length === 0) {
+      toast.error("No ledgers to export");
+      return;
+    }
+    const headers = ["Name", "Type", "Phone", "Place", "Balance", "Status"];
+    const rows = exportable.map((l) => [
+      l.name,
+      l.type_name || "",
+      l.phone || "",
+      l.place || "",
+      formatCurrency(l.current_balance || 0).replace("₹", "Rs. "),
+      l.status || "",
+    ]);
+    exportToPDF("Ledgers", headers, rows, "Ledgers");
+  };
+
   if (loading) return <LoadingSpinner className="py-20" size="lg" />;
 
   return (
@@ -206,13 +245,29 @@ export default function LedgerListPage() {
             All ledger accounts ({filtered.length})
           </p>
         </div>
-        <button
-          onClick={() => navigate("/ledger-creation")}
-          className="btn-primary gap-2"
-        >
-          <PlusIcon className="h-4 w-4" />
-          New Ledger
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportExcel}
+            className="p-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-colors"
+            title="Download as Excel"
+          >
+            <TableCellsIcon className="h-5 w-5" />
+          </button>
+          <button
+            onClick={handleExportPDF}
+            className="p-2 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors"
+            title="Download as PDF"
+          >
+            <DocumentArrowDownIcon className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => navigate("/ledger-creation")}
+            className="btn-primary gap-2"
+          >
+            <PlusIcon className="h-4 w-4" />
+            New Ledger
+          </button>
+        </div>
       </div>
 
       {/* Filters */}

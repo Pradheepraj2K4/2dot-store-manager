@@ -121,7 +121,7 @@ export default function GlobalFinder({ open, onClose }) {
                     </span>
                   )}
                   <span className={`text-xs font-mono flex-shrink-0 ${selectedIdx === idx ? 'text-blue-200' : 'text-slate-300'}`}>
-                    #{l.id}
+                    {l.id}
                   </span>
                 </button>
               </li>

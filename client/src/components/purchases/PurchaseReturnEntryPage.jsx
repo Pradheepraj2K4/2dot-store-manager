@@ -165,7 +165,7 @@ export default function PurchaseReturnEntryPage() {
       const res = isEdit
         ? await purchaseReturnApi.update(returnIdParam, payload)
         : await purchaseReturnApi.create(payload);
-      toast.success(isEdit ? 'Purchase return updated' : `Purchase return #${res.data.return_number} saved`);
+      toast.success(isEdit ? 'Purchase return updated' : `Purchase return ${res.data.return_number} saved`);
       navigate('/purchase-returns');
     } catch (err) {
       toast.error(err.message);
@@ -189,7 +189,7 @@ export default function PurchaseReturnEntryPage() {
           </button>
           <div>
             <h1 className="page-title">{isEdit ? 'Edit Purchase Return' : 'Purchase Return Entry'}</h1>
-            <p className="text-sm text-slate-500">Return # {returnNumber || '—'}</p>
+            <p className="text-sm text-slate-500">Return {returnNumber || '—'}</p>
           </div>
         </div>
 

@@ -123,7 +123,7 @@ export default function PurchaseReturnListPage() {
                 {filtered.map((r) => {
                   const detail = expanded[r.id];
                   const isOpen = Boolean(detail);
-                  const billLabel = r.bill_number || (r.purchase_number ? `#${r.purchase_number}` : '—');
+                  const billLabel = r.bill_number || (r.purchase_number ? `${r.purchase_number}` : '—');
                   const rowEls = [
                     <tr key={r.id} className="border-b border-slate-100">
                       <td className="px-4 py-2.5">
@@ -131,7 +131,7 @@ export default function PurchaseReturnListPage() {
                           {isOpen ? <ChevronDownIcon className="h-4 w-4" /> : <ChevronRightIcon className="h-4 w-4" />}
                         </button>
                       </td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-slate-600">#{r.return_number}</td>
+                      <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{r.return_number}</td>
                       <td className="px-4 py-2.5">
                         <button onClick={() => navigate(`/ledger/${r.ledger_id}`)} className="font-medium text-trust-blue hover:underline">
                           {r.ledger_name}
@@ -197,7 +197,7 @@ export default function PurchaseReturnListPage() {
 
       <Modal open={deleteModal.open} onClose={() => setDeleteModal({ open: false, row: null })} title="Delete Purchase Return" size="sm">
         <p className="text-sm text-slate-600 mb-6">
-          Delete return <strong>#{deleteModal.row?.return_number}</strong>? Stock will be added back to inventory.
+          Delete return <strong>{deleteModal.row?.return_number}</strong>? Stock will be added back to inventory.
         </p>
         <div className="flex justify-end gap-3">
           <button onClick={() => setDeleteModal({ open: false, row: null })} className="btn-secondary">Cancel</button>

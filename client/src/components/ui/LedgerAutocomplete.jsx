@@ -2,6 +2,16 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { ChevronDownIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { ledgerApi } from '../../api';
 
+// Shorten common ledger type names so they take up less room in the selected
+// chip, leaving more space for the ledger name (e.g. "Supplier" -> "Sup.").
+function abbreviateType(typeName) {
+  if (!typeName) return '';
+  const t = typeName.trim().toLowerCase();
+  if (t === 'supplier') return 'Sup.';
+  if (t === 'customer') return 'Cust.';
+  return typeName;
+}
+
 export default function LedgerAutocomplete({ value, onChange, placeholder = 'Search ledger...', behaviour, autoFocus = false }) {
   const [ledgers, setLedgers] = useState([]);
   const [search, setSearch] = useState('');
@@ -95,10 +105,10 @@ export default function LedgerAutocomplete({ value, onChange, placeholder = 'Sea
   return (
     <div className="relative">
       {value ? (
-        <div className="relative input-field pr-8 flex items-center gap-1.5 min-w-0">
-          <span className="font-medium text-slate-800 truncate">{value.name}</span>
-          <span className="text-xs text-slate-400 truncate shrink-0">
-            {value.place || value.type_name || ''}
+        <div tabIndex={0} className="relative input-field pr-8 flex items-center gap-1.5 min-w-0 overflow-hidden focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue">
+          <span className="font-medium text-slate-800 truncate shrink">{value.name}</span>
+          <span className="text-xs text-slate-400 truncate shrink-0 max-w-[28%]">
+            {value.place || abbreviateType(value.type_name) || ''}
           </span>
           <button
             type="button"

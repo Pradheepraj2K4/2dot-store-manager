@@ -64,7 +64,7 @@ function maxQtyFor(line) {
 
 function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnter, onAddNew }) {
   const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState(0);
+  const [highlight, setHighlight] = useState(-1);
   const [anchorRect, setAnchorRect] = useState(null);
   const inputRef = useRef(null);
   const containerRef = useRef(null);
@@ -117,7 +117,7 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
       .slice(0, 20);
   }, [items, value]);
 
-  useEffect(() => { setHighlight(0); }, [value]);
+  useEffect(() => { setHighlight(-1); }, [value]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'ArrowDown') {
@@ -126,7 +126,7 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
       setHighlight((h) => (h + 1) % Math.max(1, filtered.length));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setHighlight((h) => (h - 1 + Math.max(1, filtered.length)) % Math.max(1, filtered.length));
+      setHighlight((h) => (h <= 0 ? filtered.length - 1 : h - 1));
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (open && filtered[highlight]) {
@@ -191,7 +191,7 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
                 }`}
               >
                 <div className="flex items-center gap-4 whitespace-nowrap">
-                  <span className="text-[10px] font-mono text-slate-400">#{it.id}</span>
+                  <span className="text-[10px] font-mono text-slate-400">{it.id}</span>
                   {it.item_code ? (
                     <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600">
                       {it.item_code}
@@ -316,6 +316,12 @@ export default function ItemSalesEntryPage() {
     setTimeout(() => r?.current?.focus(), 0);
   };
 
+  // Refs for the walk-in customer fields so we can chain focus from the
+  // empty item row into them (name -> mobile -> place).
+  const customerNameRef = useRef(null);
+  const customerMobileRef = useRef(null);
+  const customerPlaceRef = useRef(null);
+
   const refreshItems = useCallback(async () => {
     try {
       const res = await itemApi.getAll();
@@ -332,6 +338,19 @@ export default function ItemSalesEntryPage() {
       ledgerApi.getCash().then((r) => { if (r.data) setLedger(r.data); }).catch(() => {});
     }
   }, [refreshItems, isEdit]);
+
+  // When returning from the ledger-creation page (opened via the '+' button),
+  // auto-select the freshly created ledger.
+  useEffect(() => {
+    const newLedgerId = location.state?.newLedgerId;
+    if (!newLedgerId) return;
+    ledgerApi.getById(newLedgerId)
+      .then((r) => { if (r.data) setLedger(r.data); })
+      .catch(() => {})
+      .finally(() => {
+        navigate(location.pathname + location.search, { replace: true, state: {} });
+      });
+  }, [location.state, location.pathname, location.search, navigate]);
 
   // Whenever the items list refreshes, sync each line's current_stock snapshot
   // so newly-loaded or freshly-refreshed stock numbers reach the qty validator
@@ -489,6 +508,17 @@ export default function ItemSalesEntryPage() {
     if (currentIdx < FIELD_ORDER.length - 1) {
       focusCell(rowIdx, FIELD_ORDER[currentIdx + 1]);
     } else {
+      // Last field (discount) — decide whether to add a new row or jump to
+      // the walk-in customer fields.
+      const currentLine = lines[rowIdx];
+      const hasCompleteRow = lines.some((l) => l.item_id);
+      // On the trailing empty row (no item selected) once at least one item
+      // row is complete, Enter moves into the customer fields instead of
+      // creating yet another blank row.
+      if (currentLine && !currentLine.item_id && hasCompleteRow && customerNameRef.current) {
+        setTimeout(() => customerNameRef.current?.focus(), 0);
+        return;
+      }
       // Last field (discount) — add new row and focus its item name
       const isLastRow = rowIdx === lines.length - 1;
       if (isLastRow) {
@@ -560,6 +590,12 @@ export default function ItemSalesEntryPage() {
     const validLines = lines.filter((l) => l.item_name && l.item_name.trim());
     if (validLines.length === 0) { toast.error('Add at least one item line'); return; }
 
+    if (isCashLedger && customerMobile && customerMobile.length !== 10) {
+      toast.error('Customer mobile must be exactly 10 digits');
+      customerMobileRef.current?.focus();
+      return;
+    }
+
     for (let i = 0; i < validLines.length; i++) {
       const l = validLines[i];
       if (parseFloat(l.rate) < 0 || isNaN(parseFloat(l.rate))) {
@@ -619,7 +655,7 @@ export default function ItemSalesEntryPage() {
       const res = isEdit
         ? await saleApi.update(saleIdParam, payload)
         : await saleApi.create(payload);
-      toast.success(isEdit ? 'Sale updated' : `Sale #${res.data.sale_number} saved`);
+      toast.success(isEdit ? 'Sale updated' : `Sale ${res.data.sale_number} saved`);
       if (res.data) {
         openSalePreview(res.data, ledger?.name, false);
       }
@@ -699,7 +735,7 @@ export default function ItemSalesEntryPage() {
           <div>
             <h1 className="page-title">{isEdit ? 'Edit Sale' : 'Item Sales Entry'}</h1>
             <p className="text-sm text-slate-500">
-              Sale #{saleNumber || '—'}
+              Sale {saleNumber || '—'}
             </p>
           </div>
           {isEdit && (
@@ -736,7 +772,7 @@ export default function ItemSalesEntryPage() {
               >
                 <PlusIcon className="h-4 w-4" />
               </button>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <LedgerAutocomplete
                   value={ledger}
                   onChange={setLedger}
@@ -930,8 +966,15 @@ export default function ItemSalesEntryPage() {
                   <label className="text-xs font-medium text-slate-500">Customer Name</label>
                   <input
                     type="text"
+                    ref={customerNameRef}
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        customerMobileRef.current?.focus();
+                      }
+                    }}
                     className="input-field"
                     placeholder="Walk-in customer name"
                   />
@@ -940,16 +983,29 @@ export default function ItemSalesEntryPage() {
                   <label className="text-xs font-medium text-slate-500">Customer Mobile</label>
                   <input
                     type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    ref={customerMobileRef}
                     value={customerMobile}
-                    onChange={(e) => setCustomerMobile(e.target.value)}
-                    className="input-field"
+                    onChange={(e) => setCustomerMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        customerPlaceRef.current?.focus();
+                      }
+                    }}
+                    className={`input-field ${customerMobile && customerMobile.length !== 10 ? 'border-red-400' : ''}`}
                     placeholder="Mobile number"
                   />
+                  {customerMobile && customerMobile.length !== 10 && (
+                    <p className="text-xs text-red-500">Mobile number must be exactly 10 digits.</p>
+                  )}
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-slate-500">Customer Place</label>
                   <input
                     type="text"
+                    ref={customerPlaceRef}
                     value={customerPlace}
                     onChange={(e) => setCustomerPlace(e.target.value)}
                     className="input-field"

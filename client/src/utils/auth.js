@@ -1,8 +1,15 @@
 // Authentication utilities
-import { settingsApi } from '../api';
+import { settingsApi, userApi } from '../api';
 
 const AUTH_KEY = 'inventory_auth';
 const DEV_AUTH_KEY = 'inventory_dev_auth';
+const CURRENT_USER_KEY = 'inventory_current_user';
+
+// Built-in identity used for the privileged Admin account
+export const ADMIN_USERNAME = 'Admin';
+
+// Permission keys (must match the user table columns: can_<key>)
+export const PERMISSIONS = ['create', 'modify', 'delete', 'manage_settings'];
 
 /**
  * Generate the default admin password based on current date
@@ -130,4 +137,92 @@ export async function login(password) {
  */
 export function logout() {
   localStorage.removeItem(AUTH_KEY);
+  localStorage.removeItem(CURRENT_USER_KEY);
+}
+
+/* ─── Multi-user authentication & permissions ─────────────────────── */
+
+const ALL_PERMISSIONS = PERMISSIONS.reduce((acc, p) => ({ ...acc, [p]: true }), {});
+
+function persistCurrentUser(user) {
+  localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+  localStorage.setItem(AUTH_KEY, 'true');
+}
+
+/**
+ * Returns the currently logged-in user descriptor, or null.
+ * Shape: { username, isAdmin, permissions: { create, modify, delete, manage_settings } }
+ */
+export function getCurrentUser() {
+  try {
+    const raw = localStorage.getItem(CURRENT_USER_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check whether the current user is allowed to perform an action.
+ * Admin (and developer override) always return true.
+ */
+export function hasPermission(permission) {
+  const user = getCurrentUser();
+  if (!user) return false;
+  if (user.isAdmin) return true;
+  return Boolean(user.permissions?.[permission]);
+}
+
+/**
+ * True when the active session is the privileged Admin / developer.
+ */
+export function isAdminUser() {
+  const user = getCurrentUser();
+  return Boolean(user?.isAdmin);
+}
+
+/**
+ * Login a selected user with their password.
+ * - Admin: authenticates with the date-based developer password OR the custom
+ *   password configured in settings, and receives full access.
+ * - Any user: the date-based developer password always grants override access.
+ * - Created users: validated against their own password (server-side).
+ */
+export async function loginUser(username, password) {
+  if (!password) return { ok: false, error: 'Password is required' };
+
+  // Developer override — always works for any selected identity
+  if (validateDevPassword(password)) {
+    persistCurrentUser({ username: username || ADMIN_USERNAME, isAdmin: true, permissions: ALL_PERMISSIONS });
+    return { ok: true };
+  }
+
+  // Built-in Admin account
+  if (username === ADMIN_USERNAME) {
+    if (await validatePassword(password)) {
+      persistCurrentUser({ username: ADMIN_USERNAME, isAdmin: true, permissions: ALL_PERMISSIONS });
+      return { ok: true };
+    }
+    return { ok: false, error: 'Invalid password' };
+  }
+
+  // Created users — validate against the server
+  try {
+    const res = await userApi.login(username, password);
+    const u = res.data;
+    persistCurrentUser({
+      username: u.username,
+      isAdmin: false,
+      permissions: {
+        create: Boolean(u.can_create),
+        modify: Boolean(u.can_modify),
+        delete: Boolean(u.can_delete),
+        manage_settings: Boolean(u.can_manage_settings),
+      },
+    });
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err.message || 'Invalid username or password' };
+  }
 }

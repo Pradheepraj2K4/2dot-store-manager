@@ -64,12 +64,24 @@ class ExpenseRepository {
     `).get(id);
   }
 
-  create({ expense_name, expense_category_id, amount, date, notes }) {
+  // Next sequential voucher number (shared by all rows of one entry)
+  getNextVoucherNumber() {
     const db = getDb();
+    const row = db.prepare(`
+      SELECT COALESCE(MAX(CAST(voucher_number AS INTEGER)), 0) + 1 AS next
+      FROM expenses
+    `).get();
+    return String(row.next);
+  }
+
+  create({ expense_name, expense_category_id, amount, date, notes, voucher_number }) {
+    const db = getDb();
+    const vno = voucher_number || this.getNextVoucherNumber();
     const info = db.prepare(`
-      INSERT INTO expenses (expense_name, expense_category_id, amount, date, notes)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO expenses (voucher_number, expense_name, expense_category_id, amount, date, notes)
+      VALUES (?, ?, ?, ?, ?, ?)
     `).run(
+      vno,
       expense_name.trim(),
       expense_category_id || null,
       amount,
@@ -77,6 +89,36 @@ class ExpenseRepository {
       (notes || '').trim()
     );
     return this.getById(info.lastInsertRowid);
+  }
+
+  // Create multiple expense rows sharing a single voucher number (one entry)
+  createBatch({ date, lines, voucher_number }) {
+    const db = getDb();
+    const run = db.transaction(() => {
+      const vno = voucher_number || this.getNextVoucherNumber();
+      const stmt = db.prepare(`
+        INSERT INTO expenses (voucher_number, expense_name, expense_category_id, amount, date, notes)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      const ids = [];
+      for (const line of lines) {
+        const info = stmt.run(
+          vno,
+          line.expense_name.trim(),
+          line.expense_category_id || null,
+          line.amount,
+          date,
+          (line.notes || '').trim()
+        );
+        ids.push(info.lastInsertRowid);
+      }
+      return { vno, ids };
+    })();
+
+    return {
+      voucher_number: run.vno,
+      expenses: run.ids.map((id) => this.getById(id)),
+    };
   }
 
   update(id, { expense_name, expense_category_id, amount, date, notes }) {

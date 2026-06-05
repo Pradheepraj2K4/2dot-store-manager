@@ -76,7 +76,7 @@ export default function EstimationListPage() {
     try {
       setConvertModal((p) => ({ ...p, busy: true }));
       const res = await estimationApi.convert(convertModal.row.id);
-      toast.success(`Converted to sale #${res.data.sale_number}`);
+      toast.success(`Converted to sale ${res.data.sale_number}`);
       setConvertModal({ open: false, row: null, busy: false });
       navigate('/item-sales');
     } catch (err) {
@@ -169,7 +169,7 @@ export default function EstimationListPage() {
                           {isOpen ? <ChevronDownIcon className="h-4 w-4" /> : <ChevronRightIcon className="h-4 w-4" />}
                         </button>
                       </td>
-                      <td className="px-4 py-2.5 font-mono text-xs text-slate-600">#{r.estimation_number}</td>
+                      <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{r.estimation_number}</td>
                       <td className="px-4 py-2.5">
                         {r.ledger_id ? (
                           <button
@@ -266,7 +266,7 @@ export default function EstimationListPage() {
 
       <Modal open={deleteModal.open} onClose={() => setDeleteModal({ open: false, row: null })} title="Delete Estimation" size="sm">
         <p className="text-sm text-slate-600 mb-6">
-          Delete estimation <strong>#{deleteModal.row?.estimation_number}</strong>? This action cannot be undone.
+          Delete estimation <strong>{deleteModal.row?.estimation_number}</strong>? This action cannot be undone.
         </p>
         <div className="flex justify-end gap-3">
           <button onClick={() => setDeleteModal({ open: false, row: null })} className="btn-secondary">Cancel</button>
@@ -276,7 +276,7 @@ export default function EstimationListPage() {
 
       <Modal open={convertModal.open} onClose={() => !convertModal.busy && setConvertModal({ open: false, row: null, busy: false })} title="Convert to Sale" size="sm">
         <p className="text-sm text-slate-600 mb-6">
-          Convert estimation <strong>#{convertModal.row?.estimation_number}</strong> to a sale invoice?
+          Convert estimation <strong>{convertModal.row?.estimation_number}</strong> to a sale invoice?
           This will deduct stock and update the customer's balance.
         </p>
         <div className="flex justify-end gap-3">

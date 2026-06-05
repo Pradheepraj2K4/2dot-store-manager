@@ -6,7 +6,7 @@ import {
   PlusIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
-import { itemApi, purchaseApi } from '../../api';
+import { itemApi, purchaseApi, ledgerApi } from '../../api';
 import { ITEM_UNITS, DEFAULT_ITEM_UNIT } from '../../utils/itemConstants';
 import { formatCurrency, todayISO } from '../../utils/helpers';
 import LedgerAutocomplete from '../ui/LedgerAutocomplete';
@@ -46,9 +46,9 @@ function emptyLine() {
   };
 }
 
-function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnter, onAddNew }) {
+function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnter, onAddNew, onEnterEmpty }) {
   const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState(0);
+  const [highlight, setHighlight] = useState(-1);
   const [anchorRect, setAnchorRect] = useState(null);
   const inputRef = useRef(null);
   const containerRef = useRef(null);
@@ -96,7 +96,7 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
       .slice(0, 20);
   }, [items, value]);
 
-  useEffect(() => { setHighlight(0); }, [value]);
+  useEffect(() => { setHighlight(-1); }, [value]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'ArrowDown') {
@@ -105,14 +105,19 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
       setHighlight((h) => (h + 1) % Math.max(1, filtered.length));
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setHighlight((h) => (h - 1 + Math.max(1, filtered.length)) % Math.max(1, filtered.length));
+      setHighlight((h) => (h <= 0 ? filtered.length - 1 : h - 1));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (open && filtered[highlight]) {
+      if (open && highlight >= 0 && filtered[highlight]) {
         onSelect(filtered[highlight]);
         setOpen(false);
+        onKeyEnter();
+      } else if (!(value || '').trim()) {
+        // No item highlighted and the field is empty — jump to the ledger field.
+        setOpen(false);
+        onEnterEmpty?.();
       }
-      onKeyEnter();
+      // Text typed but no item selected — do nothing, keep focus on the input.
     } else if (e.key === 'Escape') {
       setOpen(false);
     }
@@ -170,7 +175,7 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
                 }`}
               >
                 <div className="flex items-center gap-4 whitespace-nowrap">
-                  <span className="text-[10px] font-mono text-slate-400">#{it.id}</span>
+                  <span className="text-[10px] font-mono text-slate-400">{it.id}</span>
                   {it.item_code ? (
                     <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600">
                       {it.item_code}
@@ -217,6 +222,15 @@ export default function ItemPurchaseEntryPage() {
     setTimeout(() => r?.current?.focus(), 0);
   };
 
+  // Wraps the ledger LedgerAutocomplete so its input can be focused on demand.
+  const ledgerFieldRef = useRef(null);
+  const focusLedger = () => {
+    setTimeout(() => {
+      const el = ledgerFieldRef.current?.querySelector('input, [tabindex]');
+      el?.focus();
+    }, 0);
+  };
+
   const refreshItems = useCallback(async () => {
     try {
       const res = await itemApi.getAll();
@@ -234,6 +248,19 @@ export default function ItemPurchaseEntryPage() {
         .catch(() => {});
     }
   }, [refreshItems, isEdit]);
+
+  // When returning from the ledger-creation page (opened via the '+' button),
+  // auto-select the freshly created ledger.
+  useEffect(() => {
+    const newLedgerId = location.state?.newLedgerId;
+    if (!newLedgerId) return;
+    ledgerApi.getById(newLedgerId)
+      .then((r) => { if (r.data) setLedger(r.data); })
+      .catch(() => {})
+      .finally(() => {
+        navigate(location.pathname + location.search, { replace: true, state: {} });
+      });
+  }, [location.state, location.pathname, location.search, navigate]);
 
   useEffect(() => {
     if (!isEdit) return;
@@ -434,7 +461,7 @@ export default function ItemPurchaseEntryPage() {
       const res = isEdit
         ? await purchaseApi.update(purchaseIdParam, payload)
         : await purchaseApi.create(payload);
-      toast.success(isEdit ? 'Purchase updated' : `Purchase #${res.data.purchase_number} saved`);
+      toast.success(isEdit ? 'Purchase updated' : `Purchase ${res.data.purchase_number} saved`);
       if (!isEdit) {
         setLedger(null);
         setBillNumber('');
@@ -479,7 +506,7 @@ export default function ItemPurchaseEntryPage() {
           <div>
             <h1 className="page-title">{isEdit ? 'Edit Purchase' : 'Item Purchase'}</h1>
             <p className="text-sm text-slate-500">
-              Purchase #{purchaseNumber || '—'}
+              Purchase {purchaseNumber || '—'}
             </p>
           </div>
         </div>
@@ -496,7 +523,7 @@ export default function ItemPurchaseEntryPage() {
               >
                 <PlusIcon className="h-4 w-4" />
               </button>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0" ref={ledgerFieldRef}>
                 <LedgerAutocomplete
                   value={ledger}
                   onChange={setLedger}
@@ -573,6 +600,7 @@ export default function ItemPurchaseEntryPage() {
                         registerRef={(ref) => setCellRef(idx, 'itemName', ref)}
                         onKeyEnter={() => handleCellEnter(idx, 'itemName')}
                         onAddNew={() => handleAddNewItem(idx)}
+                        onEnterEmpty={focusLedger}
                       />
                     </td>
                     <td className="px-3 py-2">

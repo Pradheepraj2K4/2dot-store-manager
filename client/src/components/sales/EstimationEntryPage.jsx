@@ -160,7 +160,7 @@ export default function EstimationEntryPage() {
       const res = isEdit
         ? await estimationApi.update(estimationIdParam, payload)
         : await estimationApi.create(payload);
-      toast.success(isEdit ? 'Estimation updated' : `Estimation #${res.data.estimation_number} saved`);
+      toast.success(isEdit ? 'Estimation updated' : `Estimation ${res.data.estimation_number} saved`);
       navigate('/estimations');
     } catch (err) {
       toast.error(err.message);
@@ -175,13 +175,13 @@ export default function EstimationEntryPage() {
       toast.error('A customer ledger is required to convert this estimation to a sale');
       return;
     }
-    if (!window.confirm(`Convert estimation #${estimationNumber} to a sale? This will deduct stock and update the customer balance.`)) {
+    if (!window.confirm(`Convert estimation ${estimationNumber} to a sale? This will deduct stock and update the customer balance.`)) {
       return;
     }
     try {
       setConverting(true);
       const res = await estimationApi.convert(estimationIdParam);
-      toast.success(`Converted to sale #${res.data.sale_number}`);
+      toast.success(`Converted to sale ${res.data.sale_number}`);
       navigate('/item-sales');
     } catch (err) {
       toast.error(err.message);
@@ -207,7 +207,7 @@ export default function EstimationEntryPage() {
           <div>
             <h1 className="page-title">{isEdit ? 'Edit Estimation' : 'New Estimation'}</h1>
             <p className="text-sm text-slate-500 flex items-center gap-2">
-              <span>Estimation #{estimationNumber || '—'}</span>
+              <span>Estimation {estimationNumber || '—'}</span>
               {isEdit && (
                 <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${STATUS_COLORS[status] || 'bg-slate-100 text-slate-600'}`}>
                   {status}

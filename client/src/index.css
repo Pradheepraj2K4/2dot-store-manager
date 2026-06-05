@@ -61,6 +61,19 @@
   .card {
     @apply rounded-xl border border-slate-200 bg-white p-6 shadow-md;
   }
+  /* Compact settings — tighten inputs, cards and labels so the page feels less bulky */
+  .settings-compact .card {
+    @apply p-4 shadow-sm;
+  }
+  .settings-compact .input-field {
+    @apply px-2.5 py-1.5 text-sm;
+  }
+  .settings-compact .label {
+    @apply text-xs mb-0.5;
+  }
+  .settings-compact h2 {
+    @apply text-sm;
+  }
   .page-title {
     @apply text-2xl font-bold text-slate-900;
   }
@@ -79,4 +92,21 @@
   .badge-pending {
     @apply inline-flex items-center rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-pending-amber;
   }
+}
+
+/* ── Permission-based UI gating ───────────────────────────────────────────
+   Hide record actions for users who lack the corresponding permission.
+   Title-prefix selectors match "Delete", "Delete sale", "Edit", … but NOT
+   in-form helpers such as "Remove row". Applied via classes on the app root
+   (perm-no-delete / perm-no-modify / perm-no-create) in AppLayout. */
+.perm-no-delete [title^="Delete"],
+.perm-no-delete [title^="delete"] {
+  display: none !important;
+}
+.perm-no-modify [title="Edit"],
+.perm-no-modify [title^="Edit "] {
+  display: none !important;
+}
+.perm-no-create [data-perm="create"] {
+  display: none !important;
 }

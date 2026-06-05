@@ -41,6 +41,16 @@ export const transactionApi = {
   getNextRunningNumber: (entryType) => api.get(`/transactions/next-number?entryType=${entryType}`),
 };
 
+export const userApi = {
+  getAll: () => api.get('/users'),
+  getLoginList: () => api.get('/users/login-list'),
+  getById: (id) => api.get(`/users/${id}`),
+  create: (data) => api.post('/users', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
+  login: (username, password) => api.post('/users/login', { username, password }),
+};
+
 export const settingsApi = {
   getAll: () => api.get('/settings'),
   get: (key) => api.get(`/settings/${key}`),
@@ -111,6 +121,8 @@ export const expenseApi = {
   },
   getById: (id) => api.get(`/expenses/${id}`),
   create: (data) => api.post('/expenses', data),
+  createBatch: (data) => api.post('/expenses/batch', data),
+  getNextVoucher: () => api.get('/expenses/next-voucher'),
   update: (id, data) => api.put(`/expenses/${id}`, data),
   delete: (id) => api.delete(`/expenses/${id}`),
   getSuggestions: (q) => api.get(`/expenses/suggestions?q=${encodeURIComponent(q)}`),

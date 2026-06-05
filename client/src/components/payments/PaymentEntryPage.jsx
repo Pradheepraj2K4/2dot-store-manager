@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { transactionApi, ledgerApi, settingsApi, interestApi, interestSchemeApi, transactionCategoryApi } from '../../api';
-import { formatCurrency, formatDate, formatDateTime, todayISO } from '../../utils/helpers';
+import { formatCurrency, formatDate, todayISO } from '../../utils/helpers';
 import { buildTransactionReceiptHtml } from '../../utils/transactionReceipt';
 import { fetchLogoDataUrl } from '../../utils/interestReceipt';
 import LedgerAutocomplete from '../ui/LedgerAutocomplete';
@@ -659,7 +659,6 @@ export default function PaymentEntryPage() {
                     <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Date</th>
                     <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Category</th>
                     <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Remarks</th>
-                    <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Recorded At</th>
                     <th className="px-4 py-2.5"></th>
                   </tr>
                 </thead>
@@ -677,7 +676,6 @@ export default function PaymentEntryPage() {
                         ) : '—'}
                       </td>
                       <td className="px-4 py-2.5 text-slate-500 text-xs max-w-[200px] truncate">{txn.notes || '—'}</td>
-                      <td className="px-4 py-2.5 text-slate-400 text-xs">{formatDateTime(txn.created_at)}</td>
                       <td className="px-4 py-2.5">
                         <div className="flex items-center gap-1">
                           {printEnabled && (

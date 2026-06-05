@@ -4,9 +4,11 @@ import { expenseApi, transactionCategoryApi } from '../../api';
 import toast from 'react-hot-toast';
 import Modal from '../ui/Modal';
 import ImportContactsModal from './ImportContactsModal';
-import { LockClosedIcon, EyeIcon, EyeSlashIcon, PlusIcon, PencilIcon, TrashIcon, TagIcon, ArrowUpTrayIcon } from '@heroicons/react/24/outline';
+import UsersSettings from './UsersSettings';
+import { LockClosedIcon, EyeIcon, EyeSlashIcon, PlusIcon, PencilIcon, TrashIcon, TagIcon, ArrowUpTrayIcon, Cog6ToothIcon, UsersIcon } from '@heroicons/react/24/outline';
 
 export default function SettingsPage() {
+  const [activeTab, setActiveTab] = useState('general');
   const [showDefaultPassword, setShowDefaultPassword] = useState(false);
   const [customPassword, setCustomPasswordState] = useState('');
   const [showCustomPassword, setShowCustomPassword] = useState(false);
@@ -180,13 +182,37 @@ export default function SettingsPage() {
   const [importContactsOpen, setImportContactsOpen] = useState(false);
 
   return (
-    <div className="space-y-3 max-w-3xl">
+    <div className="space-y-3 max-w-3xl settings-compact">
       <div>
         <h1 className="page-title">Settings</h1>
         <p className="text-sm text-slate-500 mt-1">Manage application settings</p>
       </div>
+      {/* Tabs */}
+      <div className="flex gap-1 bg-slate-100 rounded-lg p-1 w-fit">
+        <button
+          onClick={() => setActiveTab('general')}
+          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'general' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <Cog6ToothIcon className="h-4 w-4" />
+          General
+        </button>
+        <button
+          onClick={() => setActiveTab('users')}
+          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'users' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <UsersIcon className="h-4 w-4" />
+          Users
+        </button>
+      </div>
 
-      {/* ── Import Contacts ───────────────────────────────────────────── */}
+      {activeTab === 'users' && <UsersSettings />}
+
+      {activeTab === 'general' && (
+      <>      {/* ── Import Contacts ───────────────────────────────────────────── */}
       <div className="card">
         <div className="flex items-center gap-2 mb-2">
           <ArrowUpTrayIcon className="h-5 w-5 text-trust-blue" />
@@ -402,6 +428,8 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+      </>
+      )}
       <Modal
         open={deleteCatModal.open}
         onClose={() => setDeleteCatModal({ open: false, cat: null })}

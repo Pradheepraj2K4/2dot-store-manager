@@ -26,7 +26,7 @@ import {
   ArchiveBoxIcon,
   CalculatorIcon,
 } from "@heroicons/react/24/outline";
-import { logout, hasPermission } from "../../utils/auth";
+import { logout, hasPermission, getCurrentUser } from "../../utils/auth";
 import { interestApi, expenseApi } from "../../api";
 import toast from "react-hot-toast";
 
@@ -174,6 +174,8 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
     toast.success("Logged out successfully");
     navigate("/login", { replace: true });
   };
+
+  const currentUsername = getCurrentUser()?.username || "";
 
   // Auto-expand the group that contains the active route (keeping single-open).
   useEffect(() => {
@@ -343,6 +345,11 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
 
         {/* Footer */}
         <div className="border-t border-slate-700 px-3 py-2">
+          {currentUsername && (
+            <div className="px-1 pb-1.5 text-[11px] text-slate-400 truncate">
+              Logged in as <span className="font-medium text-slate-300">{currentUsername}</span>
+            </div>
+          )}
           <div className="flex items-center gap-1.5">
             <button
               onClick={() => navigate(-1)}

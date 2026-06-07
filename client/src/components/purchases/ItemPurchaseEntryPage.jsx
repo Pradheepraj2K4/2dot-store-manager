@@ -15,6 +15,10 @@ import GstSelect from '../ui/GstSelect';
 
 const FIELD_ORDER = ['itemName', 'unit', 'rate', 'qty', 'discount'];
 
+// localStorage key for the in-progress (new) purchase entry, so partially
+// filled data survives navigating to another menu and back.
+const PURCHASE_DRAFT_KEY = 'item_purchase_entry_draft';
+
 function nowHHMM() {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -211,6 +215,7 @@ function ImeiQtyCell({
   onImeisChange,
   registerRef,
   onKeyEnter,
+  invalid,
 }) {
   const [open, setOpen] = useState(false);
   const [anchorRect, setAnchorRect] = useState(null);
@@ -322,7 +327,11 @@ function ImeiQtyCell({
         onChange={(e) => onQuantityChange(e.target.value)}
         onFocus={() => { if (showPanel) setOpen(true); }}
         onKeyDown={handleQtyKeyDown}
-        className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
+        className={`w-full px-2 py-1.5 text-sm text-right border rounded focus:outline-none focus:ring-1 ${
+          invalid
+            ? 'border-debit-red focus:border-debit-red focus:ring-debit-red'
+            : 'border-slate-200 focus:border-trust-blue focus:ring-trust-blue'
+        }`}
         placeholder="1"
       />
 
@@ -353,7 +362,11 @@ function ImeiQtyCell({
                   onChange={(e) => setImeiAt(i, e.target.value)}
                   onKeyDown={(e) => handleImeiKeyDown(e, i)}
                   placeholder={`IMEI ${i + 1}`}
-                  className="flex-1 px-2 py-1 text-xs border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
+                  className={`flex-1 px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 ${
+                    invalid && !String(val || '').trim()
+                      ? 'border-debit-red focus:border-debit-red focus:ring-debit-red'
+                      : 'border-slate-200 focus:border-trust-blue focus:ring-trust-blue'
+                  }`}
                   autoComplete="off"
                 />
               </div>
@@ -383,6 +396,12 @@ export default function ItemPurchaseEntryPage() {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [imeiEnabled, setImeiEnabled] = useState(false);
+  // When a save is attempted with missing IMEIs, highlight the offending rows
+  // until the operator enters the required count. Cleared once valid.
+  const [showImeiErrors, setShowImeiErrors] = useState(false);
+  // Tracks whether the saved draft has been restored, so the auto-save effect
+  // doesn't overwrite it with the initial empty state before restore runs.
+  const draftLoaded = useRef(false);
 
   const cellRefs = useRef({});
   const setCellRef = (row, field, ref) => {
@@ -430,6 +449,45 @@ export default function ItemPurchaseEntryPage() {
       })
       .catch(() => {});
   }, []);
+
+  // ── Draft persistence ───────────────────────────────────────────
+  // Restore a partially-filled new entry when returning to this page, and
+  // auto-save changes so switching to another menu doesn't lose the data.
+  useEffect(() => {
+    if (isEdit) { draftLoaded.current = true; return; }
+    try {
+      const raw = localStorage.getItem(PURCHASE_DRAFT_KEY);
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d.ledger) setLedger(d.ledger);
+        if (d.billNumber != null) setBillNumber(d.billNumber);
+        if (d.date) setDate(d.date);
+        if (d.time != null) setTime(d.time);
+        if (d.notes != null) setNotes(d.notes);
+        if (d.billDiscount != null) setBillDiscount(d.billDiscount);
+        if (Array.isArray(d.lines) && d.lines.length) setLines(d.lines);
+      }
+    } catch (_) { /* ignore malformed draft */ }
+    draftLoaded.current = true;
+  }, [isEdit]);
+
+  useEffect(() => {
+    if (isEdit || !draftLoaded.current) return;
+    const meaningful =
+      Boolean(ledger) ||
+      (billNumber && billNumber.trim()) ||
+      (notes && notes.trim()) ||
+      lines.some((l) => l.item_name && l.item_name.trim());
+    try {
+      if (meaningful) {
+        localStorage.setItem(PURCHASE_DRAFT_KEY, JSON.stringify({
+          ledger, billNumber, date, time, notes, billDiscount, lines,
+        }));
+      } else {
+        localStorage.removeItem(PURCHASE_DRAFT_KEY);
+      }
+    } catch (_) { /* ignore storage quota errors */ }
+  }, [isEdit, ledger, billNumber, date, time, notes, billDiscount, lines]);
 
   // When returning from the ledger-creation page (opened via the '+' button),
   // auto-select the freshly created ledger.
@@ -621,11 +679,21 @@ export default function ItemPurchaseEntryPage() {
       }
     }
 
-    // When IMEI tracking is on, ensure entered IMEIs are unique across the bill.
+    // When IMEI tracking is on, every linked-item line must carry one IMEI per
+    // unit, and IMEIs must be unique across the bill.
     if (imeiEnabled) {
       const seen = new Set();
-      for (const l of validLines) {
+      for (let i = 0; i < validLines.length; i++) {
+        const l = validLines[i];
         const imeis = Array.isArray(l.imeis) ? l.imeis.map((s) => String(s || '').trim()).filter(Boolean) : [];
+        if (l.item_id) {
+          const qty = Math.floor(parseFloat(l.quantity) || 0);
+          if (imeis.length !== qty) {
+            setShowImeiErrors(true);
+            toast.error(`Row ${i + 1}: enter ${qty} IMEI${qty === 1 ? '' : 's'} for "${l.item_name}" (entered ${imeis.length})`);
+            return;
+          }
+        }
         for (const imei of imeis) {
           if (seen.has(imei)) {
             toast.error(`Duplicate IMEI "${imei}" entered`);
@@ -634,6 +702,7 @@ export default function ItemPurchaseEntryPage() {
           seen.add(imei);
         }
       }
+      setShowImeiErrors(false);
     }
 
     try {
@@ -665,6 +734,7 @@ export default function ItemPurchaseEntryPage() {
         : await purchaseApi.create(payload);
       toast.success(isEdit ? 'Purchase updated' : `Purchase ${res.data.purchase_number} saved`);
       if (!isEdit) {
+        localStorage.removeItem(PURCHASE_DRAFT_KEY);
         setLedger(null);
         setBillNumber('');
         setDate(todayISO());
@@ -853,6 +923,11 @@ export default function ItemPurchaseEntryPage() {
                         onImeisChange={(arr) => updateLine(idx, { imeis: arr })}
                         registerRef={(ref) => setCellRef(idx, 'qty', ref)}
                         onKeyEnter={() => handleCellEnter(idx, 'qty')}
+                        invalid={
+                          showImeiErrors && imeiEnabled && Boolean(line.item_id) &&
+                          (Array.isArray(line.imeis) ? line.imeis.map((s) => String(s || '').trim()).filter(Boolean).length : 0) !==
+                            Math.floor(parseFloat(line.quantity) || 0)
+                        }
                       />
                     </td>
                     <td className="px-3 py-2">

@@ -20,6 +20,10 @@ import GstSelect from '../ui/GstSelect';
 
 const FIELD_ORDER = ['itemName', 'unit', 'rate', 'qty', 'discount'];
 
+// localStorage key for the in-progress (new) sale entry, so partially filled
+// data survives navigating to another menu and back.
+const SALE_DRAFT_KEY = 'item_sale_entry_draft';
+
 function nowHHMM() {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -482,6 +486,9 @@ export default function ItemSalesEntryPage() {
   const [imeiEnabled, setImeiEnabled] = useState(false);
   // Cache of available (in-stock) IMEIs per item id, fetched lazily.
   const [availableImeis, setAvailableImeis] = useState({});
+  // When a save is attempted with missing IMEIs, highlight the offending rows
+  // until the operator selects the required count. Cleared once valid.
+  const [showImeiErrors, setShowImeiErrors] = useState(false);
 
   // CASH walk-in sales capture the buyer's name/mobile inline since they are
   // all billed against the shared system CASH ledger.
@@ -575,6 +582,12 @@ export default function ItemSalesEntryPage() {
   const customerMobileRef = useRef(null);
   const customerPlaceRef = useRef(null);
 
+  // Draft persistence: track when the saved draft has been restored (so the
+  // auto-save effect doesn't clobber it) and whether it supplied a ledger (so
+  // the default-CASH fallback doesn't override the restored selection).
+  const draftLoaded = useRef(false);
+  const draftLedgerRestored = useRef(false);
+
   const refreshItems = useCallback(async () => {
     try {
       const res = await itemApi.getAll();
@@ -594,6 +607,50 @@ export default function ItemSalesEntryPage() {
       .catch(() => {});
   }, []);
 
+  // ── Draft persistence ───────────────────────────────────────────
+  // Restore a partially-filled new sale when returning to this page, and
+  // auto-save changes so switching to another menu doesn't lose the data.
+  useEffect(() => {
+    if (isEdit) { draftLoaded.current = true; return; }
+    try {
+      const raw = localStorage.getItem(SALE_DRAFT_KEY);
+      if (raw) {
+        const d = JSON.parse(raw);
+        if (d.ledger) { setLedger(d.ledger); draftLedgerRestored.current = true; }
+        if (d.date) setDate(d.date);
+        if (d.time != null) setTime(d.time);
+        if (d.notes != null) setNotes(d.notes);
+        if (d.customerName != null) setCustomerName(d.customerName);
+        if (d.customerMobile != null) setCustomerMobile(d.customerMobile);
+        if (d.customerPlace != null) setCustomerPlace(d.customerPlace);
+        if (d.billDiscount != null) setBillDiscount(d.billDiscount);
+        if (Array.isArray(d.lines) && d.lines.length) setLines(d.lines);
+      }
+    } catch (_) { /* ignore malformed draft */ }
+    draftLoaded.current = true;
+  }, [isEdit]);
+
+  useEffect(() => {
+    if (isEdit || !draftLoaded.current) return;
+    const meaningful =
+      (customerName && customerName.trim()) ||
+      (customerMobile && customerMobile.trim()) ||
+      (customerPlace && customerPlace.trim()) ||
+      (notes && notes.trim()) ||
+      lines.some((l) => l.item_name && l.item_name.trim());
+    try {
+      if (meaningful) {
+        localStorage.setItem(SALE_DRAFT_KEY, JSON.stringify({
+          ledger, date, time, notes,
+          customerName, customerMobile, customerPlace,
+          billDiscount, lines,
+        }));
+      } else {
+        localStorage.removeItem(SALE_DRAFT_KEY);
+      }
+    } catch (_) { /* ignore storage quota errors */ }
+  }, [isEdit, ledger, date, time, notes, customerName, customerMobile, customerPlace, billDiscount, lines]);
+
   // Fetch (and cache) the in-stock IMEIs for an item so the picker can offer
   // them. Re-fetches on demand to reflect units sold in other tabs.
   const loadImeis = useCallback(async (itemId, { force = false } = {}) => {
@@ -610,7 +667,7 @@ export default function ItemSalesEntryPage() {
     refreshItems();
     if (!isEdit) {
       saleApi.getNextNumber().then((r) => setSaleNumber(r.data?.sale_number || '')).catch(() => {});
-      ledgerApi.getCash().then((r) => { if (r.data) setLedger(r.data); }).catch(() => {});
+      ledgerApi.getCash().then((r) => { if (r.data && !draftLedgerRestored.current) setLedger(r.data); }).catch(() => {});
     }
   }, [refreshItems, isEdit]);
 
@@ -733,6 +790,15 @@ export default function ItemSalesEntryPage() {
     setLines((prev) => {
       if (prev.length <= 1) return [emptyLine()];
       return prev.filter((_, i) => i !== idx);
+    });
+  };
+
+  // Drop any empty (no item selected) rows. Used when focus moves to the
+  // customer fields so trailing blank rows don't clutter the bill.
+  const pruneEmptyLines = () => {
+    setLines((prev) => {
+      const filled = prev.filter((l) => l.item_id);
+      return filled.length > 0 ? filled : [emptyLine()];
     });
   };
 
@@ -912,22 +978,26 @@ export default function ItemSalesEntryPage() {
       }
     }
 
-    // IMEI selection check — when tracking is on and an item has IMEIs to pick
-    // from, the operator must select exactly `qty` of them.
+    // IMEI selection check — when tracking is on, the operator must select
+    // exactly `qty` IMEIs for every linked-item line.
     if (imeiEnabled) {
+      let firstBad = -1;
       for (let i = 0; i < validLines.length; i++) {
         const l = validLines[i];
         if (!l.item_id) continue;
-        const pool = availableImeis[l.item_id] || [];
         const sel = Array.isArray(l.imeis) ? l.imeis.filter(Boolean) : [];
-        const hasTracking = pool.length > 0 || sel.length > 0;
-        if (!hasTracking) continue;
         const qty = Math.floor(parseFloat(l.quantity) || 0);
-        if (sel.length !== qty) {
-          toast.error(`Row ${i + 1}: select ${qty} IMEI${qty === 1 ? '' : 's'} for "${l.item_name}" (selected ${sel.length})`);
-          return;
-        }
+        if (sel.length !== qty) { firstBad = i; break; }
       }
+      if (firstBad >= 0) {
+        const l = validLines[firstBad];
+        const sel = Array.isArray(l.imeis) ? l.imeis.filter(Boolean) : [];
+        const qty = Math.floor(parseFloat(l.quantity) || 0);
+        setShowImeiErrors(true);
+        toast.error(`Row ${firstBad + 1}: select ${qty} IMEI${qty === 1 ? '' : 's'} for "${l.item_name}" (selected ${sel.length})`);
+        return;
+      }
+      setShowImeiErrors(false);
     }
 
     try {
@@ -965,6 +1035,7 @@ export default function ItemSalesEntryPage() {
         openSalePreview(res.data, ledger?.name, false);
       }
       if (!isEdit) {
+        localStorage.removeItem(SALE_DRAFT_KEY);
         setLedger(null);
         setDate(todayISO());
         setTime(nowHHMM());
@@ -1202,7 +1273,12 @@ export default function ItemSalesEntryPage() {
                       onOpen={() => line.item_id && loadImeis(line.item_id)}
                       registerRef={(ref) => setCellRef(idx, 'qty', ref)}
                       onKeyEnter={() => handleCellEnter(idx, 'qty')}
-                      invalid={Boolean(line.item_id) && parseFloat(line.quantity) > maxQtyFor(line)}
+                      invalid={
+                        (Boolean(line.item_id) && parseFloat(line.quantity) > maxQtyFor(line)) ||
+                        (showImeiErrors && imeiEnabled && Boolean(line.item_id) &&
+                          (Array.isArray(line.imeis) ? line.imeis.filter(Boolean).length : 0) !==
+                            Math.floor(parseFloat(line.quantity) || 0))
+                      }
                       stockTitle={line.item_id && line.current_stock != null ? `In stock: ${line.current_stock}` : undefined}
                     />
                   </td>
@@ -1275,6 +1351,7 @@ export default function ItemSalesEntryPage() {
                     ref={customerNameRef}
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
+                    onFocus={pruneEmptyLines}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -1294,6 +1371,7 @@ export default function ItemSalesEntryPage() {
                     ref={customerMobileRef}
                     value={customerMobile}
                     onChange={(e) => setCustomerMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    onFocus={pruneEmptyLines}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -1314,6 +1392,7 @@ export default function ItemSalesEntryPage() {
                     ref={customerPlaceRef}
                     value={customerPlace}
                     onChange={(e) => setCustomerPlace(e.target.value)}
+                    onFocus={pruneEmptyLines}
                     className="input-field"
                     placeholder="Place / location"
                   />

@@ -1,6 +1,7 @@
 const purchaseRepository = require('../repositories/purchaseRepository');
 const ledgerRepository = require('../repositories/ledgerRepository');
 const itemRepository = require('../repositories/itemRepository');
+const imeiRepository = require('../repositories/imeiRepository');
 const { AppError } = require('../middleware/errorHandler');
 const { getDb } = require('../db/database');
 
@@ -32,6 +33,16 @@ function applyStockDelta(items, sign) {
     const qty = parseFloat(line.quantity) || 0;
     if (!qty) continue;
     itemRepository.adjustStock(line.item_id, sign * qty);
+  }
+}
+
+/** Register the IMEIs supplied on each purchase line as fresh in-stock units. */
+function registerImeis(items, purchaseId) {
+  for (const line of items || []) {
+    if (!line.item_id || !Array.isArray(line.imeis)) continue;
+    const clean = line.imeis.map((s) => String(s || '').trim()).filter(Boolean);
+    if (clean.length === 0) continue;
+    imeiRepository.addForPurchase(line.item_id, purchaseId, clean);
   }
 }
 
@@ -137,6 +148,8 @@ class PurchaseService {
 
       // Stock-in: every linked item's stock goes up
       applyStockDelta(normalisedItems, +1);
+      // Register any IMEIs entered on the lines as in-stock units.
+      registerImeis(normalisedItems, purchase.id);
       return purchase;
     });
     return run();
@@ -162,6 +175,10 @@ class PurchaseService {
       applyStockDelta(existing.items, -1);
       applyStockDelta(normalisedItems, +1);
 
+      // Reverse the prior in-stock IMEIs from this purchase, then re-register
+      // from the edited payload. Already-sold IMEIs are preserved.
+      imeiRepository.removeInStockByPurchase(id);
+
       // Reverse the prior ledger movement and apply the new one (skip CASH).
       // The old purchase may have used a different ledger, so reverse on that.
       const oldLedger = ledgerRepository.findById(existing.ledger_id);
@@ -175,7 +192,7 @@ class PurchaseService {
         ledgerRepository.updateBalance(fresh.id, fresh.current_balance + newDelta);
       }
 
-      return purchaseRepository.update(id, {
+      const updated = purchaseRepository.update(id, {
         ledger_id: ledger.id,
         bill_number: data.bill_number || '',
         date: data.date || existing.date,
@@ -187,6 +204,9 @@ class PurchaseService {
         notes: data.notes || '',
         items: normalisedItems,
       });
+      // Re-register IMEIs from the edited payload against this purchase.
+      registerImeis(normalisedItems, id);
+      return updated;
     });
     return run();
   }
@@ -204,6 +224,8 @@ class PurchaseService {
       }
       // Reverse the stock-in introduced by this purchase
       applyStockDelta(existing.items, -1);
+      // Drop the in-stock IMEIs this purchase introduced (sold ones remain).
+      imeiRepository.removeInStockByPurchase(id);
       purchaseRepository.delete(id);
     });
     run();

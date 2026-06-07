@@ -20,6 +20,7 @@ import { fetchLogoDataUrl } from "../../utils/interestReceipt";
 import LoadingSpinner from "../ui/LoadingSpinner";
 import EmptyState from "../ui/EmptyState";
 import Modal from "../ui/Modal";
+import ImeiInfoButton from "../ui/ImeiInfoButton";
 
 function firstDayOfMonth() {
   const d = new Date();
@@ -483,7 +484,15 @@ export default function SalesReportPage() {
                                     {formatCurrency(line.rate)}
                                   </td>
                                   <td className="px-2 py-1 text-right text-slate-600">
-                                    {line.quantity}
+                                    <span className="inline-flex items-center justify-end gap-1">
+                                      {Array.isArray(line.imeis) && line.imeis.length > 0 && (
+                                        <ImeiInfoButton
+                                          title="Sold IMEIs"
+                                          groups={[{ items: line.imeis, tone: 'green' }]}
+                                        />
+                                      )}
+                                      {line.quantity}
+                                    </span>
                                   </td>
                                   <td className="px-2 py-1 text-right text-slate-600">
                                     {line.discount_percent || 0}%

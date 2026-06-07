@@ -1,4 +1,5 @@
 const { getDb } = require('../db/database');
+const imeiRepository = require('./imeiRepository');
 
 class SaleRepository {
   getNextSaleNumber() {
@@ -68,6 +69,18 @@ class SaleRepository {
     sale.items = db.prepare(`
       SELECT * FROM sale_items WHERE sale_id = ? ORDER BY sort_order ASC, id ASC
     `).all(id);
+    // Attach the IMEIs consumed by this sale, grouped per item, so the edit
+    // screen can re-populate the per-line IMEI selections.
+    const imeiRows = imeiRepository.getBySale(id);
+    const byItem = new Map();
+    for (const row of imeiRows) {
+      if (!byItem.has(row.item_id)) byItem.set(row.item_id, []);
+      byItem.get(row.item_id).push(row.imei);
+    }
+    sale.items = sale.items.map((line) => ({
+      ...line,
+      imeis: line.item_id ? (byItem.get(line.item_id) || []) : [],
+    }));
     return sale;
   }
 

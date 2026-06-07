@@ -148,6 +148,8 @@ export const itemApi = {
     const qs = new URLSearchParams(params).toString();
     return api.get(`/items/stock-report${qs ? `?${qs}` : ''}`);
   },
+  getImeis: (id) => api.get(`/items/${id}/imeis`),
+  getImeiBreakdown: (id) => api.get(`/items/${id}/imeis/breakdown`),
 };
 
 export const saleApi = {

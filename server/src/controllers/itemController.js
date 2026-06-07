@@ -60,6 +60,20 @@ class ItemController {
       res.json({ success: true, data: rows });
     } catch (err) { next(err); }
   }
+
+  getImeis(req, res, next) {
+    try {
+      const imeis = itemService.getAvailableImeis(parseInt(req.params.id));
+      res.json({ success: true, data: imeis });
+    } catch (err) { next(err); }
+  }
+
+  getImeiBreakdown(req, res, next) {
+    try {
+      const data = itemService.getImeiBreakdown(parseInt(req.params.id));
+      res.json({ success: true, data });
+    } catch (err) { next(err); }
+  }
 }
 
 module.exports = new ItemController();

@@ -1,4 +1,5 @@
 const { getDb } = require('../db/database');
+const imeiRepository = require('./imeiRepository');
 
 class PurchaseRepository {
   getNextPurchaseNumber() {
@@ -66,6 +67,18 @@ class PurchaseRepository {
     purchase.items = db.prepare(`
       SELECT * FROM purchase_items WHERE purchase_id = ? ORDER BY sort_order ASC, id ASC
     `).all(id);
+    // Attach IMEIs (grouped by item) registered by this purchase so the edit
+    // screen can re-populate the per-line IMEI inputs.
+    const imeiRows = imeiRepository.getByPurchase(id);
+    const byItem = new Map();
+    for (const row of imeiRows) {
+      if (!byItem.has(row.item_id)) byItem.set(row.item_id, []);
+      byItem.get(row.item_id).push(row.imei);
+    }
+    purchase.items = purchase.items.map((line) => ({
+      ...line,
+      imeis: line.item_id ? (byItem.get(line.item_id) || []) : [],
+    }));
     return purchase;
   }
 

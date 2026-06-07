@@ -1,6 +1,7 @@
 const saleRepository = require('../repositories/saleRepository');
 const ledgerRepository = require('../repositories/ledgerRepository');
 const itemRepository = require('../repositories/itemRepository');
+const imeiRepository = require('../repositories/imeiRepository');
 const { AppError } = require('../middleware/errorHandler');
 const { getDb } = require('../db/database');
 
@@ -11,6 +12,16 @@ function applyStockDelta(items, sign) {
     const qty = parseFloat(line.quantity) || 0;
     if (!qty) continue;
     itemRepository.adjustStock(line.item_id, sign * qty);
+  }
+}
+
+/** Mark the IMEIs selected on each sale line as sold and link them to a sale. */
+function consumeImeis(items, saleId) {
+  for (const line of items || []) {
+    if (!line.item_id || !Array.isArray(line.imeis)) continue;
+    const clean = line.imeis.map((s) => String(s || '').trim()).filter(Boolean);
+    if (clean.length === 0) continue;
+    imeiRepository.markSold(line.item_id, saleId, clean);
   }
 }
 
@@ -125,6 +136,8 @@ class SaleService {
 
       // Decrement stock for every linked item line
       applyStockDelta(normalisedItems, -1);
+      // Mark any selected IMEIs as sold against this sale.
+      consumeImeis(normalisedItems, sale.id);
       return sale;
     });
     return run();
@@ -171,7 +184,11 @@ class SaleService {
       applyStockDelta(existing.items, +1);
       applyStockDelta(normalisedItems, -1);
 
-      return saleRepository.update(id, {
+      // Restore the IMEIs the previous version of this sale consumed, then
+      // mark the newly selected ones as sold.
+      imeiRepository.restoreBySale(id);
+
+      const updated = saleRepository.update(id, {
         date: data.date || existing.date,
         time: data.time != null ? data.time : existing.time,
         total_amount: Math.round((total_amount - bill_discount_val) * 100) / 100,
@@ -185,6 +202,8 @@ class SaleService {
         customer_place: data.customer_place || '',
         items: normalisedItems,
       });
+      consumeImeis(normalisedItems, id);
+      return updated;
     });
     return run();
   }
@@ -201,6 +220,8 @@ class SaleService {
       }
       // Restore stock back to inventory
       applyStockDelta(existing.items, +1);
+      // Return any consumed IMEIs to in-stock.
+      imeiRepository.restoreBySale(id);
       saleRepository.delete(id);
     });
     run();

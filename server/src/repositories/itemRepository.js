@@ -165,6 +165,7 @@ class ItemRepository {
         COALESCE(s.total_sold, 0)           AS total_sold,
         COALESCE(sr.total_sales_return, 0)  AS total_sales_return,
         COALESCE(pr.total_purchase_return, 0) AS total_purchase_return,
+        COALESCE(im.imei_count, 0)          AS imei_count,
         (i.mrp * i.current_stock)           AS stock_value
       FROM items i
       LEFT JOIN (
@@ -183,6 +184,10 @@ class ItemRepository {
         SELECT item_id, SUM(quantity) AS total_purchase_return
         FROM purchase_return_items WHERE item_id IS NOT NULL GROUP BY item_id
       ) pr ON pr.item_id = i.id
+      LEFT JOIN (
+        SELECT item_id, COUNT(*) AS imei_count
+        FROM item_imeis GROUP BY item_id
+      ) im ON im.item_id = i.id
       ${where}
       ORDER BY i.name ASC
     `).all(...params);

@@ -51,6 +51,7 @@ function emptyLine() {
     amount: 0,
     current_stock: null,
     original_quantity: 0,
+    imeis: [],
   };
 }
 
@@ -129,10 +130,10 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
       setHighlight((h) => (h <= 0 ? filtered.length - 1 : h - 1));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (open && filtered[highlight]) {
+      if (open && highlight >= 0 && filtered[highlight]) {
         onSelect(filtered[highlight]);
-        setOpen(false);
       }
+      setOpen(false);
       onKeyEnter();
     } else if (e.key === 'Escape') {
       setOpen(false);
@@ -210,6 +211,255 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
   );
 }
 
+// Quantity cell for sales with an inline IMEI picker. When IMEI tracking is on
+// and a linked item is selected, focusing the quantity opens a dropdown listing
+// the IMEIs still available for that item; the operator picks exactly `qty` of
+// them. IMEIs already chosen on other lines (or sold) are not offered.
+function ImeiSaleQtyCell({
+  enabled,
+  itemId,
+  quantity,
+  selected,
+  pool,
+  usedElsewhere,
+  onQuantityChange,
+  onSelectedChange,
+  onOpen,
+  registerRef,
+  onKeyEnter,
+  invalid,
+  stockTitle,
+}) {
+  const [open, setOpen] = useState(false);
+  const [anchorRect, setAnchorRect] = useState(null);
+  const [query, setQuery] = useState('');
+  const inputRef = useRef(null);
+  const containerRef = useRef(null);
+  const panelRef = useRef(null);
+  const searchRef = useRef(null);
+  const optionRefs = useRef([]);
+
+  useEffect(() => { registerRef(inputRef); }, [registerRef]);
+
+  const qty = Math.max(0, Math.floor(parseFloat(quantity) || 0));
+  const sel = Array.isArray(selected) ? selected : [];
+  const showPanel = enabled && Boolean(itemId);
+
+  // Options = currently-selected IMEIs (kept visible, e.g. in edit mode) plus
+  // the available pool, minus those chosen on other lines.
+  const options = useMemo(() => {
+    const used = usedElsewhere || new Set();
+    const avail = (pool || []).filter((imei) => !used.has(imei));
+    return Array.from(new Set([...sel, ...avail]));
+  }, [pool, usedElsewhere, sel]);
+
+  // Apply the search filter (case-insensitive substring match).
+  const visibleOptions = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter((imei) => String(imei).toLowerCase().includes(q));
+  }, [options, query]);
+
+  useEffect(() => {
+    if (!open || !showPanel) return;
+    const update = () => {
+      if (inputRef.current) setAnchorRect(inputRef.current.getBoundingClientRect());
+    };
+    update();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [open, showPanel]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (
+        containerRef.current && !containerRef.current.contains(e.target) &&
+        panelRef.current && !panelRef.current.contains(e.target)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const openPanel = () => {
+    setOpen(true);
+    setQuery('');
+    onOpen?.();
+  };
+
+  const toggle = (imei) => {
+    const isSel = sel.includes(imei);
+    if (isSel) {
+      onSelectedChange(sel.filter((s) => s !== imei));
+    } else {
+      if (sel.length >= qty) return; // cannot exceed quantity
+      onSelectedChange([...sel, imei]);
+    }
+  };
+
+  const handleQtyKeyDown = (e) => {
+    if (e.key === 'ArrowDown' && showPanel) {
+      e.preventDefault();
+      openPanel();
+      setTimeout(() => searchRef.current?.focus(), 0);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      onKeyEnter();
+    }
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      optionRefs.current[0]?.focus();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      // If exactly one option matches, toggle it for quick keyboard selection.
+      if (visibleOptions.length === 1) {
+        toggle(visibleOptions[0]);
+        setQuery('');
+      } else {
+        optionRefs.current[0]?.focus();
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setOpen(false);
+      inputRef.current?.focus();
+    }
+  };
+
+  const handleOptionKeyDown = (e, i, imei) => {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (i < visibleOptions.length - 1) optionRefs.current[i + 1]?.focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (i > 0) optionRefs.current[i - 1]?.focus();
+      else searchRef.current?.focus();
+    } else if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      if (e.key === 'Enter' && sel.length >= qty) {
+        // Selection complete — move on to the next column.
+        setOpen(false);
+        onKeyEnter();
+        return;
+      }
+      toggle(imei);
+    } else if (e.key === 'Escape') {
+      setOpen(false);
+      inputRef.current?.focus();
+    }
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className="relative"
+      onBlur={(e) => {
+        const root = e.currentTarget;
+        setTimeout(() => {
+          if (!root.contains(document.activeElement) &&
+              !(panelRef.current && panelRef.current.contains(document.activeElement))) {
+            setOpen(false);
+          }
+        }, 0);
+      }}
+    >
+      <input
+        ref={inputRef}
+        type="number"
+        step="0.001"
+        min="0"
+        value={quantity}
+        onChange={(e) => onQuantityChange(e.target.value)}
+        onFocus={() => { if (showPanel) openPanel(); }}
+        onKeyDown={handleQtyKeyDown}
+        className={`w-full px-2 py-1.5 text-sm text-right border rounded focus:outline-none focus:ring-1 ${
+          invalid
+            ? 'border-debit-red focus:border-debit-red focus:ring-debit-red'
+            : 'border-slate-200 focus:border-trust-blue focus:ring-trust-blue'
+        }`}
+        placeholder="1"
+        title={stockTitle}
+      />
+
+      {showPanel && open && anchorRect && (
+        <div
+          ref={panelRef}
+          style={{
+            position: 'fixed',
+            top: anchorRect.bottom + 4,
+            left: Math.max(8, anchorRect.right - 260),
+            width: 260,
+            zIndex: 1000,
+          }}
+          className="bg-white rounded-lg border border-slate-200 shadow-lg p-2"
+        >
+          <div className="flex items-center justify-between px-1 pb-1.5 mb-1 border-b border-slate-100">
+            <span className="text-[11px] font-semibold text-slate-600">Select IMEIs to sell</span>
+            <span className={`text-[10px] ${sel.length === qty ? 'text-credit-green' : 'text-slate-400'}`}>{sel.length}/{qty}</span>
+          </div>
+          <input
+            ref={searchRef}
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={handleSearchKeyDown}
+            onMouseDown={(e) => e.stopPropagation()}
+            placeholder="Search IMEI…"
+            className="w-full mb-1.5 px-2 py-1.5 text-xs font-mono border border-slate-200 rounded focus:outline-none focus:ring-1 focus:border-trust-blue focus:ring-trust-blue"
+          />
+          <div className="max-h-56 overflow-y-auto space-y-0.5">
+            {options.length === 0 ? (
+              <div className="px-2 py-3 text-center text-[11px] text-slate-400">
+                No IMEIs available for this item.
+              </div>
+            ) : visibleOptions.length === 0 ? (
+              <div className="px-2 py-3 text-center text-[11px] text-slate-400">
+                No IMEIs match “{query}”.
+              </div>
+            ) : (
+              visibleOptions.map((imei, i) => {
+                const checked = sel.includes(imei);
+                const disabled = !checked && sel.length >= qty;
+                return (
+                  <button
+                    type="button"
+                    key={imei}
+                    ref={(el) => { optionRefs.current[i] = el; }}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => toggle(imei)}
+                    onKeyDown={(e) => handleOptionKeyDown(e, i, imei)}
+                    disabled={disabled}
+                    className={`w-full flex items-center gap-2 px-2 py-1.5 text-left text-xs rounded border ${
+                      checked
+                        ? 'border-trust-blue bg-trust-blue/10 text-slate-800'
+                        : disabled
+                          ? 'border-slate-100 text-slate-300 cursor-not-allowed'
+                          : 'border-slate-100 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <span className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border ${checked ? 'border-trust-blue bg-trust-blue text-white' : 'border-slate-300'}`}>
+                      {checked ? '✓' : ''}
+                    </span>
+                    <span className="font-mono truncate">{imei}</span>
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ItemSalesEntryPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -229,6 +479,9 @@ export default function ItemSalesEntryPage() {
   const [lines, setLines] = useState([emptyLine()]);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
+  const [imeiEnabled, setImeiEnabled] = useState(false);
+  // Cache of available (in-stock) IMEIs per item id, fetched lazily.
+  const [availableImeis, setAvailableImeis] = useState({});
 
   // CASH walk-in sales capture the buyer's name/mobile inline since they are
   // all billed against the shared system CASH ledger.
@@ -331,6 +584,28 @@ export default function ItemSalesEntryPage() {
     }
   }, []);
 
+  // Load the IMEI-tracking toggle once on mount.
+  useEffect(() => {
+    settingsApi.get('imei_tracking_enabled')
+      .then((r) => {
+        const v = r.data?.value;
+        setImeiEnabled(v === true || v === 'true');
+      })
+      .catch(() => {});
+  }, []);
+
+  // Fetch (and cache) the in-stock IMEIs for an item so the picker can offer
+  // them. Re-fetches on demand to reflect units sold in other tabs.
+  const loadImeis = useCallback(async (itemId, { force = false } = {}) => {
+    if (!itemId) return;
+    if (!force && availableImeis[itemId]) return;
+    try {
+      const res = await itemApi.getImeis(itemId);
+      const list = (res.data || []).map((r) => r.imei);
+      setAvailableImeis((prev) => ({ ...prev, [itemId]: list }));
+    } catch (_) { /* non-critical */ }
+  }, [availableImeis]);
+
   useEffect(() => {
     refreshItems();
     if (!isEdit) {
@@ -401,6 +676,7 @@ export default function ItemSalesEntryPage() {
             amount: l.amount,
             current_stock: null,
             original_quantity: parseFloat(l.quantity) || 0,
+            imeis: Array.isArray(l.imeis) ? l.imeis : [],
           }))
         );
       })
@@ -488,7 +764,9 @@ export default function ItemSalesEntryPage() {
       gst_percent: item.gst_percent ? String(item.gst_percent) : '',
       current_stock: stock,
       original_quantity: 0,
+      imeis: [],
     });
+    if (imeiEnabled) loadImeis(item.id, { force: true });
   };
 
   const handleQuantityChange = (idx, value) => {
@@ -500,7 +778,13 @@ export default function ItemSalesEntryPage() {
       updateLine(idx, { quantity: String(max) });
       return;
     }
-    updateLine(idx, { quantity: value });
+    // Trim any IMEI selection that now exceeds the reduced quantity.
+    const qty = Math.floor(parseFloat(value) || 0);
+    const patch = { quantity: value };
+    if (imeiEnabled && Array.isArray(line.imeis) && line.imeis.length > qty) {
+      patch.imeis = line.imeis.slice(0, qty);
+    }
+    updateLine(idx, patch);
   };
 
   const handleCellEnter = (rowIdx, field) => {
@@ -582,7 +866,7 @@ export default function ItemSalesEntryPage() {
         baseRate: item.last_purchase_rate,
       };
     }
-    return { name: item.name || line.item_name, unit: line.unit, stock, cost };
+    return { name: item.name || line.item_name, unit: line.unit, stock, cost, imeis: Array.isArray(line.imeis) ? line.imeis : [] };
   }, [focusedRow, lines, items]);
 
   const handleSave = async () => {
@@ -628,6 +912,24 @@ export default function ItemSalesEntryPage() {
       }
     }
 
+    // IMEI selection check — when tracking is on and an item has IMEIs to pick
+    // from, the operator must select exactly `qty` of them.
+    if (imeiEnabled) {
+      for (let i = 0; i < validLines.length; i++) {
+        const l = validLines[i];
+        if (!l.item_id) continue;
+        const pool = availableImeis[l.item_id] || [];
+        const sel = Array.isArray(l.imeis) ? l.imeis.filter(Boolean) : [];
+        const hasTracking = pool.length > 0 || sel.length > 0;
+        if (!hasTracking) continue;
+        const qty = Math.floor(parseFloat(l.quantity) || 0);
+        if (sel.length !== qty) {
+          toast.error(`Row ${i + 1}: select ${qty} IMEI${qty === 1 ? '' : 's'} for "${l.item_name}" (selected ${sel.length})`);
+          return;
+        }
+      }
+    }
+
     try {
       setSaving(true);
       const payload = {
@@ -650,6 +952,9 @@ export default function ItemSalesEntryPage() {
           gst_percent: parseFloat(l.gst_percent) || 0,
           amount: parseFloat(l.amount) || 0,
           rate_tax_mode: rateTaxMode,
+          imeis: imeiEnabled
+            ? (Array.isArray(l.imeis) ? l.imeis.map((s) => String(s || '').trim()).filter(Boolean) : [])
+            : [],
         })),
       };
       const res = isEdit
@@ -845,7 +1150,7 @@ export default function ItemSalesEntryPage() {
                     <ItemNameCell
                       value={line.item_name}
                       items={items}
-                      onChange={(v) => updateLine(idx, { item_name: v, item_id: null })}
+                      onChange={(v) => updateLine(idx, { item_name: v, item_id: null, imeis: [] })}
                       onSelect={(it) => handleSelectItem(idx, it)}
                       registerRef={(ref) => setCellRef(idx, 'itemName', ref)}
                       onKeyEnter={() => handleCellEnter(idx, 'itemName')}
@@ -881,23 +1186,24 @@ export default function ItemSalesEntryPage() {
                     />
                   </td>
                   <td className="px-3 py-2">
-                    <input
-                      ref={(el) => setCellRef(idx, 'qty', { current: el })}
-                      type="number"
-                      step="0.001"
-                      min="0"
-                      value={line.quantity}
-                      onChange={(e) => handleQuantityChange(idx, e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'qty'); }
-                      }}
-                      className={`w-full px-2 py-1.5 text-sm text-right border rounded focus:outline-none focus:ring-1 ${
-                        line.item_id && parseFloat(line.quantity) > maxQtyFor(line)
-                          ? 'border-debit-red focus:border-debit-red focus:ring-debit-red'
-                          : 'border-slate-200 focus:border-trust-blue focus:ring-trust-blue'
-                      }`}
-                      placeholder="1"
-                      title={line.item_id && line.current_stock != null ? `In stock: ${line.current_stock}` : undefined}
+                    <ImeiSaleQtyCell
+                      enabled={imeiEnabled}
+                      itemId={line.item_id}
+                      quantity={line.quantity}
+                      selected={line.imeis}
+                      pool={line.item_id ? (availableImeis[line.item_id] || []) : []}
+                      usedElsewhere={new Set(
+                        lines
+                          .filter((other, i) => i !== idx && other.item_id === line.item_id)
+                          .flatMap((other) => (Array.isArray(other.imeis) ? other.imeis : []))
+                      )}
+                      onQuantityChange={(v) => handleQuantityChange(idx, v)}
+                      onSelectedChange={(arr) => updateLine(idx, { imeis: arr })}
+                      onOpen={() => line.item_id && loadImeis(line.item_id)}
+                      registerRef={(ref) => setCellRef(idx, 'qty', ref)}
+                      onKeyEnter={() => handleCellEnter(idx, 'qty')}
+                      invalid={Boolean(line.item_id) && parseFloat(line.quantity) > maxQtyFor(line)}
+                      stockTitle={line.item_id && line.current_stock != null ? `In stock: ${line.current_stock}` : undefined}
                     />
                   </td>
                   <td className="px-3 py-2">
@@ -1091,6 +1397,21 @@ export default function ItemSalesEntryPage() {
                         ({formatCurrency(focusedItemInfo.cost.baseRate)} + {focusedItemInfo.cost.gst}% GST)
                       </span>
                     )}
+                  </span>
+                )}
+                {imeiEnabled && focusedItemInfo.imeis.length > 0 && (
+                  <span className="flex items-center gap-1 min-w-0">
+                    <span className="text-slate-400 shrink-0">IMEIs:</span>
+                    <span className="flex items-center gap-1 flex-wrap">
+                      {focusedItemInfo.imeis.map((imei) => (
+                        <span
+                          key={imei}
+                          className="font-mono px-1.5 py-0.5 rounded bg-trust-blue/10 text-trust-blue border border-trust-blue/20"
+                        >
+                          {imei}
+                        </span>
+                      ))}
+                    </span>
                   </span>
                 )}
               </>

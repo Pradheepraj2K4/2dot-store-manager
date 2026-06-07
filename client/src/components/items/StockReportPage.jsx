@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { MagnifyingGlassIcon, ArrowDownTrayIcon, CubeIcon } from '@heroicons/react/24/outline';
 import { itemApi } from '../../api';
@@ -6,6 +6,7 @@ import { formatCurrency } from '../../utils/helpers';
 import { exportToExcel } from '../../utils/exportUtils';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
+import ImeiInfoButton from '../ui/ImeiInfoButton';
 
 export default function StockReportPage() {
   const [rows, setRows] = useState([]);
@@ -16,6 +17,19 @@ export default function StockReportPage() {
   const [brand, setBrand] = useState('');
   const [category, setCategory] = useState('');
   const [lowStockOnly, setLowStockOnly] = useState(false);
+
+  // Cache of in-flight / resolved IMEI breakdown promises, keyed by item id, so
+  // the three info buttons of a row share a single fetch.
+  const breakdownCache = useRef(new Map());
+  const getBreakdown = (itemId) => {
+    if (!breakdownCache.current.has(itemId)) {
+      breakdownCache.current.set(
+        itemId,
+        itemApi.getImeiBreakdown(itemId).then((res) => res.data || {}),
+      );
+    }
+    return breakdownCache.current.get(itemId);
+  };
 
   const fetchData = async () => {
     try {
@@ -195,16 +209,53 @@ export default function StockReportPage() {
                       {r.category ? <span className="text-gray-400"> / {r.category}</span> : null}
                     </td>
                     <td className="px-3 py-2 text-gray-600">{r.unit || '—'}</td>
-                    <td className="px-3 py-2 text-right">{r.total_purchased || 0}</td>
+                    <td className="px-3 py-2 text-right">
+                      <span className="inline-flex items-center justify-end gap-1">
+                        {r.imei_count > 0 && (
+                          <ImeiInfoButton
+                            title="Purchased IMEIs"
+                            loader={async () => {
+                              const b = await getBreakdown(r.id);
+                              return [{ items: b.purchased || [], tone: 'blue' }];
+                            }}
+                          />
+                        )}
+                        {r.total_purchased || 0}
+                      </span>
+                    </td>
                     <td className="px-3 py-2 text-right text-debit-red">{r.total_purchase_return || 0}</td>
-                    <td className="px-3 py-2 text-right">{r.total_sold || 0}</td>
+                    <td className="px-3 py-2 text-right">
+                      <span className="inline-flex items-center justify-end gap-1">
+                        {r.imei_count > 0 && (
+                          <ImeiInfoButton
+                            title="Sold IMEIs"
+                            loader={async () => {
+                              const b = await getBreakdown(r.id);
+                              return [{ items: b.sold || [], tone: 'green' }];
+                            }}
+                          />
+                        )}
+                        {r.total_sold || 0}
+                      </span>
+                    </td>
                     <td className="px-3 py-2 text-right text-credit-green">{r.total_sales_return || 0}</td>
                     <td
                       className={`px-3 py-2 text-right font-semibold ${
                         (r.current_stock || 0) <= 0 ? 'text-debit-red' : 'text-gray-800'
                       }`}
                     >
-                      {r.current_stock || 0}
+                      <span className="inline-flex items-center justify-end gap-1">
+                        {r.imei_count > 0 && (
+                          <ImeiInfoButton
+                            title="Remaining IMEIs (in stock)"
+                            loader={async () => {
+                              const b = await getBreakdown(r.id);
+                              return [{ items: b.remaining || [], tone: 'slate' }];
+                            }}
+                          />
+                        )}
+                        {r.current_stock || 0}
+                      </span>
                     </td>
                     <td className="px-3 py-2 text-right">{formatCurrency(r.mrp || 0)}</td>
                     <td className="px-3 py-2 text-right font-medium">{formatCurrency(r.stock_value || 0)}</td>

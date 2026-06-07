@@ -63,6 +63,8 @@ export default function DeveloperSettingsPage() {
   const [expenseModuleEnabled, setExpenseModuleEnabled] = useState(false);
   // GST fields state
   const [gstFieldsEnabled, setGstFieldsEnabled] = useState(false);
+  // IMEI tracking state
+  const [imeiTrackingEnabled, setImeiTrackingEnabled] = useState(false);
   // Print receipt settings
   const [printReceiptsPaymentEnabled, setPrintReceiptsPaymentEnabled] = useState(false);
   const [printReceiptsInterestEnabled, setPrintReceiptsInterestEnabled] = useState(false);
@@ -127,6 +129,8 @@ export default function DeveloperSettingsPage() {
       setExpenseModuleEnabled(data.expense_module_enabled === true || data.expense_module_enabled === 'true');
       // Load GST fields setting
       setGstFieldsEnabled(data.gst_fields_enabled === true || data.gst_fields_enabled === 'true');
+      // Load IMEI tracking setting
+      setImeiTrackingEnabled(data.imei_tracking_enabled === true || data.imei_tracking_enabled === 'true');
       // Load print receipt settings
       setPrintReceiptsPaymentEnabled(data.print_receipts_payment_enabled === true || data.print_receipts_payment_enabled === 'true');
       setPrintReceiptsInterestEnabled(data.print_receipts_interest_enabled === true || data.print_receipts_interest_enabled === 'true');
@@ -919,6 +923,36 @@ export default function DeveloperSettingsPage() {
                         await settingsApi.update('gst_fields_enabled', String(newVal));
                         setGstFieldsEnabled(newVal);
                         toast.success(`GST fields ${newVal ? 'enabled' : 'disabled'}`);
+                      } catch (err) {
+                        toast.error(err.message);
+                      }
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
+                </label>
+              </div>
+
+              {/* IMEI Tracking Toggle */}
+              <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-white">
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-slate-800">IMEI / Serial Tracking</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Track individual IMEI / serial numbers per unit. When enabled, purchase entry lets
+                    you key in one IMEI per quantity, and sales entry requires picking which IMEIs are
+                    sold. Sold IMEIs are removed from the available pool.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer ml-4">
+                  <input
+                    type="checkbox"
+                    checked={imeiTrackingEnabled}
+                    onChange={async (e) => {
+                      const newVal = e.target.checked;
+                      try {
+                        await settingsApi.update('imei_tracking_enabled', String(newVal));
+                        setImeiTrackingEnabled(newVal);
+                        toast.success(`IMEI tracking ${newVal ? 'enabled' : 'disabled'}`);
                       } catch (err) {
                         toast.error(err.message);
                       }

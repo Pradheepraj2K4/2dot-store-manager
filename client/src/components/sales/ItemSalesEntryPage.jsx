@@ -67,7 +67,7 @@ function maxQtyFor(line) {
   return (parseFloat(line.current_stock) || 0) + (parseFloat(line.original_quantity) || 0);
 }
 
-function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnter, onAddNew }) {
+function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnter, onAddNew, onKeyBack }) {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(-1);
   const [anchorRect, setAnchorRect] = useState(null);
@@ -139,6 +139,9 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
       }
       setOpen(false);
       onKeyEnter();
+    } else if (e.key === 'ArrowLeft' && !value) {
+      e.preventDefault();
+      onKeyBack?.();
     } else if (e.key === 'Escape') {
       setOpen(false);
     }
@@ -231,6 +234,7 @@ function ImeiSaleQtyCell({
   onOpen,
   registerRef,
   onKeyEnter,
+  onKeyBack,
   invalid,
   stockTitle,
 }) {
@@ -315,6 +319,9 @@ function ImeiSaleQtyCell({
     } else if (e.key === 'Enter') {
       e.preventDefault();
       onKeyEnter();
+    } else if (e.key === 'ArrowLeft' && !quantity) {
+      e.preventDefault();
+      onKeyBack?.();
     }
   };
 
@@ -853,6 +860,15 @@ export default function ItemSalesEntryPage() {
     updateLine(idx, patch);
   };
 
+  const handleCellBack = (rowIdx, field) => {
+    const currentIdx = FIELD_ORDER.indexOf(field);
+    if (currentIdx > 0) {
+      focusCell(rowIdx, FIELD_ORDER[currentIdx - 1]);
+    } else if (rowIdx > 0) {
+      focusCell(rowIdx - 1, FIELD_ORDER[FIELD_ORDER.length - 1]);
+    }
+  };
+
   const handleCellEnter = (rowIdx, field) => {
     const currentIdx = FIELD_ORDER.indexOf(field);
     if (currentIdx < FIELD_ORDER.length - 1) {
@@ -1225,6 +1241,7 @@ export default function ItemSalesEntryPage() {
                       onSelect={(it) => handleSelectItem(idx, it)}
                       registerRef={(ref) => setCellRef(idx, 'itemName', ref)}
                       onKeyEnter={() => handleCellEnter(idx, 'itemName')}
+                      onKeyBack={() => handleCellBack(idx, 'itemName')}
                       onAddNew={() => handleAddNewItem(idx)}
                     />
                   </td>
@@ -1251,6 +1268,7 @@ export default function ItemSalesEntryPage() {
                       onChange={(e) => updateLine(idx, { rate: e.target.value })}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'rate'); }
+                        else if (e.key === 'ArrowLeft' && !e.target.value) { e.preventDefault(); handleCellBack(idx, 'rate'); }
                       }}
                       className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
                       placeholder="0.00"
@@ -1273,6 +1291,7 @@ export default function ItemSalesEntryPage() {
                       onOpen={() => line.item_id && loadImeis(line.item_id)}
                       registerRef={(ref) => setCellRef(idx, 'qty', ref)}
                       onKeyEnter={() => handleCellEnter(idx, 'qty')}
+                      onKeyBack={() => handleCellBack(idx, 'qty')}
                       invalid={
                         (Boolean(line.item_id) && parseFloat(line.quantity) > maxQtyFor(line)) ||
                         (showImeiErrors && imeiEnabled && Boolean(line.item_id) &&
@@ -1291,6 +1310,7 @@ export default function ItemSalesEntryPage() {
                       onChange={(e) => updateLine(idx, { discount_percent: e.target.value })}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'discount'); }
+                        else if (e.key === 'ArrowLeft' && !e.target.value) { e.preventDefault(); handleCellBack(idx, 'discount'); }
                       }}
                       className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
                       placeholder="0"

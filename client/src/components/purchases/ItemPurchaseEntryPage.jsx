@@ -51,7 +51,7 @@ function emptyLine() {
   };
 }
 
-function ItemNameCell({ value, items, selected, onSelect, onChange, registerRef, onKeyEnter, onAddNew, onEnterEmpty }) {
+function ItemNameCell({ value, items, selected, onSelect, onChange, registerRef, onKeyEnter, onAddNew, onEnterEmpty, onKeyBack }) {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(-1);
   const [anchorRect, setAnchorRect] = useState(null);
@@ -125,6 +125,9 @@ function ItemNameCell({ value, items, selected, onSelect, onChange, registerRef,
       }
       // Empty field or typed-but-unmatched text — do nothing, keep focus on
       // the item name input.
+    } else if (e.key === 'ArrowLeft' && !value) {
+      e.preventDefault();
+      onKeyBack?.();
     } else if (e.key === 'Escape') {
       setOpen(false);
     }
@@ -215,6 +218,7 @@ function ImeiQtyCell({
   onImeisChange,
   registerRef,
   onKeyEnter,
+  onKeyBack,
   invalid,
 }) {
   const [open, setOpen] = useState(false);
@@ -277,6 +281,9 @@ function ImeiQtyCell({
     } else if (e.key === 'Enter') {
       e.preventDefault();
       onKeyEnter();
+    } else if (e.key === 'ArrowLeft' && !quantity) {
+      e.preventDefault();
+      onKeyBack?.();
     }
   };
 
@@ -618,6 +625,15 @@ export default function ItemPurchaseEntryPage() {
     });
   };
 
+  const handleCellBack = (rowIdx, field) => {
+    const currentIdx = FIELD_ORDER.indexOf(field);
+    if (currentIdx > 0) {
+      focusCell(rowIdx, FIELD_ORDER[currentIdx - 1]);
+    } else if (rowIdx > 0) {
+      focusCell(rowIdx - 1, FIELD_ORDER[FIELD_ORDER.length - 1]);
+    }
+  };
+
   const handleCellEnter = (rowIdx, field) => {
     const currentIdx = FIELD_ORDER.indexOf(field);
     if (currentIdx < FIELD_ORDER.length - 1) {
@@ -872,6 +888,7 @@ export default function ItemPurchaseEntryPage() {
                         onSelect={(it) => handleSelectItem(idx, it)}
                         registerRef={(ref) => setCellRef(idx, 'itemName', ref)}
                         onKeyEnter={() => handleCellEnter(idx, 'itemName')}
+                        onKeyBack={() => handleCellBack(idx, 'itemName')}
                         onAddNew={() => handleAddNewItem(idx)}
                         onEnterEmpty={focusLedger}
                       />
@@ -908,6 +925,7 @@ export default function ItemPurchaseEntryPage() {
                         onChange={(e) => updateLine(idx, { rate: e.target.value })}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'rate'); }
+                          else if (e.key === 'ArrowLeft' && !e.target.value) { e.preventDefault(); handleCellBack(idx, 'rate'); }
                         }}
                         className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
                         placeholder="0.00"
@@ -923,6 +941,7 @@ export default function ItemPurchaseEntryPage() {
                         onImeisChange={(arr) => updateLine(idx, { imeis: arr })}
                         registerRef={(ref) => setCellRef(idx, 'qty', ref)}
                         onKeyEnter={() => handleCellEnter(idx, 'qty')}
+                        onKeyBack={() => handleCellBack(idx, 'qty')}
                         invalid={
                           showImeiErrors && imeiEnabled && Boolean(line.item_id) &&
                           (Array.isArray(line.imeis) ? line.imeis.map((s) => String(s || '').trim()).filter(Boolean).length : 0) !==
@@ -939,6 +958,7 @@ export default function ItemPurchaseEntryPage() {
                         onChange={(e) => updateLine(idx, { discount_percent: e.target.value })}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'discount'); }
+                          else if (e.key === 'ArrowLeft' && !e.target.value) { e.preventDefault(); handleCellBack(idx, 'discount'); }
                         }}
                         className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
                         placeholder="0"

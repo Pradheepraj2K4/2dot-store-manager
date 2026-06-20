@@ -938,9 +938,10 @@ export default function DeveloperSettingsPage() {
                 <div className="flex-1">
                   <h3 className="text-sm font-semibold text-slate-800">IMEI / Serial Tracking</h3>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Track individual IMEI / serial numbers per unit. When enabled, purchase entry lets
-                    you key in one IMEI per quantity, and sales entry requires picking which IMEIs are
-                    sold. Sold IMEIs are removed from the available pool.
+                    Master switch for IMEI / serial tracking. When enabled, items flagged with
+                    "IMEI Enable" prompt for one IMEI per unit during purchase entry, and sales
+                    entry requires picking which of those IMEIs are sold. Sold IMEIs are removed
+                    from the available pool.
                   </p>
                 </div>
                 <label className="relative inline-flex items-center cursor-pointer ml-4">

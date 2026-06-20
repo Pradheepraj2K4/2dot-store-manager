@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { transactionApi, ledgerApi, settingsApi, interestApi, interestSchemeApi, transactionCategoryApi } from '../../api';
 import { formatCurrency, formatDate, todayISO } from '../../utils/helpers';
 import { buildTransactionReceiptHtml } from '../../utils/transactionReceipt';
@@ -21,6 +21,7 @@ import {
 
 export default function PaymentEntryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const initialType = searchParams.get('type') === 'receipt' ? 'receipt' : 'payment';
   const initialLedgerId = searchParams.get('ledgerId');
@@ -32,6 +33,20 @@ export default function PaymentEntryPage() {
     const t = searchParams.get('type') === 'receipt' ? 'receipt' : 'payment';
     setEntryType(t);
   }, [searchParams]);
+
+  // F10 opens the matching report (Payment Entry → Payment Report,
+  // Receipt Entry → Receipt Report), filtered by entry type.
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'F10') {
+        e.preventDefault();
+        navigate(`/reports?entryType=${entryType}`);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [navigate, entryType]);
+
   const [selectedLedger, setSelectedLedger] = useState(null);
   const [loadingLedger, setLoadingLedger] = useState(false);
 

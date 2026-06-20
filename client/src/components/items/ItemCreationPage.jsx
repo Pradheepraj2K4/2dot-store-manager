@@ -37,6 +37,7 @@ export default function ItemCreationPage() {
     gst_percent: '',
     brand: '',
     category: '',
+    imei_enabled: false,
   });
   const [errors, setErrors] = useState({});
   const [brands, setBrands] = useState([]);
@@ -64,6 +65,7 @@ export default function ItemCreationPage() {
           gst_percent: it.gst_percent != null && it.gst_percent !== 0 ? String(it.gst_percent) : '',
           brand: it.brand || '',
           category: it.category || '',
+          imei_enabled: it.imei_enabled === 1 || it.imei_enabled === true,
         });
       })
       .catch((err) => toast.error(err.message))
@@ -112,6 +114,7 @@ export default function ItemCreationPage() {
         gst_percent: parseFloat(form.gst_percent) || 0,
         brand: form.brand.trim(),
         category: form.category.trim(),
+        imei_enabled: form.imei_enabled ? 1 : 0,
       };
       const res = isEdit
         ? await itemApi.update(id, payload)
@@ -298,6 +301,26 @@ export default function ItemCreationPage() {
             <datalist id="item-category-list">
               {categories.map((c) => <option key={c} value={c} />)}
             </datalist>
+          </div>
+        </div>
+
+        {/* IMEI Enable */}
+        <div className="flex gap-4">
+          <label className="w-28 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">IMEI Enable</label>
+          <div className="flex-1">
+            <label className="inline-flex items-center gap-2 cursor-pointer h-9">
+              <input
+                type="checkbox"
+                name="imei_enabled"
+                checked={form.imei_enabled}
+                onChange={(e) => setForm((p) => ({ ...p, imei_enabled: e.target.checked }))}
+                className="h-4 w-4 rounded border-slate-300 text-trust-blue focus:ring-trust-blue"
+              />
+              <span className="text-sm text-slate-700">{form.imei_enabled ? 'Yes' : 'No'}</span>
+            </label>
+            <p className="text-xs text-slate-400 mt-1">
+              When enabled, a valid IMEI / serial number must be entered for each unit during Purchase Entry.
+            </p>
           </div>
         </div>
 

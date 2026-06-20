@@ -3,6 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   ArrowLeftIcon,
+  ArrowPathIcon,
   PlusIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
@@ -583,6 +584,24 @@ export default function ItemPurchaseEntryPage() {
     } catch (_) { /* noop */ }
   }, [location.key, refreshItems]);
 
+  // A line needs IMEI capture only when the IMEI module is enabled AND the
+  // selected item has been flagged "IMEI Enable" in its master record.
+  const itemImeiTracked = (line) => {
+    if (!imeiEnabled || !line?.item_id) return false;
+    const it = items.find((x) => x.id === line.item_id);
+    return Boolean(it && (it.imei_enabled === 1 || it.imei_enabled === true));
+  };
+
+  // True when an IMEI-tracked line still has fewer IMEIs filled than its qty.
+  const imeiIncomplete = (line) => {
+    if (!itemImeiTracked(line)) return false;
+    const qty = Math.floor(parseFloat(line.quantity) || 0);
+    const filled = Array.isArray(line.imeis)
+      ? line.imeis.map((s) => String(s || '').trim()).filter(Boolean).length
+      : 0;
+    return filled !== qty;
+  };
+
   const updateLine = (idx, patch) => {
     setLines((prev) => {
       const next = [...prev];
@@ -639,6 +658,14 @@ export default function ItemPurchaseEntryPage() {
     if (currentIdx < FIELD_ORDER.length - 1) {
       focusCell(rowIdx, FIELD_ORDER[currentIdx + 1]);
     } else {
+      // Leaving this row — IMEI-tracked items must have every IMEI filled in
+      // before the cursor is allowed to move on to the next line.
+      if (imeiIncomplete(lines[rowIdx])) {
+        setShowImeiErrors(true);
+        toast.error(`Enter all IMEI numbers for "${lines[rowIdx].item_name}" before continuing`);
+        focusCell(rowIdx, 'qty');
+        return;
+      }
       const isLastRow = rowIdx === lines.length - 1;
       if (isLastRow) {
         const hasEmptyRow = lines.some((l) => !l.item_id);
@@ -695,27 +722,28 @@ export default function ItemPurchaseEntryPage() {
       }
     }
 
-    // When IMEI tracking is on, every linked-item line must carry one IMEI per
-    // unit, and IMEIs must be unique across the bill.
+    // When IMEI tracking is on, each IMEI-enabled item line must carry one
+    // IMEI per unit, and IMEIs must be unique across the bill.
     if (imeiEnabled) {
       const seen = new Set();
       for (let i = 0; i < validLines.length; i++) {
         const l = validLines[i];
+        const tracked = itemImeiTracked(l);
         const imeis = Array.isArray(l.imeis) ? l.imeis.map((s) => String(s || '').trim()).filter(Boolean) : [];
-        if (l.item_id) {
+        if (tracked) {
           const qty = Math.floor(parseFloat(l.quantity) || 0);
           if (imeis.length !== qty) {
             setShowImeiErrors(true);
             toast.error(`Row ${i + 1}: enter ${qty} IMEI${qty === 1 ? '' : 's'} for "${l.item_name}" (entered ${imeis.length})`);
             return;
           }
-        }
-        for (const imei of imeis) {
-          if (seen.has(imei)) {
-            toast.error(`Duplicate IMEI "${imei}" entered`);
-            return;
+          for (const imei of imeis) {
+            if (seen.has(imei)) {
+              toast.error(`Duplicate IMEI "${imei}" entered`);
+              return;
+            }
+            seen.add(imei);
           }
-          seen.add(imei);
         }
       }
       setShowImeiErrors(false);
@@ -740,7 +768,7 @@ export default function ItemPurchaseEntryPage() {
           discount_percent: parseFloat(l.discount_percent) || 0,
           gst_percent: parseFloat(l.gst_percent) || 0,
           amount: parseFloat(l.amount) || 0,
-          imeis: imeiEnabled
+          imeis: itemImeiTracked(l)
             ? (Array.isArray(l.imeis) ? l.imeis.map((s) => String(s || '').trim()).filter(Boolean) : [])
             : [],
         })),
@@ -778,6 +806,20 @@ export default function ItemPurchaseEntryPage() {
     navigate(`/items/new?${qs}`);
   };
 
+  // Clear the cached draft and reset the form to a fresh, empty entry.
+  const handleResetDraft = () => {
+    localStorage.removeItem(PURCHASE_DRAFT_KEY);
+    setLedger(null);
+    setBillNumber('');
+    setDate(todayISO());
+    setTime(nowHHMM());
+    setNotes('');
+    setBillDiscount('0');
+    setLines([emptyLine()]);
+    setShowImeiErrors(false);
+    toast.success('Entry reset');
+  };
+
   if (loading) return <LoadingSpinner className="py-20" size="lg" />;
 
   return (
@@ -797,6 +839,16 @@ export default function ItemPurchaseEntryPage() {
               Purchase {purchaseNumber || '—'}
             </p>
           </div>
+          {!isEdit && (
+            <button
+              type="button"
+              onClick={handleResetDraft}
+              className="ml-1 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              title="Reset entry (clear cached draft)"
+            >
+              <ArrowPathIcon className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         <div className="flex flex-wrap items-end gap-2">
@@ -933,7 +985,7 @@ export default function ItemPurchaseEntryPage() {
                     </td>
                     <td className="px-3 py-2">
                       <ImeiQtyCell
-                        enabled={imeiEnabled}
+                        enabled={itemImeiTracked(line)}
                         hasItem={Boolean(line.item_id)}
                         quantity={line.quantity}
                         imeis={line.imeis}
@@ -942,11 +994,7 @@ export default function ItemPurchaseEntryPage() {
                         registerRef={(ref) => setCellRef(idx, 'qty', ref)}
                         onKeyEnter={() => handleCellEnter(idx, 'qty')}
                         onKeyBack={() => handleCellBack(idx, 'qty')}
-                        invalid={
-                          showImeiErrors && imeiEnabled && Boolean(line.item_id) &&
-                          (Array.isArray(line.imeis) ? line.imeis.map((s) => String(s || '').trim()).filter(Boolean).length : 0) !==
-                            Math.floor(parseFloat(line.quantity) || 0)
-                        }
+                        invalid={showImeiErrors && imeiIncomplete(line)}
                       />
                     </td>
                     <td className="px-3 py-2">

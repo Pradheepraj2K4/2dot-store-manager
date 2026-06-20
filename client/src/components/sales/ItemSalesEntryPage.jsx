@@ -3,6 +3,7 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   ArrowLeftIcon,
+  ArrowPathIcon,
   Cog6ToothIcon,
   PlusIcon,
   PrinterIcon,
@@ -839,7 +840,9 @@ export default function ItemSalesEntryPage() {
       original_quantity: 0,
       imeis: [],
     });
-    if (imeiEnabled) loadImeis(item.id, { force: true });
+    if (imeiEnabled && (item.imei_enabled === 1 || item.imei_enabled === true)) {
+      loadImeis(item.id, { force: true });
+    }
   };
 
   const handleQuantityChange = (idx, value) => {
@@ -951,6 +954,14 @@ export default function ItemSalesEntryPage() {
     return { name: item.name || line.item_name, unit: line.unit, stock, cost, imeis: Array.isArray(line.imeis) ? line.imeis : [] };
   }, [focusedRow, lines, items]);
 
+  // A line needs IMEI selection only when the IMEI module is enabled AND the
+  // selected item has been flagged "IMEI Enable" in its master record.
+  const itemImeiTracked = (line) => {
+    if (!imeiEnabled || !line?.item_id) return false;
+    const it = items.find((x) => x.id === line.item_id);
+    return Boolean(it && (it.imei_enabled === 1 || it.imei_enabled === true));
+  };
+
   const handleSave = async () => {
     if (!ledger) { toast.error('Select a customer ledger'); return; }
     const validLines = lines.filter((l) => l.item_name && l.item_name.trim());
@@ -994,13 +1005,13 @@ export default function ItemSalesEntryPage() {
       }
     }
 
-    // IMEI selection check — when tracking is on, the operator must select
-    // exactly `qty` IMEIs for every linked-item line.
+    // IMEI selection check — for every IMEI-enabled item line, the operator
+    // must select exactly `qty` IMEIs.
     if (imeiEnabled) {
       let firstBad = -1;
       for (let i = 0; i < validLines.length; i++) {
         const l = validLines[i];
-        if (!l.item_id) continue;
+        if (!itemImeiTracked(l)) continue;
         const sel = Array.isArray(l.imeis) ? l.imeis.filter(Boolean) : [];
         const qty = Math.floor(parseFloat(l.quantity) || 0);
         if (sel.length !== qty) { firstBad = i; break; }
@@ -1038,7 +1049,7 @@ export default function ItemSalesEntryPage() {
           gst_percent: parseFloat(l.gst_percent) || 0,
           amount: parseFloat(l.amount) || 0,
           rate_tax_mode: rateTaxMode,
-          imeis: imeiEnabled
+          imeis: itemImeiTracked(l)
             ? (Array.isArray(l.imeis) ? l.imeis.map((s) => String(s || '').trim()).filter(Boolean) : [])
             : [],
         })),
@@ -1110,6 +1121,24 @@ export default function ItemSalesEntryPage() {
     navigate(`/items/new?${qs}`);
   };
 
+  // Clear the cached draft and reset the form to a fresh, empty entry.
+  const handleResetDraft = () => {
+    localStorage.removeItem(SALE_DRAFT_KEY);
+    draftLedgerRestored.current = false;
+    setLedger(null);
+    setDate(todayISO());
+    setTime(nowHHMM());
+    setNotes('');
+    setCustomerName('');
+    setCustomerMobile('');
+    setCustomerPlace('');
+    setBillDiscount('0');
+    setLines([emptyLine()]);
+    setShowImeiErrors(false);
+    ledgerApi.getCash().then((r) => { if (r.data) setLedger(r.data); }).catch(() => {});
+    toast.success('Entry reset');
+  };
+
   if (loading) return <LoadingSpinner className="py-20" size="lg" />;
 
   return (
@@ -1130,6 +1159,16 @@ export default function ItemSalesEntryPage() {
               Sale {saleNumber || '—'}
             </p>
           </div>
+          {!isEdit && (
+            <button
+              type="button"
+              onClick={handleResetDraft}
+              className="ml-1 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              title="Reset entry (clear cached draft)"
+            >
+              <ArrowPathIcon className="h-4 w-4" />
+            </button>
+          )}
           {isEdit && (
             <button
               type="button"
@@ -1276,7 +1315,7 @@ export default function ItemSalesEntryPage() {
                   </td>
                   <td className="px-3 py-2">
                     <ImeiSaleQtyCell
-                      enabled={imeiEnabled}
+                      enabled={itemImeiTracked(line)}
                       itemId={line.item_id}
                       quantity={line.quantity}
                       selected={line.imeis}
@@ -1294,7 +1333,7 @@ export default function ItemSalesEntryPage() {
                       onKeyBack={() => handleCellBack(idx, 'qty')}
                       invalid={
                         (Boolean(line.item_id) && parseFloat(line.quantity) > maxQtyFor(line)) ||
-                        (showImeiErrors && imeiEnabled && Boolean(line.item_id) &&
+                        (showImeiErrors && itemImeiTracked(line) &&
                           (Array.isArray(line.imeis) ? line.imeis.filter(Boolean).length : 0) !==
                             Math.floor(parseFloat(line.quantity) || 0))
                       }

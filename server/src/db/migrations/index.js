@@ -44,6 +44,7 @@ const v21 = require('./v21');
 const v22 = require('./v22');
 const v23 = require('./v23');
 const v24 = require('./v24');
+const v25 = require('./v25');
 
 // ── Register all migrations here, sorted by VERSION ascending ──────────────
 const MIGRATIONS = [
@@ -71,7 +72,8 @@ const MIGRATIONS = [
   v22,
   v23,
   v24,
-  // v25, … add future migrations here
+  v25,
+  // v26, … add future migrations here
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -3,11 +3,13 @@ const purchaseService = require('../services/purchaseService');
 class PurchaseController {
   getAll(req, res, next) {
     try {
-      const { ledgerId, fromDate, toDate } = req.query;
+      const { ledgerId, fromDate, toDate, search, limit } = req.query;
       const purchases = purchaseService.getAll({
         ledgerId: ledgerId ? parseInt(ledgerId) : undefined,
         fromDate,
         toDate,
+        search,
+        limit: limit ? parseInt(limit) : undefined,
       });
       res.json({ success: true, data: purchases });
     } catch (err) { next(err); }

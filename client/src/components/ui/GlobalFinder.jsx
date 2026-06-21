@@ -1,7 +1,19 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ledgerApi } from '../../api';
-import { MagnifyingGlassIcon, XMarkIcon } from '@heroicons/react/24/outline';
+import { ledgerApi, saleApi, purchaseApi } from '../../api';
+import {
+  MagnifyingGlassIcon,
+  XMarkIcon,
+  UserIcon,
+  ShoppingCartIcon,
+  ArchiveBoxIcon,
+} from '@heroicons/react/24/outline';
+
+const TYPE_META = {
+  ledger: { label: 'Ledger', icon: UserIcon },
+  sale: { label: 'Item Sale', icon: ShoppingCartIcon },
+  purchase: { label: 'Item Purchase', icon: ArchiveBoxIcon },
+};
 
 export default function GlobalFinder({ open, onClose }) {
   const [query, setQuery] = useState('');
@@ -29,8 +41,46 @@ export default function GlobalFinder({ open, onClose }) {
     const timer = setTimeout(async () => {
       try {
         setLoading(true);
-        const res = await ledgerApi.getAll({ search: query });
-        setResults((res.data || []).slice(0, 10));
+        const [ledgerRes, saleRes, purchaseRes] = await Promise.allSettled([
+          ledgerApi.getAll({ search: query }),
+          saleApi.getAll({ search: query, limit: 6 }),
+          purchaseApi.getAll({ search: query, limit: 6 }),
+        ]);
+
+        const ledgers = (ledgerRes.status === 'fulfilled' ? ledgerRes.value.data || [] : [])
+          .slice(0, 6)
+          .map((l) => ({
+            type: 'ledger',
+            id: l.id,
+            path: `/ledger/${l.id}`,
+            title: l.name,
+            meta: l.phone || '',
+            tag: String(l.id),
+          }));
+
+        const sales = (saleRes.status === 'fulfilled' ? saleRes.value.data || [] : [])
+          .map((s) => ({
+            type: 'sale',
+            id: s.id,
+            path: `/item-sales/${s.id}/edit`,
+            title: `Sale #${s.sale_number}`,
+            meta: [s.customer_name || s.ledger_name, s.date].filter(Boolean).join(' · '),
+            tag: s.total_amount != null ? `₹${Number(s.total_amount).toLocaleString('en-IN')}` : '',
+          }));
+
+        const purchases = (purchaseRes.status === 'fulfilled' ? purchaseRes.value.data || [] : [])
+          .map((p) => ({
+            type: 'purchase',
+            id: p.id,
+            path: `/item-purchases/${p.id}/edit`,
+            title: `Purchase #${p.purchase_number}`,
+            meta: [p.ledger_name, p.bill_number && `Bill ${p.bill_number}`, p.date]
+              .filter(Boolean)
+              .join(' · '),
+            tag: p.total_amount != null ? `₹${Number(p.total_amount).toLocaleString('en-IN')}` : '',
+          }));
+
+        setResults([...ledgers, ...sales, ...purchases]);
         setSelectedIdx(0);
       } catch {
         setResults([]);
@@ -47,8 +97,8 @@ export default function GlobalFinder({ open, onClose }) {
     el?.scrollIntoView({ block: 'nearest' });
   }, [selectedIdx]);
 
-  const goTo = (id) => {
-    navigate(`/ledger/${id}`);
+  const goTo = (result) => {
+    navigate(result.path);
     onClose();
   };
 
@@ -61,7 +111,7 @@ export default function GlobalFinder({ open, onClose }) {
       setSelectedIdx((i) => Math.max(i - 1, 0));
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      if (results.length > 0) goTo(results[selectedIdx].id);
+      if (results.length > 0) goTo(results[selectedIdx]);
     } else if (e.key === 'Escape') {
       onClose();
     }
@@ -85,7 +135,7 @@ export default function GlobalFinder({ open, onClose }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Search by name, phone, or ledger ID…"
+            placeholder="Search ledgers, sales, purchases, items, IMEI…"
             className="flex-1 bg-transparent text-sm text-slate-800 placeholder:text-slate-400 outline-none"
           />
           {loading && (
@@ -101,38 +151,57 @@ export default function GlobalFinder({ open, onClose }) {
 
         {/* Results */}
         {results.length > 0 && (
-          <ul ref={listRef} className="max-h-72 overflow-y-auto py-1">
-            {results.map((l, idx) => (
-              <li key={l.id}>
-                <button
-                  data-idx={idx}
-                  onClick={() => goTo(l.id)}
-                  onMouseEnter={() => setSelectedIdx(idx)}
-                  className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
-                    selectedIdx === idx
-                      ? 'bg-trust-blue text-white'
-                      : 'text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  <span className="font-medium text-sm truncate flex-1">{l.name}</span>
-                  {l.phone && (
-                    <span className={`text-xs flex-shrink-0 ${selectedIdx === idx ? 'text-blue-100' : 'text-slate-400'}`}>
-                      {l.phone}
+          <ul ref={listRef} className="max-h-80 overflow-y-auto py-1">
+            {results.map((r, idx) => {
+              const meta = TYPE_META[r.type];
+              const Icon = meta.icon;
+              const active = selectedIdx === idx;
+              return (
+                <li key={`${r.type}-${r.id}`}>
+                  <button
+                    data-idx={idx}
+                    onClick={() => goTo(r)}
+                    onMouseEnter={() => setSelectedIdx(idx)}
+                    className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${
+                      active ? 'bg-trust-blue text-white' : 'text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Icon
+                      className={`h-4 w-4 flex-shrink-0 ${active ? 'text-blue-100' : 'text-slate-400'}`}
+                    />
+                    <span className="font-medium text-sm truncate">{r.title}</span>
+                    {r.meta && (
+                      <span
+                        className={`text-xs truncate flex-1 ${active ? 'text-blue-100' : 'text-slate-400'}`}
+                      >
+                        {r.meta}
+                      </span>
+                    )}
+                    {r.tag && (
+                      <span
+                        className={`text-xs font-mono flex-shrink-0 ${active ? 'text-blue-200' : 'text-slate-300'}`}
+                      >
+                        {r.tag}
+                      </span>
+                    )}
+                    <span
+                      className={`text-[10px] uppercase tracking-wide flex-shrink-0 rounded px-1.5 py-0.5 ${
+                        active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-400'
+                      }`}
+                    >
+                      {meta.label}
                     </span>
-                  )}
-                  <span className={`text-xs font-mono flex-shrink-0 ${selectedIdx === idx ? 'text-blue-200' : 'text-slate-300'}`}>
-                    {l.id}
-                  </span>
-                </button>
-              </li>
-            ))}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
 
         {/* Empty state */}
         {query.trim() && !loading && results.length === 0 && (
           <div className="px-4 py-8 text-center text-sm text-slate-400">
-            No ledgers found for &ldquo;{query}&rdquo;
+            No matches found for &ldquo;{query}&rdquo;
           </div>
         )}
 

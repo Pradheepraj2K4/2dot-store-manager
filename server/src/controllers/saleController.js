@@ -3,11 +3,13 @@ const saleService = require('../services/saleService');
 class SaleController {
   getAll(req, res, next) {
     try {
-      const { ledgerId, fromDate, toDate } = req.query;
+      const { ledgerId, fromDate, toDate, search, limit } = req.query;
       const sales = saleService.getAll({
         ledgerId: ledgerId ? parseInt(ledgerId) : undefined,
         fromDate,
         toDate,
+        search,
+        limit: limit ? parseInt(limit) : undefined,
       });
       res.json({ success: true, data: sales });
     } catch (err) { next(err); }

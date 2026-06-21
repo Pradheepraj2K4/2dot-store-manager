@@ -82,20 +82,33 @@ class PurchaseRepository {
     return purchase;
   }
 
-  getAll({ ledgerId, fromDate, toDate } = {}) {
+  getAll({ ledgerId, fromDate, toDate, search, limit } = {}) {
     const db = getDb();
     const conds = [];
     const params = [];
     if (ledgerId) { conds.push('p.ledger_id = ?'); params.push(ledgerId); }
     if (fromDate) { conds.push('p.date >= ?');    params.push(fromDate); }
     if (toDate)   { conds.push('p.date <= ?');    params.push(toDate); }
+    if (search && String(search).trim()) {
+      const like = `%${String(search).trim()}%`;
+      conds.push(`(
+        p.purchase_number LIKE ? OR
+        p.bill_number LIKE ? OR
+        l.name LIKE ? OR
+        EXISTS (SELECT 1 FROM purchase_items pi WHERE pi.purchase_id = p.id AND pi.item_name LIKE ?) OR
+        EXISTS (SELECT 1 FROM item_imeis iu WHERE iu.purchase_id = p.id AND iu.imei LIKE ?)
+      )`);
+      params.push(like, like, like, like, like);
+    }
     const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+    const limitClause = limit ? `LIMIT ${parseInt(limit, 10)}` : '';
     return db.prepare(`
       SELECT p.*, l.name AS ledger_name
       FROM purchases p
       JOIN ledgers l ON l.id = p.ledger_id
       ${where}
       ORDER BY p.date DESC, p.id DESC
+      ${limitClause}
     `).all(...params);
   }
 

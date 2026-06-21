@@ -84,20 +84,34 @@ class SaleRepository {
     return sale;
   }
 
-  getAll({ ledgerId, fromDate, toDate } = {}) {
+  getAll({ ledgerId, fromDate, toDate, search, limit } = {}) {
     const db = getDb();
     const conds = [];
     const params = [];
     if (ledgerId)  { conds.push('s.ledger_id = ?'); params.push(ledgerId); }
     if (fromDate)  { conds.push('s.date >= ?');    params.push(fromDate); }
     if (toDate)    { conds.push('s.date <= ?');    params.push(toDate); }
+    if (search && String(search).trim()) {
+      const like = `%${String(search).trim()}%`;
+      conds.push(`(
+        s.sale_number LIKE ? OR
+        l.name LIKE ? OR
+        s.customer_name LIKE ? OR
+        s.customer_mobile LIKE ? OR
+        EXISTS (SELECT 1 FROM sale_items si WHERE si.sale_id = s.id AND si.item_name LIKE ?) OR
+        EXISTS (SELECT 1 FROM item_imeis iu WHERE iu.sale_id = s.id AND iu.imei LIKE ?)
+      )`);
+      params.push(like, like, like, like, like, like);
+    }
     const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+    const limitClause = limit ? `LIMIT ${parseInt(limit, 10)}` : '';
     return db.prepare(`
       SELECT s.*, l.name AS ledger_name
       FROM sales s
       JOIN ledgers l ON l.id = s.ledger_id
       ${where}
       ORDER BY s.date DESC, s.id DESC
+      ${limitClause}
     `).all(...params);
   }
 

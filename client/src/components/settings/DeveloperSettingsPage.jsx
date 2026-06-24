@@ -61,6 +61,8 @@ export default function DeveloperSettingsPage() {
   const [interestModuleEnabled, setInterestModuleEnabled] = useState(false);
   // Expense module state
   const [expenseModuleEnabled, setExpenseModuleEnabled] = useState(false);
+  // Service module state
+  const [serviceModuleEnabled, setServiceModuleEnabled] = useState(false);
   // GST fields state
   const [gstFieldsEnabled, setGstFieldsEnabled] = useState(false);
   // IMEI tracking state
@@ -127,6 +129,8 @@ export default function DeveloperSettingsPage() {
       setInterestModuleEnabled(data.interest_module_enabled === true || data.interest_module_enabled === 'true');
       // Load expense module setting
       setExpenseModuleEnabled(data.expense_module_enabled === true || data.expense_module_enabled === 'true');
+      // Load service module setting
+      setServiceModuleEnabled(data.service_module_enabled === true || data.service_module_enabled === 'true');
       // Load GST fields setting
       setGstFieldsEnabled(data.gst_fields_enabled === true || data.gst_fields_enabled === 'true');
       // Load IMEI tracking setting
@@ -894,6 +898,36 @@ export default function DeveloperSettingsPage() {
                         await settingsApi.update('expense_module_enabled', String(newVal));
                         setExpenseModuleEnabled(newVal);
                         toast.success(`Expense module ${newVal ? 'enabled' : 'disabled'}`);
+                      } catch (err) {
+                        toast.error(err.message);
+                      }
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
+                </label>
+              </div>
+
+              {/* Service Module Toggle */}
+              <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-white">
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-slate-800">Service Module</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Manage repair / service jobs. Adds a Staffs master, a Service menu with
+                    service entry, pending services and closed services. Closing a service
+                    records material &amp; labour cost and computes the amount to collect.
+                  </p>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer ml-4">
+                  <input
+                    type="checkbox"
+                    checked={serviceModuleEnabled}
+                    onChange={async (e) => {
+                      const newVal = e.target.checked;
+                      try {
+                        await settingsApi.update('service_module_enabled', String(newVal));
+                        setServiceModuleEnabled(newVal);
+                        toast.success(`Service module ${newVal ? 'enabled' : 'disabled'}`);
                       } catch (err) {
                         toast.error(err.message);
                       }

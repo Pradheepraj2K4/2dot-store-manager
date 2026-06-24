@@ -216,3 +216,28 @@ export const purchaseReturnApi = {
   update: (id, data) => api.put(`/purchase-returns/${id}`, data),
   delete: (id) => api.delete(`/purchase-returns/${id}`),
 };
+
+export const staffApi = {
+  getAll: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return api.get(`/staffs${qs ? `?${qs}` : ''}`);
+  },
+  getById: (id) => api.get(`/staffs/${id}`),
+  create: (data) => api.post('/staffs', data),
+  update: (id, data) => api.put(`/staffs/${id}`, data),
+  delete: (id) => api.delete(`/staffs/${id}`),
+};
+
+export const serviceApi = {
+  getAll: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return api.get(`/services${qs ? `?${qs}` : ''}`);
+  },
+  getById: (id) => api.get(`/services/${id}`),
+  getNextNumber: () => api.get('/services/next-number'),
+  create: (data) => api.post('/services', data),
+  update: (id, data) => api.put(`/services/${id}`, data),
+  close: (id, data) => api.post(`/services/${id}/close`, data),
+  delete: (id) => api.delete(`/services/${id}`),
+  isEnabled: () => api.get('/settings/service_module_enabled'),
+};

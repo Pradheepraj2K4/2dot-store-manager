@@ -32,6 +32,10 @@ import SalesReturnListPage from "./components/sales/SalesReturnListPage";
 import PurchaseReturnEntryPage from "./components/purchases/PurchaseReturnEntryPage";
 import PurchaseReturnListPage from "./components/purchases/PurchaseReturnListPage";
 import StockReportPage from "./components/items/StockReportPage";
+import StaffListPage from "./components/staff/StaffListPage";
+import ServiceEntryPage from "./components/services/ServiceEntryPage";
+import ServiceListPage from "./components/services/ServiceListPage";
+import ServiceClosePage from "./components/services/ServiceClosePage";
 
 export default function App() {
   return (
@@ -113,6 +117,11 @@ export default function App() {
                 <Route path="/purchase-return" element={<PurchaseReturnEntryPage />} />
                 <Route path="/purchase-return/:id/edit" element={<PurchaseReturnEntryPage />} />
                 <Route path="/stock-report" element={<StockReportPage />} />
+                <Route path="/staffs" element={<StaffListPage />} />
+                <Route path="/services/new" element={<ServiceEntryPage />} />
+                <Route path="/services/pending" element={<ServiceListPage status="pending" />} />
+                <Route path="/services/closed" element={<ServiceListPage status="closed" />} />
+                <Route path="/services/:id/close" element={<ServiceClosePage />} />
               </Routes>
             </AppLayout>
           </ProtectedRoute>

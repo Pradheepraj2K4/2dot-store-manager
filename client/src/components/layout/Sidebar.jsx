@@ -25,9 +25,11 @@ import {
   ClipboardDocumentListIcon,
   ArchiveBoxIcon,
   CalculatorIcon,
+  WrenchScrewdriverIcon,
+  UserGroupIcon,
 } from "@heroicons/react/24/outline";
 import { logout, hasPermission, getCurrentUser } from "../../utils/auth";
-import { interestApi, expenseApi } from "../../api";
+import { interestApi, expenseApi, serviceApi } from "../../api";
 import toast from "react-hot-toast";
 
 const baseNavigation = [
@@ -98,6 +100,7 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
   const location = useLocation();
   const [interestEnabled, setInterestEnabled] = useState(false);
   const [expenseEnabled, setExpenseEnabled] = useState(false);
+  const [serviceEnabled, setServiceEnabled] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState("Master");
 
   useEffect(() => {
@@ -112,6 +115,13 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
       .then((res) => {
         const val = res.data?.value;
         setExpenseEnabled(val === true || val === "true");
+      })
+      .catch(() => {});
+    serviceApi
+      .isEnabled()
+      .then((res) => {
+        const val = res.data?.value;
+        setServiceEnabled(val === true || val === "true");
       })
       .catch(() => {});
   }, []);
@@ -161,6 +171,37 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
         }
         return item;
       });
+    }
+    if (serviceEnabled) {
+      // Add a Staffs entry under the Master group.
+      nav = nav.map((item) => {
+        if (item.name === "Master") {
+          return {
+            ...item,
+            children: [
+              ...item.children,
+              { name: "Staffs", href: "/staffs", icon: UserGroupIcon },
+            ],
+          };
+        }
+        return item;
+      });
+      // Insert a dedicated Service group after the Master group.
+      const masterIdx = nav.findIndex((n) => n.name === "Master");
+      const insertAt = masterIdx >= 0 ? masterIdx + 1 : nav.length;
+      nav = [
+        ...nav.slice(0, insertAt),
+        {
+          name: "Service",
+          icon: WrenchScrewdriverIcon,
+          children: [
+            { name: "Service Entry", href: "/services/new", icon: WrenchScrewdriverIcon },
+            { name: "Pending Services", href: "/services/pending", icon: ClockIcon },
+            { name: "Closed Services", href: "/services/closed", icon: CheckCircleIcon },
+          ],
+        },
+        ...nav.slice(insertAt),
+      ];
     }
     // Hide Settings for users without the manage-settings permission
     if (!hasPermission("manage_settings")) {

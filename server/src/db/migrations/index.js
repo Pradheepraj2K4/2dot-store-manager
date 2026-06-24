@@ -20,31 +20,32 @@
  *     the next server start.
  */
 
-const v1 = require('./v1');
-const v2 = require('./v2');
-const v3 = require('./v3');
-const v4 = require('./v4');
-const v5 = require('./v5');
-const v6 = require('./v6');
-const v7 = require('./v7');
-const v8 = require('./v8');
-const v9 = require('./v9');
-const v10 = require('./v10');
-const v11 = require('./v11');
-const v12 = require('./v12');
-const v13 = require('./v13');
-const v14 = require('./v14');
-const v15 = require('./v15');
-const v16 = require('./v16');
-const v17 = require('./v17');
-const v18 = require('./v18');
-const v19 = require('./v19');
-const v20 = require('./v20');
-const v21 = require('./v21');
-const v22 = require('./v22');
-const v23 = require('./v23');
-const v24 = require('./v24');
-const v25 = require('./v25');
+const v1 = require("./v1");
+const v2 = require("./v2");
+const v3 = require("./v3");
+const v4 = require("./v4");
+const v5 = require("./v5");
+const v6 = require("./v6");
+const v7 = require("./v7");
+const v8 = require("./v8");
+const v9 = require("./v9");
+const v10 = require("./v10");
+const v11 = require("./v11");
+const v12 = require("./v12");
+const v13 = require("./v13");
+const v14 = require("./v14");
+const v15 = require("./v15");
+const v16 = require("./v16");
+const v17 = require("./v17");
+const v18 = require("./v18");
+const v19 = require("./v19");
+const v20 = require("./v20");
+const v21 = require("./v21");
+const v22 = require("./v22");
+const v23 = require("./v23");
+const v24 = require("./v24");
+const v25 = require("./v25");
+const v26 = require("./v26");
 
 // ── Register all migrations here, sorted by VERSION ascending ──────────────
 const MIGRATIONS = [
@@ -73,7 +74,7 @@ const MIGRATIONS = [
   v23,
   v24,
   v25,
-  // v26, … add future migrations here
+  v26,
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -97,18 +98,21 @@ function bootstrapVersionTable(db) {
  * Returns the integer version currently stored in the database.
  */
 function getCurrentVersion(db) {
-  return db.prepare('SELECT version FROM schema_version WHERE id = 1').get().version;
+  return db.prepare("SELECT version FROM schema_version WHERE id = 1").get()
+    .version;
 }
 
 /**
  * Persists the new version number inside the same transaction as the migration.
  */
 function setVersion(db, version) {
-  db.prepare(`
+  db.prepare(
+    `
     UPDATE schema_version
     SET version = ?, updated_at = datetime('now', 'localtime')
     WHERE id = 1
-  `).run(version);
+  `,
+  ).run(version);
 }
 
 /**
@@ -119,9 +123,9 @@ function runMigrations(db) {
   bootstrapVersionTable(db);
 
   const currentVersion = getCurrentVersion(db);
-  const pending = MIGRATIONS
-    .filter(m => m.VERSION > currentVersion)
-    .sort((a, b) => a.VERSION - b.VERSION);
+  const pending = MIGRATIONS.filter((m) => m.VERSION > currentVersion).sort(
+    (a, b) => a.VERSION - b.VERSION,
+  );
 
   if (pending.length === 0) {
     console.log(`[DB] Schema is up to date (version ${currentVersion}).`);

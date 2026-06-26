@@ -115,6 +115,9 @@ router.post('/backup/now', (req, res, next) => {
 // POST /settings/data/clear — delete all non-settings data (ledgers, transactions, interest, expenses)
 router.post('/data/clear', (req, res, next) => settingsController.clearData(req, res, next));
 
+// POST /settings/data/clear-transactions — delete transactional data but keep masters (ledgers, items, …)
+router.post('/data/clear-transactions', (req, res, next) => settingsController.clearTransactions(req, res, next));
+
 // POST /settings/reset — reset all settings to their seeded defaults
 router.post('/reset', (req, res, next) => settingsController.resetSettings(req, res, next));
 

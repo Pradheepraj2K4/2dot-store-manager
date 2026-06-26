@@ -1,7 +1,26 @@
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __esm = (fn, res) => function __init() {
+  return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+};
 var __commonJS = (cb, mod) => function __require() {
   return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
 };
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // node_modules/depd/index.js
 var require_depd = __commonJS({
@@ -160,13 +179,13 @@ var require_depd = __commonJS({
       if (!funcName) {
         funcName = "<anonymous@" + formatLocation(site) + ">";
       }
-      var context = callSite.getThis();
-      var typeName = context && callSite.getTypeName();
+      var context2 = callSite.getThis();
+      var typeName = context2 && callSite.getTypeName();
       if (typeName === "Object") {
         typeName = void 0;
       }
       if (typeName === "Function") {
-        typeName = context.name || typeName;
+        typeName = context2.name || typeName;
       }
       return typeName && callSite.getMethodName() ? typeName + "." + funcName : funcName;
     }
@@ -1013,12 +1032,12 @@ var require_debug = __commonJS({
     function createDebug(namespace) {
       function debug() {
         if (!debug.enabled) return;
-        var self = debug;
+        var self2 = debug;
         var curr = +/* @__PURE__ */ new Date();
         var ms = curr - (prevTime || curr);
-        self.diff = ms;
-        self.prev = prevTime;
-        self.curr = curr;
+        self2.diff = ms;
+        self2.prev = prevTime;
+        self2.curr = curr;
         prevTime = curr;
         var args = new Array(arguments.length);
         for (var i = 0; i < args.length; i++) {
@@ -1035,15 +1054,15 @@ var require_debug = __commonJS({
           var formatter = exports2.formatters[format];
           if ("function" === typeof formatter) {
             var val = args[index];
-            match = formatter.call(self, val);
+            match = formatter.call(self2, val);
             args.splice(index, 1);
             index--;
           }
           return match;
         });
-        exports2.formatArgs.call(self, args);
+        exports2.formatArgs.call(self2, args);
         var logFn = debug.log || exports2.log || console.log.bind(console);
-        logFn.apply(self, args);
+        logFn.apply(self2, args);
       }
       debug.namespace = namespace;
       debug.enabled = exports2.enabled(namespace);
@@ -2984,17 +3003,17 @@ var require_dbcs_codec = __commonJS({
       return newBuf.slice(0, j).toString("ucs2");
     };
     DBCSDecoder.prototype.end = function() {
-      var ret = "";
+      var ret2 = "";
       while (this.prevBuf.length > 0) {
-        ret += this.defaultCharUnicode;
+        ret2 += this.defaultCharUnicode;
         var buf = this.prevBuf.slice(1);
         this.prevBuf = Buffer2.alloc(0);
         this.nodeIdx = 0;
         if (buf.length > 0)
-          ret += this.write(buf);
+          ret2 += this.write(buf);
       }
       this.nodeIdx = 0;
-      return ret;
+      return ret2;
     };
     function findIdx(table, val) {
       if (table[0] > val)
@@ -17975,14 +17994,14 @@ var require_router = __commonJS({
       }
       var params = this._params;
       var len = params.length;
-      var ret;
+      var ret2;
       if (name[0] === ":") {
         deprecate("router.param(" + JSON.stringify(name) + ", fn): Use router.param(" + JSON.stringify(name.slice(1)) + ", fn) instead");
         name = name.slice(1);
       }
       for (var i = 0; i < len; ++i) {
-        if (ret = params[i](name, fn)) {
-          fn = ret;
+        if (ret2 = params[i](name, fn)) {
+          fn = ret2;
         }
       }
       if ("function" !== typeof fn) {
@@ -17992,7 +18011,7 @@ var require_router = __commonJS({
       return this;
     };
     proto.handle = function handle(req, res, out) {
-      var self = this;
+      var self2 = this;
       debug("dispatching %s %s", req.method, req.url);
       var idx = 0;
       var protohost = getProtohost(req.url) || "";
@@ -18001,7 +18020,7 @@ var require_router = __commonJS({
       var sync = 0;
       var paramcalled = {};
       var options = [];
-      var stack = self.stack;
+      var stack = self2.stack;
       var parentParams = req.params;
       var parentUrl = req.baseUrl || "";
       var done = restore(out, req, "baseUrl", "next", "params");
@@ -18076,9 +18095,9 @@ var require_router = __commonJS({
         if (route) {
           req.route = route;
         }
-        req.params = self.mergeParams ? mergeParams(layer.params, parentParams) : layer.params;
+        req.params = self2.mergeParams ? mergeParams(layer.params, parentParams) : layer.params;
         var layerPath = layer.path;
-        self.process_params(layer, paramcalled, req, res, function(err2) {
+        self2.process_params(layer, paramcalled, req, res, function(err2) {
           if (err2) {
             next(layerError || err2);
           } else if (route) {
@@ -19385,52 +19404,52 @@ var require_send = __commonJS({
     };
     SendStream.prototype.sendFile = function sendFile(path3) {
       var i = 0;
-      var self = this;
+      var self2 = this;
       debug('stat "%s"', path3);
       fs.stat(path3, function onstat(err, stat) {
         if (err && err.code === "ENOENT" && !extname(path3) && path3[path3.length - 1] !== sep) {
           return next(err);
         }
-        if (err) return self.onStatError(err);
-        if (stat.isDirectory()) return self.redirect(path3);
-        self.emit("file", path3, stat);
-        self.send(path3, stat);
+        if (err) return self2.onStatError(err);
+        if (stat.isDirectory()) return self2.redirect(path3);
+        self2.emit("file", path3, stat);
+        self2.send(path3, stat);
       });
       function next(err) {
-        if (self._extensions.length <= i) {
-          return err ? self.onStatError(err) : self.error(404);
+        if (self2._extensions.length <= i) {
+          return err ? self2.onStatError(err) : self2.error(404);
         }
-        var p = path3 + "." + self._extensions[i++];
+        var p = path3 + "." + self2._extensions[i++];
         debug('stat "%s"', p);
         fs.stat(p, function(err2, stat) {
           if (err2) return next(err2);
           if (stat.isDirectory()) return next();
-          self.emit("file", p, stat);
-          self.send(p, stat);
+          self2.emit("file", p, stat);
+          self2.send(p, stat);
         });
       }
     };
     SendStream.prototype.sendIndex = function sendIndex(path3) {
       var i = -1;
-      var self = this;
+      var self2 = this;
       function next(err) {
-        if (++i >= self._index.length) {
-          if (err) return self.onStatError(err);
-          return self.error(404);
+        if (++i >= self2._index.length) {
+          if (err) return self2.onStatError(err);
+          return self2.error(404);
         }
-        var p = join(path3, self._index[i]);
+        var p = join(path3, self2._index[i]);
         debug('stat "%s"', p);
         fs.stat(p, function(err2, stat) {
           if (err2) return next(err2);
           if (stat.isDirectory()) return next();
-          self.emit("file", p, stat);
-          self.send(p, stat);
+          self2.emit("file", p, stat);
+          self2.send(p, stat);
         });
       }
       next();
     };
     SendStream.prototype.stream = function stream(path3, options) {
-      var self = this;
+      var self2 = this;
       var res = this.res;
       var stream2 = fs.createReadStream(path3, options);
       this.emit("stream", stream2);
@@ -19441,10 +19460,10 @@ var require_send = __commonJS({
       onFinished(res, cleanup);
       stream2.on("error", function onerror(err) {
         cleanup();
-        self.onStatError(err);
+        self2.onStatError(err);
       });
       stream2.on("end", function onend() {
-        self.emit("end");
+        self2.emit("end");
       });
     };
     SendStream.prototype.type = function type(path3) {
@@ -20444,11 +20463,11 @@ var require_utils2 = __commonJS({
       return ~type.indexOf("/") ? acceptParams(type) : { value: mime.lookup(type), params: {} };
     };
     exports2.normalizeTypes = function(types) {
-      var ret = [];
+      var ret2 = [];
       for (var i = 0; i < types.length; ++i) {
-        ret.push(exports2.normalizeType(types[i]));
+        ret2.push(exports2.normalizeType(types[i]));
       }
-      return ret;
+      return ret2;
     };
     exports2.contentDisposition = deprecate.function(
       contentDisposition,
@@ -20456,16 +20475,16 @@ var require_utils2 = __commonJS({
     );
     function acceptParams(str) {
       var parts = str.split(/ *; */);
-      var ret = { value: parts[0], quality: 1, params: {} };
+      var ret2 = { value: parts[0], quality: 1, params: {} };
       for (var i = 1; i < parts.length; ++i) {
         var pms = parts[i].split(/ *= */);
         if ("q" === pms[0]) {
-          ret.quality = parseFloat(pms[1]);
+          ret2.quality = parseFloat(pms[1]);
         } else {
-          ret.params[pms[0]] = pms[1];
+          ret2.params[pms[0]] = pms[1];
         }
       }
-      return ret;
+      return ret2;
     }
     exports2.compileETag = function(val) {
       var fn;
@@ -22273,15 +22292,15 @@ var require_response = __commonJS({
       var done = callback;
       var opts = options || {};
       var req = this.req;
-      var self = this;
+      var self2 = this;
       if (typeof options === "function") {
         done = options;
         opts = {};
       }
-      opts._locals = self.locals;
+      opts._locals = self2.locals;
       done = done || function(err, str) {
         if (err) return req.next(err);
-        self.send(str);
+        self2.send(str);
       };
       app2.render(view, opts, done);
     };
@@ -23345,40 +23364,10 @@ var require_morgan = __commonJS({
   }
 });
 
-// src/db/connection.js
-var require_connection = __commonJS({
-  "src/db/connection.js"(exports2, module2) {
-    var Database = require("better-sqlite3");
-    var path2 = require("path");
-    var fs = require("fs");
-    var DB_DIR = process.env.DATA_DIR || path2.join(__dirname, "..", "..", "data");
-    var DB_PATH = path2.join(DB_DIR, "inventory.db");
-    var db;
-    function getDb() {
-      if (!db) {
-        if (!fs.existsSync(DB_DIR)) {
-          fs.mkdirSync(DB_DIR, { recursive: true });
-        }
-        db = new Database(DB_PATH);
-        db.pragma("journal_mode = WAL");
-        db.pragma("foreign_keys = ON");
-      }
-      return db;
-    }
-    function closeDb() {
-      if (db) {
-        db.close();
-        db = null;
-      }
-    }
-    module2.exports = { getDb, closeDb, DB_PATH };
-  }
-});
-
 // src/db/migrations/v1.js
 var require_v1 = __commonJS({
   "src/db/migrations/v1.js"(exports2, module2) {
-    var VERSION = 1;
+    var VERSION2 = 1;
     var SQL = `
   -- \u2500\u2500 Ledger Types \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   CREATE TABLE IF NOT EXISTS ledger_types (
@@ -23468,34 +23457,34 @@ var require_v1 = __commonJS({
     function up(db) {
       db.exec(SQL);
     }
-    module2.exports = { VERSION, up };
+    module2.exports = { VERSION: VERSION2, up };
   }
 });
 
 // src/db/migrations/v2.js
 var require_v2 = __commonJS({
   "src/db/migrations/v2.js"(exports2, module2) {
-    var VERSION = 2;
+    var VERSION2 = 2;
     function up(_db) {
     }
-    module2.exports = { VERSION, up };
+    module2.exports = { VERSION: VERSION2, up };
   }
 });
 
 // src/db/migrations/v3.js
 var require_v3 = __commonJS({
   "src/db/migrations/v3.js"(exports2, module2) {
-    var VERSION = 3;
+    var VERSION2 = 3;
     function up(_db) {
     }
-    module2.exports = { VERSION, up };
+    module2.exports = { VERSION: VERSION2, up };
   }
 });
 
 // src/db/migrations/v4.js
 var require_v4 = __commonJS({
   "src/db/migrations/v4.js"(exports2, module2) {
-    var VERSION = 4;
+    var VERSION2 = 4;
     var SQL = `
   -- \u2500\u2500 Expense Categories \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
   CREATE TABLE IF NOT EXISTS expense_categories (
@@ -23524,14 +23513,14 @@ var require_v4 = __commonJS({
     function up(db) {
       db.exec(SQL);
     }
-    module2.exports = { VERSION, up };
+    module2.exports = { VERSION: VERSION2, up };
   }
 });
 
 // src/db/migrations/v5.js
 var require_v5 = __commonJS({
   "src/db/migrations/v5.js"(exports2, module2) {
-    var VERSION = 5;
+    var VERSION2 = 5;
     var LEGACY_DEFAULTS = [
       "Salary",
       "Stationery",
@@ -23545,42 +23534,51 @@ var require_v5 = __commonJS({
       const placeholders = LEGACY_DEFAULTS.map(() => "?").join(", ");
       db.prepare(`DELETE FROM expense_categories WHERE name IN (${placeholders})`).run(...LEGACY_DEFAULTS);
     }
-    module2.exports = { VERSION, up };
+    module2.exports = { VERSION: VERSION2, up };
   }
 });
 
 // src/db/migrations/v6.js
 var require_v6 = __commonJS({
   "src/db/migrations/v6.js"(exports2, module2) {
-    var VERSION = 6;
+    var VERSION2 = 6;
     function up(db) {
-      db.exec(`
-    ALTER TABLE ledgers ADD COLUMN interest_start_date TEXT NOT NULL DEFAULT '';
-  `);
+      const cols = db.pragma("table_info(ledgers)").map((c) => c.name);
+      if (!cols.includes("interest_start_date")) {
+        db.exec(`
+      ALTER TABLE ledgers ADD COLUMN interest_start_date TEXT NOT NULL DEFAULT '';
+    `);
+      }
     }
-    module2.exports = { VERSION, up };
+    module2.exports = { VERSION: VERSION2, up };
   }
 });
 
 // src/db/migrations/v7.js
 var require_v7 = __commonJS({
   "src/db/migrations/v7.js"(exports2, module2) {
-    var VERSION = 7;
+    var VERSION2 = 7;
     function up(db) {
-      db.exec(`
-    ALTER TABLE ledgers ADD COLUMN ledger_date TEXT NOT NULL DEFAULT '';
-  `);
+      const cols = db.pragma("table_info(ledgers)").map((c) => c.name);
+      if (!cols.includes("ledger_date")) {
+        db.exec(`
+      ALTER TABLE ledgers ADD COLUMN ledger_date TEXT NOT NULL DEFAULT '';
+    `);
+      }
     }
-    module2.exports = { VERSION, up };
+    module2.exports = { VERSION: VERSION2, up };
   }
 });
 
 // src/db/migrations/v8.js
 var require_v8 = __commonJS({
   "src/db/migrations/v8.js"(exports2, module2) {
-    var VERSION = 8;
+    var VERSION2 = 8;
     function up(db) {
-      db.exec(`ALTER TABLE interest_entries ADD COLUMN interest_number TEXT NOT NULL DEFAULT '';`);
+      const cols = db.pragma("table_info(interest_entries)").map((c) => c.name);
+      if (!cols.includes("interest_number")) {
+        db.exec(`ALTER TABLE interest_entries ADD COLUMN interest_number TEXT NOT NULL DEFAULT '';`);
+      }
       const entries = db.prepare("SELECT id FROM interest_entries ORDER BY id ASC").all();
       const update = db.prepare("UPDATE interest_entries SET interest_number = ? WHERE id = ?");
       entries.forEach((e, i) => {
@@ -23589,14 +23587,14 @@ var require_v8 = __commonJS({
     }
     function down() {
     }
-    module2.exports = { VERSION, up, down };
+    module2.exports = { VERSION: VERSION2, up, down };
   }
 });
 
 // src/db/migrations/v9.js
 var require_v9 = __commonJS({
   "src/db/migrations/v9.js"(exports2, module2) {
-    var VERSION = 9;
+    var VERSION2 = 9;
     function up(db) {
       db.exec(`
     CREATE TABLE IF NOT EXISTS interest_schemes (
@@ -23625,7 +23623,597 @@ var require_v9 = __commonJS({
     }
     function down() {
     }
-    module2.exports = { VERSION, up, down };
+    module2.exports = { VERSION: VERSION2, up, down };
+  }
+});
+
+// src/db/migrations/v10.js
+var require_v10 = __commonJS({
+  "src/db/migrations/v10.js"(exports2, module2) {
+    var VERSION2 = 10;
+    function up(db) {
+      db.exec(`
+    CREATE TABLE IF NOT EXISTS transaction_categories (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT    NOT NULL UNIQUE,
+      created_at TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+  `);
+      try {
+        db.exec(`ALTER TABLE transactions ADD COLUMN category_id INTEGER REFERENCES transaction_categories(id);`);
+      } catch (_) {
+      }
+    }
+    function down() {
+    }
+    module2.exports = { VERSION: VERSION2, up, down };
+  }
+});
+
+// src/db/migrations/v11.js
+var require_v11 = __commonJS({
+  "src/db/migrations/v11.js"(exports2, module2) {
+    var VERSION2 = 11;
+    var SQL = `
+  -- \u2500\u2500 Items master \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  CREATE TABLE IF NOT EXISTS items (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    name       TEXT    NOT NULL,
+    unit       TEXT    NOT NULL DEFAULT 'Nos',
+    mrp        REAL    NOT NULL DEFAULT 0,
+    brand      TEXT    NOT NULL DEFAULT '',
+    category   TEXT    NOT NULL DEFAULT '',
+    status     TEXT    NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'inactive')),
+    created_at TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    updated_at TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+  );
+
+  -- \u2500\u2500 Sales (invoice header) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  CREATE TABLE IF NOT EXISTS sales (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    sale_number   TEXT    NOT NULL,
+    ledger_id     INTEGER NOT NULL,
+    date          TEXT    NOT NULL DEFAULT (date('now', 'localtime')),
+    time          TEXT    NOT NULL DEFAULT (strftime('%H:%M', 'now', 'localtime')),
+    total_amount  REAL    NOT NULL DEFAULT 0,
+    total_discount REAL   NOT NULL DEFAULT 0,
+    item_count    INTEGER NOT NULL DEFAULT 0,
+    notes         TEXT    NOT NULL DEFAULT '',
+    created_at    TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (ledger_id) REFERENCES ledgers(id) ON DELETE CASCADE
+  );
+
+  -- \u2500\u2500 Sale line items \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  CREATE TABLE IF NOT EXISTS sale_items (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    sale_id          INTEGER NOT NULL,
+    item_id          INTEGER,
+    item_name        TEXT    NOT NULL,
+    unit             TEXT    NOT NULL DEFAULT 'Nos',
+    mrp              REAL    NOT NULL DEFAULT 0,
+    rate             REAL    NOT NULL DEFAULT 0,
+    quantity         REAL    NOT NULL DEFAULT 1,
+    discount_percent REAL    NOT NULL DEFAULT 0,
+    amount           REAL    NOT NULL DEFAULT 0,
+    sort_order       INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (sale_id) REFERENCES sales(id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id) REFERENCES items(id) ON DELETE SET NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_items_name        ON items(name);
+  CREATE INDEX IF NOT EXISTS idx_items_brand       ON items(brand);
+  CREATE INDEX IF NOT EXISTS idx_items_category    ON items(category);
+  CREATE INDEX IF NOT EXISTS idx_sales_ledger      ON sales(ledger_id);
+  CREATE INDEX IF NOT EXISTS idx_sales_date        ON sales(date);
+  CREATE INDEX IF NOT EXISTS idx_sale_items_sale   ON sale_items(sale_id);
+  CREATE INDEX IF NOT EXISTS idx_sale_items_item   ON sale_items(item_id);
+`;
+    function up(db) {
+      db.exec(SQL);
+    }
+    function down() {
+    }
+    module2.exports = { VERSION: VERSION2, up, down };
+  }
+});
+
+// src/db/migrations/v12.js
+var require_v12 = __commonJS({
+  "src/db/migrations/v12.js"(exports2, module2) {
+    var VERSION2 = 12;
+    function up(db) {
+      db.exec(`ALTER TABLE sale_items ADD COLUMN gst_percent REAL NOT NULL DEFAULT 0`);
+      db.exec(`ALTER TABLE sale_items ADD COLUMN gst_amount  REAL NOT NULL DEFAULT 0`);
+      db.exec(`ALTER TABLE sales      ADD COLUMN total_gst   REAL NOT NULL DEFAULT 0`);
+    }
+    function down() {
+    }
+    module2.exports = { VERSION: VERSION2, up, down };
+  }
+});
+
+// src/db/migrations/v13.js
+var require_v13 = __commonJS({
+  "src/db/migrations/v13.js"(exports2, module2) {
+    var VERSION2 = 13;
+    function up(db) {
+      db.exec(`ALTER TABLE items ADD COLUMN gst_percent REAL NOT NULL DEFAULT 0`);
+    }
+    function down() {
+    }
+    module2.exports = { VERSION: VERSION2, up, down };
+  }
+});
+
+// src/db/migrations/v14.js
+var require_v14 = __commonJS({
+  "src/db/migrations/v14.js"(exports2, module2) {
+    var VERSION2 = 14;
+    var SQL = `
+  -- \u2500\u2500 Stock column on items master \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  ALTER TABLE items ADD COLUMN current_stock REAL NOT NULL DEFAULT 0;
+
+  -- \u2500\u2500 Purchases (invoice header) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  CREATE TABLE IF NOT EXISTS purchases (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    purchase_number TEXT    NOT NULL,
+    ledger_id       INTEGER NOT NULL,
+    bill_number     TEXT    NOT NULL DEFAULT '',
+    date            TEXT    NOT NULL DEFAULT (date('now', 'localtime')),
+    time            TEXT    NOT NULL DEFAULT (strftime('%H:%M', 'now', 'localtime')),
+    total_amount    REAL    NOT NULL DEFAULT 0,
+    total_discount  REAL    NOT NULL DEFAULT 0,
+    total_gst       REAL    NOT NULL DEFAULT 0,
+    item_count      INTEGER NOT NULL DEFAULT 0,
+    notes           TEXT    NOT NULL DEFAULT '',
+    created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (ledger_id) REFERENCES ledgers(id) ON DELETE CASCADE
+  );
+
+  -- \u2500\u2500 Purchase line items \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  CREATE TABLE IF NOT EXISTS purchase_items (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    purchase_id      INTEGER NOT NULL,
+    item_id          INTEGER,
+    item_name        TEXT    NOT NULL,
+    unit             TEXT    NOT NULL DEFAULT 'Nos',
+    mrp              REAL    NOT NULL DEFAULT 0,
+    rate             REAL    NOT NULL DEFAULT 0,
+    quantity         REAL    NOT NULL DEFAULT 1,
+    discount_percent REAL    NOT NULL DEFAULT 0,
+    gst_percent      REAL    NOT NULL DEFAULT 0,
+    gst_amount       REAL    NOT NULL DEFAULT 0,
+    amount           REAL    NOT NULL DEFAULT 0,
+    sort_order       INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id)     REFERENCES items(id)     ON DELETE SET NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_purchases_ledger    ON purchases(ledger_id);
+  CREATE INDEX IF NOT EXISTS idx_purchases_date      ON purchases(date);
+  CREATE INDEX IF NOT EXISTS idx_purchase_items_purchase ON purchase_items(purchase_id);
+  CREATE INDEX IF NOT EXISTS idx_purchase_items_item     ON purchase_items(item_id);
+`;
+    function up(db) {
+      db.exec(SQL);
+      const adjustments = db.prepare(`
+    SELECT item_id, COALESCE(SUM(quantity), 0) AS sold
+    FROM sale_items
+    WHERE item_id IS NOT NULL
+    GROUP BY item_id
+  `).all();
+      const upd = db.prepare("UPDATE items SET current_stock = ? WHERE id = ?");
+      for (const row of adjustments) {
+        upd.run(-1 * (parseFloat(row.sold) || 0), row.item_id);
+      }
+    }
+    function down() {
+    }
+    module2.exports = { VERSION: VERSION2, up, down };
+  }
+});
+
+// src/db/migrations/v15.js
+var require_v15 = __commonJS({
+  "src/db/migrations/v15.js"(exports2, module2) {
+    var VERSION2 = 15;
+    var SQL = `
+  ALTER TABLE items ADD COLUMN item_code TEXT NOT NULL DEFAULT '';
+  CREATE INDEX IF NOT EXISTS idx_items_item_code ON items(item_code);
+`;
+    function up(db) {
+      db.exec(SQL);
+    }
+    function down() {
+    }
+    module2.exports = { VERSION: VERSION2, up, down };
+  }
+});
+
+// src/db/migrations/v16.js
+var require_v16 = __commonJS({
+  "src/db/migrations/v16.js"(exports2, module2) {
+    var VERSION2 = 16;
+    var SQL = `
+  -- \u2500\u2500 Estimations \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  CREATE TABLE IF NOT EXISTS estimations (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    estimation_number   TEXT    NOT NULL,
+    ledger_id           INTEGER,
+    customer_name       TEXT    NOT NULL DEFAULT '',
+    date                TEXT    NOT NULL DEFAULT (date('now', 'localtime')),
+    time                TEXT    NOT NULL DEFAULT (strftime('%H:%M', 'now', 'localtime')),
+    valid_until         TEXT    NOT NULL DEFAULT '',
+    total_amount        REAL    NOT NULL DEFAULT 0,
+    total_discount      REAL    NOT NULL DEFAULT 0,
+    total_gst           REAL    NOT NULL DEFAULT 0,
+    item_count          INTEGER NOT NULL DEFAULT 0,
+    status              TEXT    NOT NULL DEFAULT 'open',  -- open | converted | expired | cancelled
+    converted_sale_id   INTEGER,
+    notes               TEXT    NOT NULL DEFAULT '',
+    created_at          TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (ledger_id)         REFERENCES ledgers(id) ON DELETE SET NULL,
+    FOREIGN KEY (converted_sale_id) REFERENCES sales(id)   ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS estimation_items (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    estimation_id    INTEGER NOT NULL,
+    item_id          INTEGER,
+    item_name        TEXT    NOT NULL,
+    unit             TEXT    NOT NULL DEFAULT 'Nos',
+    mrp              REAL    NOT NULL DEFAULT 0,
+    rate             REAL    NOT NULL DEFAULT 0,
+    quantity         REAL    NOT NULL DEFAULT 1,
+    discount_percent REAL    NOT NULL DEFAULT 0,
+    gst_percent      REAL    NOT NULL DEFAULT 0,
+    gst_amount       REAL    NOT NULL DEFAULT 0,
+    amount           REAL    NOT NULL DEFAULT 0,
+    sort_order       INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (estimation_id) REFERENCES estimations(id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id)       REFERENCES items(id)        ON DELETE SET NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_estimations_ledger    ON estimations(ledger_id);
+  CREATE INDEX IF NOT EXISTS idx_estimations_date      ON estimations(date);
+  CREATE INDEX IF NOT EXISTS idx_estimation_items_est  ON estimation_items(estimation_id);
+  CREATE INDEX IF NOT EXISTS idx_estimation_items_item ON estimation_items(item_id);
+
+  -- \u2500\u2500 Sales Returns \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  CREATE TABLE IF NOT EXISTS sales_returns (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    return_number       TEXT    NOT NULL,
+    ledger_id           INTEGER NOT NULL,
+    sale_id             INTEGER,
+    date                TEXT    NOT NULL DEFAULT (date('now', 'localtime')),
+    time                TEXT    NOT NULL DEFAULT (strftime('%H:%M', 'now', 'localtime')),
+    reason              TEXT    NOT NULL DEFAULT '',
+    total_amount        REAL    NOT NULL DEFAULT 0,
+    total_discount      REAL    NOT NULL DEFAULT 0,
+    total_gst           REAL    NOT NULL DEFAULT 0,
+    item_count          INTEGER NOT NULL DEFAULT 0,
+    notes               TEXT    NOT NULL DEFAULT '',
+    created_at          TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (ledger_id) REFERENCES ledgers(id) ON DELETE CASCADE,
+    FOREIGN KEY (sale_id)   REFERENCES sales(id)   ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS sales_return_items (
+    id                INTEGER PRIMARY KEY AUTOINCREMENT,
+    sales_return_id   INTEGER NOT NULL,
+    item_id           INTEGER,
+    item_name         TEXT    NOT NULL,
+    unit              TEXT    NOT NULL DEFAULT 'Nos',
+    mrp               REAL    NOT NULL DEFAULT 0,
+    rate              REAL    NOT NULL DEFAULT 0,
+    quantity          REAL    NOT NULL DEFAULT 1,
+    discount_percent  REAL    NOT NULL DEFAULT 0,
+    gst_percent       REAL    NOT NULL DEFAULT 0,
+    gst_amount        REAL    NOT NULL DEFAULT 0,
+    amount            REAL    NOT NULL DEFAULT 0,
+    sort_order        INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (sales_return_id) REFERENCES sales_returns(id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id)         REFERENCES items(id)         ON DELETE SET NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_sales_returns_ledger   ON sales_returns(ledger_id);
+  CREATE INDEX IF NOT EXISTS idx_sales_returns_sale     ON sales_returns(sale_id);
+  CREATE INDEX IF NOT EXISTS idx_sales_returns_date     ON sales_returns(date);
+  CREATE INDEX IF NOT EXISTS idx_sr_items_return        ON sales_return_items(sales_return_id);
+  CREATE INDEX IF NOT EXISTS idx_sr_items_item          ON sales_return_items(item_id);
+
+  -- \u2500\u2500 Purchase Returns \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  CREATE TABLE IF NOT EXISTS purchase_returns (
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    return_number       TEXT    NOT NULL,
+    ledger_id           INTEGER NOT NULL,
+    purchase_id         INTEGER,
+    bill_number         TEXT    NOT NULL DEFAULT '',
+    date                TEXT    NOT NULL DEFAULT (date('now', 'localtime')),
+    time                TEXT    NOT NULL DEFAULT (strftime('%H:%M', 'now', 'localtime')),
+    reason              TEXT    NOT NULL DEFAULT '',
+    total_amount        REAL    NOT NULL DEFAULT 0,
+    total_discount      REAL    NOT NULL DEFAULT 0,
+    total_gst           REAL    NOT NULL DEFAULT 0,
+    item_count          INTEGER NOT NULL DEFAULT 0,
+    notes               TEXT    NOT NULL DEFAULT '',
+    created_at          TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+    FOREIGN KEY (ledger_id)   REFERENCES ledgers(id)   ON DELETE CASCADE,
+    FOREIGN KEY (purchase_id) REFERENCES purchases(id) ON DELETE SET NULL
+  );
+
+  CREATE TABLE IF NOT EXISTS purchase_return_items (
+    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+    purchase_return_id   INTEGER NOT NULL,
+    item_id              INTEGER,
+    item_name            TEXT    NOT NULL,
+    unit                 TEXT    NOT NULL DEFAULT 'Nos',
+    mrp                  REAL    NOT NULL DEFAULT 0,
+    rate                 REAL    NOT NULL DEFAULT 0,
+    quantity             REAL    NOT NULL DEFAULT 1,
+    discount_percent     REAL    NOT NULL DEFAULT 0,
+    gst_percent          REAL    NOT NULL DEFAULT 0,
+    gst_amount           REAL    NOT NULL DEFAULT 0,
+    amount               REAL    NOT NULL DEFAULT 0,
+    sort_order           INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (purchase_return_id) REFERENCES purchase_returns(id) ON DELETE CASCADE,
+    FOREIGN KEY (item_id)            REFERENCES items(id)            ON DELETE SET NULL
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_purchase_returns_ledger   ON purchase_returns(ledger_id);
+  CREATE INDEX IF NOT EXISTS idx_purchase_returns_purchase ON purchase_returns(purchase_id);
+  CREATE INDEX IF NOT EXISTS idx_purchase_returns_date     ON purchase_returns(date);
+  CREATE INDEX IF NOT EXISTS idx_pr_items_return           ON purchase_return_items(purchase_return_id);
+  CREATE INDEX IF NOT EXISTS idx_pr_items_item             ON purchase_return_items(item_id);
+`;
+    function up(db) {
+      db.exec(SQL);
+    }
+    function down() {
+    }
+    module2.exports = { VERSION: VERSION2, up, down };
+  }
+});
+
+// src/db/migrations/v17.js
+var require_v17 = __commonJS({
+  "src/db/migrations/v17.js"(exports2, module2) {
+    var VERSION2 = 17;
+    function up(db) {
+      db.exec(`
+    ALTER TABLE sales     ADD COLUMN bill_discount REAL NOT NULL DEFAULT 0;
+    ALTER TABLE purchases ADD COLUMN bill_discount REAL NOT NULL DEFAULT 0;
+  `);
+    }
+    module2.exports = { VERSION: VERSION2, up };
+  }
+});
+
+// src/db/migrations/v18.js
+var require_v18 = __commonJS({
+  "src/db/migrations/v18.js"(exports2, module2) {
+    var VERSION2 = 18;
+    function up(db) {
+      db.exec(`ALTER TABLE ledgers ADD COLUMN is_system INTEGER NOT NULL DEFAULT 0;`);
+      db.prepare(`
+    INSERT OR IGNORE INTO ledger_types (name, behaviour, is_system)
+    VALUES ('CASH', 'customer', 1)
+  `).run();
+      const cashType = db.prepare(
+        `SELECT id FROM ledger_types WHERE name = 'CASH' LIMIT 1`
+      ).get();
+      if (!cashType) return;
+      db.prepare(`
+    INSERT OR IGNORE INTO ledgers
+      (ledger_type_id, name, phone, place, address, gst_no, state_code, igst_status,
+       current_balance, interest_rate, interest_scheme, is_system)
+    SELECT ?, 'CASH', '', '', '', '', '', 'NO', 0, 0, 'NONE', 1
+    WHERE NOT EXISTS (SELECT 1 FROM ledgers WHERE name = 'CASH' AND is_system = 1)
+  `).run(cashType.id);
+    }
+    module2.exports = { VERSION: VERSION2, up };
+  }
+});
+
+// src/db/migrations/v19.js
+var require_v19 = __commonJS({
+  "src/db/migrations/v19.js"(exports2, module2) {
+    var VERSION2 = 19;
+    function up(db) {
+      db.exec(`
+    ALTER TABLE sales ADD COLUMN customer_name   TEXT NOT NULL DEFAULT '';
+    ALTER TABLE sales ADD COLUMN customer_mobile TEXT NOT NULL DEFAULT '';
+  `);
+    }
+    module2.exports = { VERSION: VERSION2, up };
+  }
+});
+
+// src/db/migrations/v20.js
+var require_v20 = __commonJS({
+  "src/db/migrations/v20.js"(exports2, module2) {
+    var VERSION2 = 20;
+    function up(db) {
+      db.exec(`
+    ALTER TABLE items ADD COLUMN sales_rate REAL;
+  `);
+    }
+    module2.exports = { VERSION: VERSION2, up };
+  }
+});
+
+// src/db/migrations/v21.js
+var require_v21 = __commonJS({
+  "src/db/migrations/v21.js"(exports2, module2) {
+    var VERSION2 = 21;
+    function up(db) {
+      db.exec(`
+    ALTER TABLE sales ADD COLUMN customer_place TEXT NOT NULL DEFAULT '';
+  `);
+    }
+    module2.exports = { VERSION: VERSION2, up };
+  }
+});
+
+// src/db/migrations/v22.js
+var require_v22 = __commonJS({
+  "src/db/migrations/v22.js"(exports2, module2) {
+    var VERSION2 = 22;
+    function up(db) {
+      db.exec(`
+    ALTER TABLE expenses ADD COLUMN voucher_number TEXT NOT NULL DEFAULT '';
+    CREATE INDEX IF NOT EXISTS idx_expenses_voucher_number ON expenses (voucher_number);
+  `);
+    }
+    module2.exports = { VERSION: VERSION2, up };
+  }
+});
+
+// src/db/migrations/v23.js
+var require_v23 = __commonJS({
+  "src/db/migrations/v23.js"(exports2, module2) {
+    var VERSION2 = 23;
+    function up(db) {
+      db.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+      username            TEXT    NOT NULL UNIQUE,
+      password            TEXT    NOT NULL,
+      can_create          INTEGER NOT NULL DEFAULT 0,
+      can_modify          INTEGER NOT NULL DEFAULT 0,
+      can_delete          INTEGER NOT NULL DEFAULT 0,
+      can_manage_settings INTEGER NOT NULL DEFAULT 0,
+      status              TEXT    NOT NULL DEFAULT 'active',
+      created_at          TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+  `);
+    }
+    module2.exports = { VERSION: VERSION2, up };
+  }
+});
+
+// src/db/migrations/v24.js
+var require_v24 = __commonJS({
+  "src/db/migrations/v24.js"(exports2, module2) {
+    var VERSION2 = 24;
+    function up(db) {
+      db.exec(`
+    CREATE TABLE IF NOT EXISTS item_imeis (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      item_id     INTEGER NOT NULL,
+      imei        TEXT    NOT NULL,
+      status      TEXT    NOT NULL DEFAULT 'in_stock',
+      purchase_id INTEGER,
+      sale_id     INTEGER,
+      created_at  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+      updated_at  TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_item_imeis_unique ON item_imeis (item_id, imei);
+    CREATE INDEX IF NOT EXISTS idx_item_imeis_item_status ON item_imeis (item_id, status);
+    CREATE INDEX IF NOT EXISTS idx_item_imeis_purchase ON item_imeis (purchase_id);
+    CREATE INDEX IF NOT EXISTS idx_item_imeis_sale ON item_imeis (sale_id);
+  `);
+    }
+    module2.exports = { VERSION: VERSION2, up };
+  }
+});
+
+// src/db/migrations/v25.js
+var require_v25 = __commonJS({
+  "src/db/migrations/v25.js"(exports2, module2) {
+    var VERSION2 = 25;
+    function up(db) {
+      db.exec(`
+    ALTER TABLE items ADD COLUMN imei_enabled INTEGER NOT NULL DEFAULT 0;
+  `);
+    }
+    module2.exports = { VERSION: VERSION2, up };
+  }
+});
+
+// src/db/migrations/v26.js
+var require_v26 = __commonJS({
+  "src/db/migrations/v26.js"(exports2, module2) {
+    var VERSION2 = 26;
+    function up(db) {
+      db.exec(`
+    CREATE TABLE IF NOT EXISTS staffs (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT    NOT NULL,
+      status     TEXT    NOT NULL DEFAULT 'active',
+      created_at TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS services (
+      id              INTEGER PRIMARY KEY AUTOINCREMENT,
+      service_number  TEXT    NOT NULL UNIQUE,
+      ledger_id       INTEGER NOT NULL,
+      date            TEXT    NOT NULL DEFAULT (date('now', 'localtime')),
+      item_id         INTEGER,
+      item_name       TEXT    NOT NULL,
+      quantity        REAL    NOT NULL DEFAULT 1,
+      imei            TEXT    NOT NULL DEFAULT '',
+      staff_id        INTEGER,
+      staff_name      TEXT    NOT NULL DEFAULT '',
+      advance_amount  REAL    NOT NULL DEFAULT 0,
+      customer_name   TEXT    NOT NULL DEFAULT '',
+      customer_mobile TEXT    NOT NULL DEFAULT '',
+      customer_place  TEXT    NOT NULL DEFAULT '',
+      remarks         TEXT    NOT NULL DEFAULT '',
+      status          TEXT    NOT NULL DEFAULT 'pending',
+      material_cost   REAL    NOT NULL DEFAULT 0,
+      labour_cost     REAL    NOT NULL DEFAULT 0,
+      collect_amount  REAL    NOT NULL DEFAULT 0,
+      closing_remarks TEXT    NOT NULL DEFAULT '',
+      closed_at       TEXT,
+      created_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+      updated_at      TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+      FOREIGN KEY (ledger_id) REFERENCES ledgers(id),
+      FOREIGN KEY (item_id)   REFERENCES items(id),
+      FOREIGN KEY (staff_id)  REFERENCES staffs(id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_services_status_date ON services(status, date);
+    CREATE INDEX IF NOT EXISTS idx_services_ledger ON services(ledger_id);
+  `);
+    }
+    module2.exports = { VERSION: VERSION2, up };
+  }
+});
+
+// src/db/migrations/v27.js
+var require_v27 = __commonJS({
+  "src/db/migrations/v27.js"(exports2, module2) {
+    var VERSION2 = 27;
+    function up(db) {
+      db.exec(`
+    CREATE TABLE IF NOT EXISTS customers (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT    NOT NULL,
+      mobile     TEXT    NOT NULL DEFAULT '',
+      place      TEXT    NOT NULL DEFAULT '',
+      address    TEXT    NOT NULL DEFAULT '',
+      email      TEXT    NOT NULL DEFAULT '',
+      notes      TEXT    NOT NULL DEFAULT '',
+      status     TEXT    NOT NULL DEFAULT 'active' CHECK(status IN ('active', 'inactive')),
+      created_at TEXT    NOT NULL DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT    NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    -- Mobile is the de-duplication key. Allow many blank mobiles but keep
+    -- real numbers unique so the system can resolve existing vs new buyers.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_customers_mobile
+      ON customers(mobile) WHERE mobile != '';
+
+    CREATE INDEX IF NOT EXISTS idx_customers_name ON customers(name);
+  `);
+      const cols = db.prepare(`PRAGMA table_info(sales)`).all();
+      if (!cols.some((c) => c.name === "customer_id")) {
+        db.exec(`ALTER TABLE sales ADD COLUMN customer_id INTEGER REFERENCES customers(id);`);
+      }
+    }
+    module2.exports = { VERSION: VERSION2, up };
   }
 });
 
@@ -23641,6 +24229,24 @@ var require_migrations = __commonJS({
     var v7 = require_v7();
     var v8 = require_v8();
     var v9 = require_v9();
+    var v10 = require_v10();
+    var v11 = require_v11();
+    var v12 = require_v12();
+    var v13 = require_v13();
+    var v14 = require_v14();
+    var v15 = require_v15();
+    var v16 = require_v16();
+    var v17 = require_v17();
+    var v18 = require_v18();
+    var v19 = require_v19();
+    var v20 = require_v20();
+    var v21 = require_v21();
+    var v22 = require_v22();
+    var v23 = require_v23();
+    var v24 = require_v24();
+    var v25 = require_v25();
+    var v26 = require_v26();
+    var v27 = require_v27();
     var MIGRATIONS = [
       v1,
       v2,
@@ -23650,8 +24256,25 @@ var require_migrations = __commonJS({
       v6,
       v7,
       v8,
-      v9
-      // v10, … add future migrations here
+      v9,
+      v10,
+      v11,
+      v12,
+      v13,
+      v14,
+      v15,
+      v16,
+      v17,
+      v18,
+      v19,
+      v20,
+      v21,
+      v22,
+      v23,
+      v24,
+      v25,
+      v26,
+      v27
     ];
     function bootstrapVersionTable(db) {
       db.exec(`
@@ -23667,16 +24290,20 @@ var require_migrations = __commonJS({
       return db.prepare("SELECT version FROM schema_version WHERE id = 1").get().version;
     }
     function setVersion(db, version) {
-      db.prepare(`
+      db.prepare(
+        `
     UPDATE schema_version
     SET version = ?, updated_at = datetime('now', 'localtime')
     WHERE id = 1
-  `).run(version);
+  `
+      ).run(version);
     }
     function runMigrations(db) {
       bootstrapVersionTable(db);
       const currentVersion = getCurrentVersion(db);
-      const pending = MIGRATIONS.filter((m) => m.VERSION > currentVersion).sort((a, b) => a.VERSION - b.VERSION);
+      const pending = MIGRATIONS.filter((m) => m.VERSION > currentVersion).sort(
+        (a, b) => a.VERSION - b.VERSION
+      );
       if (pending.length === 0) {
         console.log(`[DB] Schema is up to date (version ${currentVersion}).`);
         return;
@@ -23709,9 +24336,11 @@ var require_settings = __commonJS({
       ["email", ""],
       ["interest_module_enabled", "false"],
       ["expense_module_enabled", "false"],
+      ["service_module_enabled", "false"],
       ["gst_fields_enabled", "false"],
       ["print_receipts_payment_enabled", "false"],
       ["print_receipts_interest_enabled", "false"],
+      ["print_receipts_sale_enabled", "false"],
       [
         "receipt_config",
         JSON.stringify({
@@ -23741,19 +24370,73 @@ var require_settings = __commonJS({
   }
 });
 
+// src/db/connection.js
+var require_connection = __commonJS({
+  "src/db/connection.js"(exports2, module2) {
+    var Database = require("better-sqlite3");
+    var path2 = require("path");
+    var fs = require("fs");
+    var { AsyncLocalStorage } = require("async_hooks");
+    var DB_DIR = process.env.DATA_DIR || path2.join(__dirname, "..", "..", "data");
+    var connections = /* @__PURE__ */ new Map();
+    var tenantStorage = new AsyncLocalStorage();
+    function extractTenant2(hostname) {
+      if (!hostname) return "trial";
+      const match = hostname.match(/^accounts-([a-z0-9_-]+)\./i);
+      if (match) return match[1].toLowerCase();
+      return "trial";
+    }
+    function isValidTenant(name) {
+      return /^[a-z0-9_-]{1,64}$/.test(name);
+    }
+    function getDbPath(tenant) {
+      const resolved = tenant || tenantStorage.getStore() || "trial";
+      const safe = isValidTenant(resolved) ? resolved : "trial";
+      return path2.join(DB_DIR, `${safe}.db`);
+    }
+    function getDb() {
+      const tenant = tenantStorage.getStore() || "trial";
+      if (!connections.has(tenant)) {
+        if (!isValidTenant(tenant)) {
+          throw new Error(`Invalid tenant name: "${tenant}"`);
+        }
+        if (!fs.existsSync(DB_DIR)) {
+          fs.mkdirSync(DB_DIR, { recursive: true });
+        }
+        const dbPath = getDbPath(tenant);
+        const db = new Database(dbPath);
+        db.pragma("foreign_keys = ON");
+        connections.set(tenant, db);
+        const { runMigrations } = require_migrations();
+        const { seedSettings } = require_settings();
+        runMigrations(db);
+        seedSettings(db);
+        console.log(`[DB] Tenant "${tenant}" ready \u2192 ${dbPath}`);
+      }
+      return connections.get(tenant);
+    }
+    function runWithTenant2(tenant, callback) {
+      const safe = isValidTenant(tenant) ? tenant : "trial";
+      return tenantStorage.run(safe, callback);
+    }
+    function closeDb() {
+      for (const db of connections.values()) {
+        db.close();
+      }
+      connections.clear();
+    }
+    module2.exports = { getDb, closeDb, getDbPath, extractTenant: extractTenant2, runWithTenant: runWithTenant2 };
+  }
+});
+
 // src/db/database.js
 var require_database = __commonJS({
   "src/db/database.js"(exports2, module2) {
-    var { getDb, closeDb } = require_connection();
-    var { runMigrations } = require_migrations();
-    var { seedSettings } = require_settings();
+    var { getDb, closeDb, getDbPath, extractTenant: extractTenant2, runWithTenant: runWithTenant2 } = require_connection();
     function initializeDatabase2() {
-      const db = getDb();
-      runMigrations(db);
-      seedSettings(db);
-      console.log("[DB] Database ready.");
+      console.log("[DB] Multi-tenant mode: databases initialised lazily per tenant.");
     }
-    module2.exports = { getDb, closeDb, initializeDatabase: initializeDatabase2 };
+    module2.exports = { getDb, closeDb, getDbPath, extractTenant: extractTenant2, runWithTenant: runWithTenant2, initializeDatabase: initializeDatabase2 };
   }
 });
 
@@ -23850,7 +24533,7 @@ var require_backupService = __commonJS({
   "src/utils/backupService.js"(exports2, module2) {
     var fs = require("fs");
     var path2 = require("path");
-    var { DB_PATH } = require_connection();
+    var { getDbPath } = require_connection();
     function getTodayDateString() {
       const now = /* @__PURE__ */ new Date();
       const dd = String(now.getDate()).padStart(2, "0");
@@ -23877,7 +24560,7 @@ var require_backupService = __commonJS({
       const dateStr = getTodayDateString();
       const destPath = path2.join(backupDir, `inventory_${dateStr}.db`);
       try {
-        fs.copyFileSync(DB_PATH, destPath);
+        fs.copyFileSync(getDbPath(), destPath);
         return { success: true, path: destPath, date: dateStr };
       } catch (err) {
         return { success: false, error: err.message };
@@ -23899,6 +24582,4762 @@ var require_backupService = __commonJS({
       return performBackup(dir);
     }
     module2.exports = { triggerDailyBackup: triggerDailyBackup2, triggerBackupNow };
+  }
+});
+
+// node_modules/prom-client/lib/util.js
+var require_util = __commonJS({
+  "node_modules/prom-client/lib/util.js"(exports2) {
+    "use strict";
+    exports2.getValueAsString = function getValueString(value) {
+      if (Number.isNaN(value)) {
+        return "Nan";
+      } else if (!Number.isFinite(value)) {
+        if (value < 0) {
+          return "-Inf";
+        } else {
+          return "+Inf";
+        }
+      } else {
+        return `${value}`;
+      }
+    };
+    exports2.removeLabels = function removeLabels(hashMap, labels, sortedLabelNames) {
+      const hash = hashObject(labels, sortedLabelNames);
+      delete hashMap[hash];
+    };
+    exports2.setValue = function setValue(hashMap, value, labels) {
+      const hash = hashObject(labels);
+      hashMap[hash] = {
+        value: typeof value === "number" ? value : 0,
+        labels: labels || {}
+      };
+      return hashMap;
+    };
+    exports2.setValueDelta = function setValueDelta(hashMap, deltaValue, labels, hash = "") {
+      const value = typeof deltaValue === "number" ? deltaValue : 0;
+      if (hashMap[hash]) {
+        hashMap[hash].value += value;
+      } else {
+        hashMap[hash] = { value, labels };
+      }
+      return hashMap;
+    };
+    exports2.getLabels = function(labelNames, args) {
+      if (typeof args[0] === "object") {
+        return args[0];
+      }
+      if (labelNames.length !== args.length) {
+        throw new Error(
+          `Invalid number of arguments (${args.length}): "${args.join(
+            ", "
+          )}" for label names (${labelNames.length}): "${labelNames.join(", ")}".`
+        );
+      }
+      const acc = {};
+      for (let i = 0; i < labelNames.length; i++) {
+        acc[labelNames[i]] = args[i];
+      }
+      return acc;
+    };
+    function fastHashObject(keys, labels) {
+      if (keys.length === 0) {
+        return "";
+      }
+      let hash = "";
+      for (let i = 0; i < keys.length; i++) {
+        const key = keys[i];
+        const value = labels[key];
+        if (value === void 0) continue;
+        hash += `${key}:${value},`;
+      }
+      return hash;
+    }
+    function hashObject(labels, labelNames) {
+      if (labelNames) {
+        return fastHashObject(labelNames, labels);
+      }
+      const keys = Object.keys(labels);
+      if (keys.length > 1) {
+        keys.sort();
+      }
+      return fastHashObject(keys, labels);
+    }
+    exports2.hashObject = hashObject;
+    exports2.isObject = function isObject(obj) {
+      return obj !== null && typeof obj === "object";
+    };
+    exports2.nowTimestamp = function nowTimestamp() {
+      return Date.now() / 1e3;
+    };
+    var Grouper = class extends Map {
+      /**
+       * Adds the `value` to the `key`'s array of values.
+       * @param {*} key Key to set.
+       * @param {*} value Value to add to `key`'s array.
+       * @returns {undefined} undefined.
+       */
+      add(key, value) {
+        if (this.has(key)) {
+          this.get(key).push(value);
+        } else {
+          this.set(key, [value]);
+        }
+      }
+    };
+    exports2.Grouper = Grouper;
+  }
+});
+
+// node_modules/prom-client/lib/registry.js
+var require_registry = __commonJS({
+  "node_modules/prom-client/lib/registry.js"(exports2, module2) {
+    "use strict";
+    var { getValueAsString } = require_util();
+    var Registry = class _Registry {
+      static get PROMETHEUS_CONTENT_TYPE() {
+        return "text/plain; version=0.0.4; charset=utf-8";
+      }
+      static get OPENMETRICS_CONTENT_TYPE() {
+        return "application/openmetrics-text; version=1.0.0; charset=utf-8";
+      }
+      constructor(regContentType = _Registry.PROMETHEUS_CONTENT_TYPE) {
+        this._metrics = {};
+        this._collectors = [];
+        this._defaultLabels = {};
+        if (regContentType !== _Registry.PROMETHEUS_CONTENT_TYPE && regContentType !== _Registry.OPENMETRICS_CONTENT_TYPE) {
+          throw new TypeError(`Content type ${regContentType} is unsupported`);
+        }
+        this._contentType = regContentType;
+      }
+      getMetricsAsArray() {
+        return Object.values(this._metrics);
+      }
+      async getMetricsAsString(metrics2) {
+        const metric = typeof metrics2.getForPromString === "function" ? await metrics2.getForPromString() : await metrics2.get();
+        const name = escapeString(metric.name);
+        const help = `# HELP ${name} ${escapeString(metric.help)}`;
+        const type = `# TYPE ${name} ${metric.type}`;
+        const values = [help, type];
+        const defaultLabels = Object.keys(this._defaultLabels).length > 0 ? this._defaultLabels : null;
+        const isOpenMetrics = this.contentType === _Registry.OPENMETRICS_CONTENT_TYPE;
+        for (const val of metric.values || []) {
+          let { metricName = name, labels = {} } = val;
+          const { sharedLabels = {} } = val;
+          if (isOpenMetrics && metric.type === "counter") {
+            metricName = `${metricName}_total`;
+          }
+          if (defaultLabels) {
+            labels = { ...labels, ...defaultLabels, ...labels };
+          }
+          const formattedLabels = formatLabels(labels, sharedLabels);
+          const flattenedShared = flattenSharedLabels(sharedLabels);
+          const labelParts = [...formattedLabels, flattenedShared].filter(Boolean);
+          const labelsString = labelParts.length ? `{${labelParts.join(",")}}` : "";
+          let fullMetricLine = `${metricName}${labelsString} ${getValueAsString(
+            val.value
+          )}`;
+          const { exemplar } = val;
+          if (exemplar && isOpenMetrics) {
+            const formattedExemplars = formatLabels(exemplar.labelSet);
+            fullMetricLine += ` # {${formattedExemplars.join(
+              ","
+            )}} ${getValueAsString(exemplar.value)} ${exemplar.timestamp}`;
+          }
+          values.push(fullMetricLine);
+        }
+        return values.join("\n");
+      }
+      async metrics() {
+        const isOpenMetrics = this.contentType === _Registry.OPENMETRICS_CONTENT_TYPE;
+        const promises = this.getMetricsAsArray().map((metric) => {
+          if (isOpenMetrics && metric.type === "counter") {
+            metric.name = standardizeCounterName(metric.name);
+          }
+          return this.getMetricsAsString(metric);
+        });
+        const resolves = await Promise.all(promises);
+        return isOpenMetrics ? `${resolves.join("\n")}
+# EOF
+` : `${resolves.join("\n\n")}
+`;
+      }
+      registerMetric(metric) {
+        if (this._metrics[metric.name] && this._metrics[metric.name] !== metric) {
+          throw new Error(
+            `A metric with the name ${metric.name} has already been registered.`
+          );
+        }
+        this._metrics[metric.name] = metric;
+      }
+      clear() {
+        this._metrics = {};
+        this._defaultLabels = {};
+      }
+      async getMetricsAsJSON() {
+        const metrics2 = [];
+        const defaultLabelNames = Object.keys(this._defaultLabels);
+        const promises = [];
+        for (const metric of this.getMetricsAsArray()) {
+          promises.push(metric.get());
+        }
+        const resolves = await Promise.all(promises);
+        for (const item of resolves) {
+          if (item.values && defaultLabelNames.length > 0) {
+            for (const val of item.values) {
+              val.labels = Object.assign({}, val.labels);
+              for (const labelName of defaultLabelNames) {
+                val.labels[labelName] = val.labels[labelName] || this._defaultLabels[labelName];
+              }
+            }
+          }
+          metrics2.push(item);
+        }
+        return metrics2;
+      }
+      removeSingleMetric(name) {
+        delete this._metrics[name];
+      }
+      getSingleMetricAsString(name) {
+        return this.getMetricsAsString(this._metrics[name]);
+      }
+      getSingleMetric(name) {
+        return this._metrics[name];
+      }
+      setDefaultLabels(labels) {
+        this._defaultLabels = labels;
+      }
+      resetMetrics() {
+        for (const metric in this._metrics) {
+          this._metrics[metric].reset();
+        }
+      }
+      get contentType() {
+        return this._contentType;
+      }
+      setContentType(metricsContentType) {
+        if (metricsContentType === _Registry.OPENMETRICS_CONTENT_TYPE || metricsContentType === _Registry.PROMETHEUS_CONTENT_TYPE) {
+          this._contentType = metricsContentType;
+        } else {
+          throw new Error(`Content type ${metricsContentType} is unsupported`);
+        }
+      }
+      static merge(registers) {
+        const regType = registers[0].contentType;
+        for (const reg of registers) {
+          if (reg.contentType !== regType) {
+            throw new Error(
+              "Registers can only be merged if they have the same content type"
+            );
+          }
+        }
+        const mergedRegistry = new _Registry(regType);
+        const metricsToMerge = registers.reduce(
+          (acc, reg) => acc.concat(reg.getMetricsAsArray()),
+          []
+        );
+        metricsToMerge.forEach(mergedRegistry.registerMetric, mergedRegistry);
+        return mergedRegistry;
+      }
+    };
+    function formatLabels(labels, exclude) {
+      const { hasOwnProperty } = Object.prototype;
+      const formatted = [];
+      for (const [name, value] of Object.entries(labels)) {
+        if (!exclude || !hasOwnProperty.call(exclude, name)) {
+          formatted.push(`${name}="${escapeLabelValue(value)}"`);
+        }
+      }
+      return formatted;
+    }
+    var sharedLabelCache = /* @__PURE__ */ new WeakMap();
+    function flattenSharedLabels(labels) {
+      const cached = sharedLabelCache.get(labels);
+      if (cached) {
+        return cached;
+      }
+      const formattedLabels = formatLabels(labels);
+      const flattened = formattedLabels.join(",");
+      sharedLabelCache.set(labels, flattened);
+      return flattened;
+    }
+    function escapeLabelValue(str) {
+      if (typeof str !== "string") {
+        return str;
+      }
+      return escapeString(str).replace(/"/g, '\\"');
+    }
+    function escapeString(str) {
+      return str.replace(/\\/g, "\\\\").replace(/\n/g, "\\n");
+    }
+    function standardizeCounterName(name) {
+      return name.replace(/_total$/, "");
+    }
+    module2.exports = Registry;
+    module2.exports.globalRegistry = new Registry();
+  }
+});
+
+// node_modules/prom-client/lib/validation.js
+var require_validation = __commonJS({
+  "node_modules/prom-client/lib/validation.js"(exports2) {
+    "use strict";
+    var util = require("util");
+    var metricRegexp = /^[a-zA-Z_:][a-zA-Z0-9_:]*$/;
+    var labelRegexp = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
+    exports2.validateMetricName = function(name) {
+      return metricRegexp.test(name);
+    };
+    exports2.validateLabelName = function(names = []) {
+      return names.every((name) => labelRegexp.test(name));
+    };
+    exports2.validateLabel = function validateLabel(savedLabels, labels) {
+      for (const label in labels) {
+        if (!savedLabels.includes(label)) {
+          throw new Error(
+            `Added label "${label}" is not included in initial labelset: ${util.inspect(
+              savedLabels
+            )}`
+          );
+        }
+      }
+    };
+  }
+});
+
+// node_modules/prom-client/lib/metric.js
+var require_metric = __commonJS({
+  "node_modules/prom-client/lib/metric.js"(exports2, module2) {
+    "use strict";
+    var Registry = require_registry();
+    var { isObject } = require_util();
+    var { validateMetricName, validateLabelName } = require_validation();
+    var Metric = class {
+      constructor(config, defaults = {}) {
+        if (!isObject(config)) {
+          throw new TypeError("constructor expected a config object");
+        }
+        Object.assign(
+          this,
+          {
+            labelNames: [],
+            registers: [Registry.globalRegistry],
+            aggregator: "sum",
+            enableExemplars: false
+          },
+          defaults,
+          config
+        );
+        if (!this.registers) {
+          this.registers = [Registry.globalRegistry];
+        }
+        if (!this.help) {
+          throw new Error("Missing mandatory help parameter");
+        }
+        if (!this.name) {
+          throw new Error("Missing mandatory name parameter");
+        }
+        if (!validateMetricName(this.name)) {
+          throw new Error("Invalid metric name");
+        }
+        if (!validateLabelName(this.labelNames)) {
+          throw new Error("Invalid label name");
+        }
+        if (this.collect && typeof this.collect !== "function") {
+          throw new Error('Optional "collect" parameter must be a function');
+        }
+        if (this.labelNames) {
+          this.sortedLabelNames = [...this.labelNames].sort();
+        } else {
+          this.sortedLabelNames = [];
+        }
+        this.reset();
+        for (const register2 of this.registers) {
+          if (this.enableExemplars && register2.contentType === Registry.PROMETHEUS_CONTENT_TYPE) {
+            throw new TypeError(
+              "Exemplars are supported only on OpenMetrics registries"
+            );
+          }
+          register2.registerMetric(this);
+        }
+      }
+      reset() {
+      }
+    };
+    module2.exports = { Metric };
+  }
+});
+
+// node_modules/prom-client/lib/exemplar.js
+var require_exemplar = __commonJS({
+  "node_modules/prom-client/lib/exemplar.js"(exports2, module2) {
+    "use strict";
+    var Exemplar = class {
+      constructor(labelSet = {}, value = null) {
+        this.labelSet = labelSet;
+        this.value = value;
+      }
+      /**
+       * Validation for the label set format.
+       * https://github.com/OpenObservability/OpenMetrics/blob/d99b705f611b75fec8f450b05e344e02eea6921d/specification/OpenMetrics.md#exemplars
+       *
+       * @param {object} labelSet - Exemplar labels.
+       * @throws {RangeError}
+       * @return {void}
+       */
+      validateExemplarLabelSet(labelSet) {
+        let res = "";
+        for (const [labelName, labelValue] of Object.entries(labelSet)) {
+          res += `${labelName}${labelValue}`;
+        }
+        if (res.length > 128) {
+          throw new RangeError(
+            "Label set size must be smaller than 128 UTF-8 chars"
+          );
+        }
+      }
+    };
+    module2.exports = Exemplar;
+  }
+});
+
+// node_modules/prom-client/lib/counter.js
+var require_counter = __commonJS({
+  "node_modules/prom-client/lib/counter.js"(exports2, module2) {
+    "use strict";
+    var util = require("util");
+    var {
+      hashObject,
+      isObject,
+      getLabels,
+      removeLabels,
+      nowTimestamp
+    } = require_util();
+    var { validateLabel } = require_validation();
+    var { Metric } = require_metric();
+    var Exemplar = require_exemplar();
+    var Counter = class extends Metric {
+      constructor(config) {
+        super(config);
+        this.type = "counter";
+        this.defaultLabels = {};
+        this.defaultValue = 1;
+        this.defaultExemplarLabelSet = {};
+        if (config.enableExemplars) {
+          this.enableExemplars = true;
+          this.inc = this.incWithExemplar;
+        } else {
+          this.inc = this.incWithoutExemplar;
+        }
+      }
+      /**
+       * Increment counter
+       * @param {object} labels - What label you want to be incremented
+       * @param {Number} value - Value to increment, if omitted increment with 1
+       * @returns {object} results - object with information about the inc operation
+       * @returns {string} results.labelHash - hash representation of the labels
+       */
+      incWithoutExemplar(labels, value) {
+        let hash = "";
+        if (isObject(labels)) {
+          hash = hashObject(labels, this.sortedLabelNames);
+          validateLabel(this.labelNames, labels);
+        } else {
+          value = labels;
+          labels = {};
+        }
+        if (value && !Number.isFinite(value)) {
+          throw new TypeError(`Value is not a valid number: ${util.format(value)}`);
+        }
+        if (value < 0) {
+          throw new Error("It is not possible to decrease a counter");
+        }
+        if (value === null || value === void 0) value = 1;
+        setValue(this.hashMap, value, labels, hash);
+        return { labelHash: hash };
+      }
+      /**
+       * Increment counter with exemplar, same as inc but accepts labels for an
+       * exemplar.
+       * If no label is provided the current exemplar labels are kept unchanged
+       * (defaults to empty set).
+       *
+       * @param {object} incOpts - Object with options about what metric to increase
+       * @param {object} incOpts.labels - What label you want to be incremented,
+       *                                  defaults to null (metric with no labels)
+       * @param {Number} incOpts.value - Value to increment, defaults to 1
+       * @param {object} incOpts.exemplarLabels - Key-value  labels for the
+       *                                          exemplar, defaults to empty set {}
+       * @returns {void}
+       */
+      incWithExemplar({
+        labels = this.defaultLabels,
+        value = this.defaultValue,
+        exemplarLabels = this.defaultExemplarLabelSet
+      } = {}) {
+        const res = this.incWithoutExemplar(labels, value);
+        this.updateExemplar(exemplarLabels, value, res.labelHash);
+      }
+      updateExemplar(exemplarLabels, value, hash) {
+        if (exemplarLabels === this.defaultExemplarLabelSet) return;
+        if (!isObject(this.hashMap[hash].exemplar)) {
+          this.hashMap[hash].exemplar = new Exemplar();
+        }
+        this.hashMap[hash].exemplar.validateExemplarLabelSet(exemplarLabels);
+        this.hashMap[hash].exemplar.labelSet = exemplarLabels;
+        this.hashMap[hash].exemplar.value = value ? value : 1;
+        this.hashMap[hash].exemplar.timestamp = nowTimestamp();
+      }
+      /**
+       * Reset counter
+       * @returns {void}
+       */
+      reset() {
+        this.hashMap = {};
+        if (this.labelNames.length === 0) {
+          setValue(this.hashMap, 0);
+        }
+      }
+      async get() {
+        if (this.collect) {
+          const v = this.collect();
+          if (v instanceof Promise) await v;
+        }
+        return {
+          help: this.help,
+          name: this.name,
+          type: this.type,
+          values: Object.values(this.hashMap),
+          aggregator: this.aggregator
+        };
+      }
+      labels(...args) {
+        const labels = getLabels(this.labelNames, args) || {};
+        return {
+          inc: this.inc.bind(this, labels)
+        };
+      }
+      remove(...args) {
+        const labels = getLabels(this.labelNames, args) || {};
+        validateLabel(this.labelNames, labels);
+        return removeLabels.call(this, this.hashMap, labels, this.sortedLabelNames);
+      }
+    };
+    function setValue(hashMap, value, labels = {}, hash = "") {
+      if (hashMap[hash]) {
+        hashMap[hash].value += value;
+      } else {
+        hashMap[hash] = { value, labels };
+      }
+      return hashMap;
+    }
+    module2.exports = Counter;
+  }
+});
+
+// node_modules/prom-client/lib/gauge.js
+var require_gauge = __commonJS({
+  "node_modules/prom-client/lib/gauge.js"(exports2, module2) {
+    "use strict";
+    var util = require("util");
+    var {
+      setValue,
+      setValueDelta,
+      getLabels,
+      hashObject,
+      isObject,
+      removeLabels
+    } = require_util();
+    var { validateLabel } = require_validation();
+    var { Metric } = require_metric();
+    var Gauge = class extends Metric {
+      constructor(config) {
+        super(config);
+        this.type = "gauge";
+      }
+      /**
+       * Set a gauge to a value
+       * @param {object} labels - Object with labels and their values
+       * @param {Number} value - Value to set the gauge to, must be positive
+       * @returns {void}
+       */
+      set(labels, value) {
+        value = getValueArg(labels, value);
+        labels = getLabelArg(labels);
+        set(this, labels, value);
+      }
+      /**
+       * Reset gauge
+       * @returns {void}
+       */
+      reset() {
+        this.hashMap = {};
+        if (this.labelNames.length === 0) {
+          setValue(this.hashMap, 0, {});
+        }
+      }
+      /**
+       * Increment a gauge value
+       * @param {object} labels - Object with labels where key is the label key and value is label value. Can only be one level deep
+       * @param {Number} value - Value to increment - if omitted, increment with 1
+       * @returns {void}
+       */
+      inc(labels, value) {
+        value = getValueArg(labels, value);
+        labels = getLabelArg(labels);
+        if (value === void 0) value = 1;
+        setDelta(this, labels, value);
+      }
+      /**
+       * Decrement a gauge value
+       * @param {object} labels - Object with labels where key is the label key and value is label value. Can only be one level deep
+       * @param {Number} value - Value to decrement - if omitted, decrement with 1
+       * @returns {void}
+       */
+      dec(labels, value) {
+        value = getValueArg(labels, value);
+        labels = getLabelArg(labels);
+        if (value === void 0) value = 1;
+        setDelta(this, labels, -value);
+      }
+      /**
+       * Set the gauge to current unix epoch
+       * @param {object} labels - Object with labels where key is the label key and value is label value. Can only be one level deep
+       * @returns {void}
+       */
+      setToCurrentTime(labels) {
+        const now = Date.now() / 1e3;
+        if (labels === void 0) {
+          this.set(now);
+        } else {
+          this.set(labels, now);
+        }
+      }
+      /**
+       * Start a timer
+       * @param {object} labels - Object with labels where key is the label key and value is label value. Can only be one level deep
+       * @returns {function} - Invoke this function to set the duration in seconds since you started the timer.
+       * @example
+       * var done = gauge.startTimer();
+       * makeXHRRequest(function(err, response) {
+       *	done(); //Duration of the request will be saved
+       * });
+       */
+      startTimer(labels) {
+        const start = process.hrtime();
+        return (endLabels) => {
+          const delta = process.hrtime(start);
+          const value = delta[0] + delta[1] / 1e9;
+          this.set(Object.assign({}, labels, endLabels), value);
+          return value;
+        };
+      }
+      async get() {
+        if (this.collect) {
+          const v = this.collect();
+          if (v instanceof Promise) await v;
+        }
+        return {
+          help: this.help,
+          name: this.name,
+          type: this.type,
+          values: Object.values(this.hashMap),
+          aggregator: this.aggregator
+        };
+      }
+      _getValue(labels) {
+        const hash = hashObject(labels || {}, this.sortedLabelNames);
+        return this.hashMap[hash] ? this.hashMap[hash].value : 0;
+      }
+      labels(...args) {
+        const labels = getLabels(this.labelNames, args);
+        validateLabel(this.labelNames, labels);
+        return {
+          inc: this.inc.bind(this, labels),
+          dec: this.dec.bind(this, labels),
+          set: this.set.bind(this, labels),
+          setToCurrentTime: this.setToCurrentTime.bind(this, labels),
+          startTimer: this.startTimer.bind(this, labels)
+        };
+      }
+      remove(...args) {
+        const labels = getLabels(this.labelNames, args);
+        validateLabel(this.labelNames, labels);
+        removeLabels.call(this, this.hashMap, labels, this.sortedLabelNames);
+      }
+    };
+    function set(gauge, labels, value) {
+      if (typeof value !== "number") {
+        throw new TypeError(`Value is not a valid number: ${util.format(value)}`);
+      }
+      validateLabel(gauge.labelNames, labels);
+      setValue(gauge.hashMap, value, labels);
+    }
+    function setDelta(gauge, labels, delta) {
+      if (typeof delta !== "number") {
+        throw new TypeError(`Delta is not a valid number: ${util.format(delta)}`);
+      }
+      validateLabel(gauge.labelNames, labels);
+      const hash = hashObject(labels, gauge.sortedLabelNames);
+      setValueDelta(gauge.hashMap, delta, labels, hash);
+    }
+    function getLabelArg(labels) {
+      return isObject(labels) ? labels : {};
+    }
+    function getValueArg(labels, value) {
+      return isObject(labels) ? value : labels;
+    }
+    module2.exports = Gauge;
+  }
+});
+
+// node_modules/prom-client/lib/histogram.js
+var require_histogram = __commonJS({
+  "node_modules/prom-client/lib/histogram.js"(exports2, module2) {
+    "use strict";
+    var util = require("util");
+    var {
+      getLabels,
+      hashObject,
+      isObject,
+      removeLabels,
+      nowTimestamp
+    } = require_util();
+    var { validateLabel } = require_validation();
+    var { Metric } = require_metric();
+    var Exemplar = require_exemplar();
+    var Histogram = class extends Metric {
+      constructor(config) {
+        super(config, {
+          buckets: [5e-3, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+        });
+        this.type = "histogram";
+        this.defaultLabels = {};
+        this.defaultExemplarLabelSet = {};
+        this.enableExemplars = false;
+        for (const label of this.labelNames) {
+          if (label === "le") {
+            throw new Error("le is a reserved label keyword");
+          }
+        }
+        this.upperBounds = this.buckets;
+        this.bucketValues = this.upperBounds.reduce((acc, upperBound) => {
+          acc[upperBound] = 0;
+          return acc;
+        }, {});
+        if (config.enableExemplars) {
+          this.enableExemplars = true;
+          this.bucketExemplars = this.upperBounds.reduce((acc, upperBound) => {
+            acc[upperBound] = null;
+            return acc;
+          }, {});
+          Object.freeze(this.bucketExemplars);
+          this.observe = this.observeWithExemplar;
+        } else {
+          this.observe = this.observeWithoutExemplar;
+        }
+        Object.freeze(this.bucketValues);
+        Object.freeze(this.upperBounds);
+        if (this.labelNames.length === 0) {
+          this.hashMap = {
+            [hashObject({})]: createBaseValues(
+              {},
+              this.bucketValues,
+              this.bucketExemplars
+            )
+          };
+        }
+      }
+      /**
+       * Observe a value in histogram
+       * @param {object} labels - Object with labels where key is the label key and value is label value. Can only be one level deep
+       * @param {Number} value - Value to observe in the histogram
+       * @returns {void}
+       */
+      observeWithoutExemplar(labels, value) {
+        observe.call(this, labels === 0 ? 0 : labels || {})(value);
+      }
+      observeWithExemplar({
+        labels = this.defaultLabels,
+        value,
+        exemplarLabels = this.defaultExemplarLabelSet
+      } = {}) {
+        observe.call(this, labels === 0 ? 0 : labels || {})(value);
+        this.updateExemplar(labels, value, exemplarLabels);
+      }
+      updateExemplar(labels, value, exemplarLabels) {
+        if (Object.keys(exemplarLabels).length === 0) return;
+        const hash = hashObject(labels, this.sortedLabelNames);
+        const bound = findBound(this.upperBounds, value);
+        const { bucketExemplars } = this.hashMap[hash];
+        let exemplar = bucketExemplars[bound];
+        if (!isObject(exemplar)) {
+          exemplar = new Exemplar();
+          bucketExemplars[bound] = exemplar;
+        }
+        exemplar.validateExemplarLabelSet(exemplarLabels);
+        exemplar.labelSet = exemplarLabels;
+        exemplar.value = value;
+        exemplar.timestamp = nowTimestamp();
+      }
+      async get() {
+        const data = await this.getForPromString();
+        data.values = data.values.map(splayLabels);
+        return data;
+      }
+      async getForPromString() {
+        if (this.collect) {
+          const v = this.collect();
+          if (v instanceof Promise) await v;
+        }
+        const data = Object.values(this.hashMap);
+        const values = data.map(extractBucketValuesForExport(this)).reduce(addSumAndCountForExport(this), []);
+        return {
+          name: this.name,
+          help: this.help,
+          type: this.type,
+          values,
+          aggregator: this.aggregator
+        };
+      }
+      reset() {
+        this.hashMap = {};
+      }
+      /**
+       * Initialize the metrics for the given combination of labels to zero
+       * @param {object} labels - Object with labels where key is the label key and value is label value. Can only be one level deep
+       * @returns {void}
+       */
+      zero(labels) {
+        const hash = hashObject(labels, this.sortedLabelNames);
+        this.hashMap[hash] = createBaseValues(
+          labels,
+          this.bucketValues,
+          this.bucketExemplars
+        );
+      }
+      /**
+       * Start a timer that could be used to logging durations
+       * @param {object} labels - Object with labels where key is the label key and value is label value. Can only be one level deep
+       * @param {object} exemplarLabels - Object with labels for exemplar where key is the label key and value is label value. Can only be one level deep
+       * @returns {function} - Function to invoke when you want to stop the timer and observe the duration in seconds
+       * @example
+       * var end = histogram.startTimer();
+       * makeExpensiveXHRRequest(function(err, res) {
+       * 	const duration = end(); //Observe the duration of expensiveXHRRequest and returns duration in seconds
+       * 	console.log('Duration', duration);
+       * });
+       */
+      startTimer(labels, exemplarLabels) {
+        return this.enableExemplars ? startTimerWithExemplar.call(this, labels, exemplarLabels)() : startTimer.call(this, labels)();
+      }
+      labels(...args) {
+        const labels = getLabels(this.labelNames, args);
+        validateLabel(this.labelNames, labels);
+        return {
+          observe: observe.call(this, labels),
+          startTimer: startTimer.call(this, labels)
+        };
+      }
+      remove(...args) {
+        const labels = getLabels(this.labelNames, args);
+        validateLabel(this.labelNames, labels);
+        removeLabels.call(this, this.hashMap, labels, this.sortedLabelNames);
+      }
+    };
+    function startTimer(startLabels) {
+      return () => {
+        const start = process.hrtime();
+        return (endLabels) => {
+          const delta = process.hrtime(start);
+          const value = delta[0] + delta[1] / 1e9;
+          this.observe(Object.assign({}, startLabels, endLabels), value);
+          return value;
+        };
+      };
+    }
+    function startTimerWithExemplar(startLabels, startExemplarLabels) {
+      return () => {
+        const start = process.hrtime();
+        return (endLabels, endExemplarLabels) => {
+          const delta = process.hrtime(start);
+          const value = delta[0] + delta[1] / 1e9;
+          this.observe({
+            labels: Object.assign({}, startLabels, endLabels),
+            value,
+            exemplarLabels: Object.assign(
+              {},
+              startExemplarLabels,
+              endExemplarLabels
+            )
+          });
+          return value;
+        };
+      };
+    }
+    function setValuePair(labels, value, metricName, exemplar, sharedLabels = {}) {
+      return {
+        labels,
+        sharedLabels,
+        value,
+        metricName,
+        exemplar
+      };
+    }
+    function findBound(upperBounds, value) {
+      for (let i = 0; i < upperBounds.length; i++) {
+        const bound = upperBounds[i];
+        if (value <= bound) {
+          return bound;
+        }
+      }
+      return -1;
+    }
+    function observe(labels) {
+      return (value) => {
+        const labelValuePair = convertLabelsAndValues(labels, value);
+        validateLabel(this.labelNames, labelValuePair.labels);
+        if (!Number.isFinite(labelValuePair.value)) {
+          throw new TypeError(
+            `Value is not a valid number: ${util.format(labelValuePair.value)}`
+          );
+        }
+        const hash = hashObject(labelValuePair.labels, this.sortedLabelNames);
+        let valueFromMap = this.hashMap[hash];
+        if (!valueFromMap) {
+          valueFromMap = createBaseValues(
+            labelValuePair.labels,
+            this.bucketValues,
+            this.bucketExemplars
+          );
+        }
+        const b = findBound(this.upperBounds, labelValuePair.value);
+        valueFromMap.sum += labelValuePair.value;
+        valueFromMap.count += 1;
+        if (Object.prototype.hasOwnProperty.call(valueFromMap.bucketValues, b)) {
+          valueFromMap.bucketValues[b] += 1;
+        }
+        this.hashMap[hash] = valueFromMap;
+      };
+    }
+    function createBaseValues(labels, bucketValues, bucketExemplars) {
+      const result = {
+        labels,
+        bucketValues: { ...bucketValues },
+        sum: 0,
+        count: 0
+      };
+      if (bucketExemplars) {
+        result.bucketExemplars = { ...bucketExemplars };
+      }
+      return result;
+    }
+    function convertLabelsAndValues(labels, value) {
+      return isObject(labels) ? {
+        labels,
+        value
+      } : {
+        value: labels,
+        labels: {}
+      };
+    }
+    function extractBucketValuesForExport(histogram) {
+      const name = `${histogram.name}_bucket`;
+      return (bucketData) => {
+        let acc = 0;
+        const buckets = histogram.upperBounds.map((upperBound) => {
+          acc += bucketData.bucketValues[upperBound];
+          return setValuePair(
+            { le: upperBound },
+            acc,
+            name,
+            bucketData.bucketExemplars ? bucketData.bucketExemplars[upperBound] : null,
+            bucketData.labels
+          );
+        });
+        return { buckets, data: bucketData };
+      };
+    }
+    function addSumAndCountForExport(histogram) {
+      return (acc, d) => {
+        acc.push(...d.buckets);
+        const infLabel = { le: "+Inf" };
+        acc.push(
+          setValuePair(
+            infLabel,
+            d.data.count,
+            `${histogram.name}_bucket`,
+            d.data.bucketExemplars ? d.data.bucketExemplars["-1"] : null,
+            d.data.labels
+          ),
+          setValuePair(
+            {},
+            d.data.sum,
+            `${histogram.name}_sum`,
+            void 0,
+            d.data.labels
+          ),
+          setValuePair(
+            {},
+            d.data.count,
+            `${histogram.name}_count`,
+            void 0,
+            d.data.labels
+          )
+        );
+        return acc;
+      };
+    }
+    function splayLabels(bucket) {
+      const { sharedLabels, labels, ...newBucket } = bucket;
+      for (const label of Object.keys(sharedLabels)) {
+        labels[label] = sharedLabels[label];
+      }
+      newBucket.labels = labels;
+      return newBucket;
+    }
+    module2.exports = Histogram;
+  }
+});
+
+// node_modules/bintrees/lib/treebase.js
+var require_treebase = __commonJS({
+  "node_modules/bintrees/lib/treebase.js"(exports2, module2) {
+    function TreeBase() {
+    }
+    TreeBase.prototype.clear = function() {
+      this._root = null;
+      this.size = 0;
+    };
+    TreeBase.prototype.find = function(data) {
+      var res = this._root;
+      while (res !== null) {
+        var c = this._comparator(data, res.data);
+        if (c === 0) {
+          return res.data;
+        } else {
+          res = res.get_child(c > 0);
+        }
+      }
+      return null;
+    };
+    TreeBase.prototype.findIter = function(data) {
+      var res = this._root;
+      var iter = this.iterator();
+      while (res !== null) {
+        var c = this._comparator(data, res.data);
+        if (c === 0) {
+          iter._cursor = res;
+          return iter;
+        } else {
+          iter._ancestors.push(res);
+          res = res.get_child(c > 0);
+        }
+      }
+      return null;
+    };
+    TreeBase.prototype.lowerBound = function(item) {
+      var cur = this._root;
+      var iter = this.iterator();
+      var cmp = this._comparator;
+      while (cur !== null) {
+        var c = cmp(item, cur.data);
+        if (c === 0) {
+          iter._cursor = cur;
+          return iter;
+        }
+        iter._ancestors.push(cur);
+        cur = cur.get_child(c > 0);
+      }
+      for (var i = iter._ancestors.length - 1; i >= 0; --i) {
+        cur = iter._ancestors[i];
+        if (cmp(item, cur.data) < 0) {
+          iter._cursor = cur;
+          iter._ancestors.length = i;
+          return iter;
+        }
+      }
+      iter._ancestors.length = 0;
+      return iter;
+    };
+    TreeBase.prototype.upperBound = function(item) {
+      var iter = this.lowerBound(item);
+      var cmp = this._comparator;
+      while (iter.data() !== null && cmp(iter.data(), item) === 0) {
+        iter.next();
+      }
+      return iter;
+    };
+    TreeBase.prototype.min = function() {
+      var res = this._root;
+      if (res === null) {
+        return null;
+      }
+      while (res.left !== null) {
+        res = res.left;
+      }
+      return res.data;
+    };
+    TreeBase.prototype.max = function() {
+      var res = this._root;
+      if (res === null) {
+        return null;
+      }
+      while (res.right !== null) {
+        res = res.right;
+      }
+      return res.data;
+    };
+    TreeBase.prototype.iterator = function() {
+      return new Iterator(this);
+    };
+    TreeBase.prototype.each = function(cb) {
+      var it = this.iterator(), data;
+      while ((data = it.next()) !== null) {
+        if (cb(data) === false) {
+          return;
+        }
+      }
+    };
+    TreeBase.prototype.reach = function(cb) {
+      var it = this.iterator(), data;
+      while ((data = it.prev()) !== null) {
+        if (cb(data) === false) {
+          return;
+        }
+      }
+    };
+    function Iterator(tree) {
+      this._tree = tree;
+      this._ancestors = [];
+      this._cursor = null;
+    }
+    Iterator.prototype.data = function() {
+      return this._cursor !== null ? this._cursor.data : null;
+    };
+    Iterator.prototype.next = function() {
+      if (this._cursor === null) {
+        var root = this._tree._root;
+        if (root !== null) {
+          this._minNode(root);
+        }
+      } else {
+        if (this._cursor.right === null) {
+          var save;
+          do {
+            save = this._cursor;
+            if (this._ancestors.length) {
+              this._cursor = this._ancestors.pop();
+            } else {
+              this._cursor = null;
+              break;
+            }
+          } while (this._cursor.right === save);
+        } else {
+          this._ancestors.push(this._cursor);
+          this._minNode(this._cursor.right);
+        }
+      }
+      return this._cursor !== null ? this._cursor.data : null;
+    };
+    Iterator.prototype.prev = function() {
+      if (this._cursor === null) {
+        var root = this._tree._root;
+        if (root !== null) {
+          this._maxNode(root);
+        }
+      } else {
+        if (this._cursor.left === null) {
+          var save;
+          do {
+            save = this._cursor;
+            if (this._ancestors.length) {
+              this._cursor = this._ancestors.pop();
+            } else {
+              this._cursor = null;
+              break;
+            }
+          } while (this._cursor.left === save);
+        } else {
+          this._ancestors.push(this._cursor);
+          this._maxNode(this._cursor.left);
+        }
+      }
+      return this._cursor !== null ? this._cursor.data : null;
+    };
+    Iterator.prototype._minNode = function(start) {
+      while (start.left !== null) {
+        this._ancestors.push(start);
+        start = start.left;
+      }
+      this._cursor = start;
+    };
+    Iterator.prototype._maxNode = function(start) {
+      while (start.right !== null) {
+        this._ancestors.push(start);
+        start = start.right;
+      }
+      this._cursor = start;
+    };
+    module2.exports = TreeBase;
+  }
+});
+
+// node_modules/bintrees/lib/rbtree.js
+var require_rbtree = __commonJS({
+  "node_modules/bintrees/lib/rbtree.js"(exports2, module2) {
+    var TreeBase = require_treebase();
+    function Node(data) {
+      this.data = data;
+      this.left = null;
+      this.right = null;
+      this.red = true;
+    }
+    Node.prototype.get_child = function(dir) {
+      return dir ? this.right : this.left;
+    };
+    Node.prototype.set_child = function(dir, val) {
+      if (dir) {
+        this.right = val;
+      } else {
+        this.left = val;
+      }
+    };
+    function RBTree(comparator) {
+      this._root = null;
+      this._comparator = comparator;
+      this.size = 0;
+    }
+    RBTree.prototype = new TreeBase();
+    RBTree.prototype.insert = function(data) {
+      var ret2 = false;
+      if (this._root === null) {
+        this._root = new Node(data);
+        ret2 = true;
+        this.size++;
+      } else {
+        var head = new Node(void 0);
+        var dir = 0;
+        var last = 0;
+        var gp = null;
+        var ggp = head;
+        var p = null;
+        var node = this._root;
+        ggp.right = this._root;
+        while (true) {
+          if (node === null) {
+            node = new Node(data);
+            p.set_child(dir, node);
+            ret2 = true;
+            this.size++;
+          } else if (is_red(node.left) && is_red(node.right)) {
+            node.red = true;
+            node.left.red = false;
+            node.right.red = false;
+          }
+          if (is_red(node) && is_red(p)) {
+            var dir2 = ggp.right === gp;
+            if (node === p.get_child(last)) {
+              ggp.set_child(dir2, single_rotate(gp, !last));
+            } else {
+              ggp.set_child(dir2, double_rotate(gp, !last));
+            }
+          }
+          var cmp = this._comparator(node.data, data);
+          if (cmp === 0) {
+            break;
+          }
+          last = dir;
+          dir = cmp < 0;
+          if (gp !== null) {
+            ggp = gp;
+          }
+          gp = p;
+          p = node;
+          node = node.get_child(dir);
+        }
+        this._root = head.right;
+      }
+      this._root.red = false;
+      return ret2;
+    };
+    RBTree.prototype.remove = function(data) {
+      if (this._root === null) {
+        return false;
+      }
+      var head = new Node(void 0);
+      var node = head;
+      node.right = this._root;
+      var p = null;
+      var gp = null;
+      var found = null;
+      var dir = 1;
+      while (node.get_child(dir) !== null) {
+        var last = dir;
+        gp = p;
+        p = node;
+        node = node.get_child(dir);
+        var cmp = this._comparator(data, node.data);
+        dir = cmp > 0;
+        if (cmp === 0) {
+          found = node;
+        }
+        if (!is_red(node) && !is_red(node.get_child(dir))) {
+          if (is_red(node.get_child(!dir))) {
+            var sr = single_rotate(node, dir);
+            p.set_child(last, sr);
+            p = sr;
+          } else if (!is_red(node.get_child(!dir))) {
+            var sibling = p.get_child(!last);
+            if (sibling !== null) {
+              if (!is_red(sibling.get_child(!last)) && !is_red(sibling.get_child(last))) {
+                p.red = false;
+                sibling.red = true;
+                node.red = true;
+              } else {
+                var dir2 = gp.right === p;
+                if (is_red(sibling.get_child(last))) {
+                  gp.set_child(dir2, double_rotate(p, last));
+                } else if (is_red(sibling.get_child(!last))) {
+                  gp.set_child(dir2, single_rotate(p, last));
+                }
+                var gpc = gp.get_child(dir2);
+                gpc.red = true;
+                node.red = true;
+                gpc.left.red = false;
+                gpc.right.red = false;
+              }
+            }
+          }
+        }
+      }
+      if (found !== null) {
+        found.data = node.data;
+        p.set_child(p.right === node, node.get_child(node.left === null));
+        this.size--;
+      }
+      this._root = head.right;
+      if (this._root !== null) {
+        this._root.red = false;
+      }
+      return found !== null;
+    };
+    function is_red(node) {
+      return node !== null && node.red;
+    }
+    function single_rotate(root, dir) {
+      var save = root.get_child(!dir);
+      root.set_child(!dir, save.get_child(dir));
+      save.set_child(dir, root);
+      root.red = true;
+      save.red = false;
+      return save;
+    }
+    function double_rotate(root, dir) {
+      root.set_child(!dir, single_rotate(root.get_child(!dir), !dir));
+      return single_rotate(root, dir);
+    }
+    module2.exports = RBTree;
+  }
+});
+
+// node_modules/bintrees/lib/bintree.js
+var require_bintree = __commonJS({
+  "node_modules/bintrees/lib/bintree.js"(exports2, module2) {
+    var TreeBase = require_treebase();
+    function Node(data) {
+      this.data = data;
+      this.left = null;
+      this.right = null;
+    }
+    Node.prototype.get_child = function(dir) {
+      return dir ? this.right : this.left;
+    };
+    Node.prototype.set_child = function(dir, val) {
+      if (dir) {
+        this.right = val;
+      } else {
+        this.left = val;
+      }
+    };
+    function BinTree(comparator) {
+      this._root = null;
+      this._comparator = comparator;
+      this.size = 0;
+    }
+    BinTree.prototype = new TreeBase();
+    BinTree.prototype.insert = function(data) {
+      if (this._root === null) {
+        this._root = new Node(data);
+        this.size++;
+        return true;
+      }
+      var dir = 0;
+      var p = null;
+      var node = this._root;
+      while (true) {
+        if (node === null) {
+          node = new Node(data);
+          p.set_child(dir, node);
+          ret = true;
+          this.size++;
+          return true;
+        }
+        if (this._comparator(node.data, data) === 0) {
+          return false;
+        }
+        dir = this._comparator(node.data, data) < 0;
+        p = node;
+        node = node.get_child(dir);
+      }
+    };
+    BinTree.prototype.remove = function(data) {
+      if (this._root === null) {
+        return false;
+      }
+      var head = new Node(void 0);
+      var node = head;
+      node.right = this._root;
+      var p = null;
+      var found = null;
+      var dir = 1;
+      while (node.get_child(dir) !== null) {
+        p = node;
+        node = node.get_child(dir);
+        var cmp = this._comparator(data, node.data);
+        dir = cmp > 0;
+        if (cmp === 0) {
+          found = node;
+        }
+      }
+      if (found !== null) {
+        found.data = node.data;
+        p.set_child(p.right === node, node.get_child(node.left === null));
+        this._root = head.right;
+        this.size--;
+        return true;
+      } else {
+        return false;
+      }
+    };
+    module2.exports = BinTree;
+  }
+});
+
+// node_modules/bintrees/index.js
+var require_bintrees = __commonJS({
+  "node_modules/bintrees/index.js"(exports2, module2) {
+    module2.exports = {
+      RBTree: require_rbtree(),
+      BinTree: require_bintree()
+    };
+  }
+});
+
+// node_modules/tdigest/tdigest.js
+var require_tdigest = __commonJS({
+  "node_modules/tdigest/tdigest.js"(exports2, module2) {
+    var RBTree = require_bintrees().RBTree;
+    function TDigest(delta, K, CX) {
+      this.discrete = delta === false;
+      this.delta = delta || 0.01;
+      this.K = K === void 0 ? 25 : K;
+      this.CX = CX === void 0 ? 1.1 : CX;
+      this.centroids = new RBTree(compare_centroid_means);
+      this.nreset = 0;
+      this.reset();
+    }
+    TDigest.prototype.reset = function() {
+      this.centroids.clear();
+      this.n = 0;
+      this.nreset += 1;
+      this.last_cumulate = 0;
+    };
+    TDigest.prototype.size = function() {
+      return this.centroids.size;
+    };
+    TDigest.prototype.toArray = function(everything) {
+      var result = [];
+      if (everything) {
+        this._cumulate(true);
+        this.centroids.each(function(c) {
+          result.push(c);
+        });
+      } else {
+        this.centroids.each(function(c) {
+          result.push({ mean: c.mean, n: c.n });
+        });
+      }
+      return result;
+    };
+    TDigest.prototype.summary = function() {
+      var approx = this.discrete ? "exact " : "approximating ";
+      var s = [
+        approx + this.n + " samples using " + this.size() + " centroids",
+        "min = " + this.percentile(0),
+        "Q1  = " + this.percentile(0.25),
+        "Q2  = " + this.percentile(0.5),
+        "Q3  = " + this.percentile(0.75),
+        "max = " + this.percentile(1)
+      ];
+      return s.join("\n");
+    };
+    function compare_centroid_means(a, b) {
+      return a.mean > b.mean ? 1 : a.mean < b.mean ? -1 : 0;
+    }
+    function compare_centroid_mean_cumns(a, b) {
+      return a.mean_cumn - b.mean_cumn;
+    }
+    TDigest.prototype.push = function(x, n) {
+      n = n || 1;
+      x = Array.isArray(x) ? x : [x];
+      for (var i = 0; i < x.length; i++) {
+        this._digest(x[i], n);
+      }
+    };
+    TDigest.prototype.push_centroid = function(c) {
+      c = Array.isArray(c) ? c : [c];
+      for (var i = 0; i < c.length; i++) {
+        this._digest(c[i].mean, c[i].n);
+      }
+    };
+    TDigest.prototype._cumulate = function(exact) {
+      if (this.n === this.last_cumulate || !exact && this.CX && this.CX > this.n / this.last_cumulate) {
+        return;
+      }
+      var cumn = 0;
+      this.centroids.each(function(c) {
+        c.mean_cumn = cumn + c.n / 2;
+        cumn = c.cumn = cumn + c.n;
+      });
+      this.n = this.last_cumulate = cumn;
+    };
+    TDigest.prototype.find_nearest = function(x) {
+      if (this.size() === 0) {
+        return null;
+      }
+      var iter = this.centroids.lowerBound({ mean: x });
+      var c = iter.data() === null ? iter.prev() : iter.data();
+      if (c.mean === x || this.discrete) {
+        return c;
+      }
+      var prev = iter.prev();
+      if (prev && Math.abs(prev.mean - x) < Math.abs(c.mean - x)) {
+        return prev;
+      } else {
+        return c;
+      }
+    };
+    TDigest.prototype._new_centroid = function(x, n, cumn) {
+      var c = { mean: x, n, cumn };
+      this.centroids.insert(c);
+      this.n += n;
+      return c;
+    };
+    TDigest.prototype._addweight = function(nearest, x, n) {
+      if (x !== nearest.mean) {
+        nearest.mean += n * (x - nearest.mean) / (nearest.n + n);
+      }
+      nearest.cumn += n;
+      nearest.mean_cumn += n / 2;
+      nearest.n += n;
+      this.n += n;
+    };
+    TDigest.prototype._digest = function(x, n) {
+      var min = this.centroids.min();
+      var max = this.centroids.max();
+      var nearest = this.find_nearest(x);
+      if (nearest && nearest.mean === x) {
+        this._addweight(nearest, x, n);
+      } else if (nearest === min) {
+        this._new_centroid(x, n, 0);
+      } else if (nearest === max) {
+        this._new_centroid(x, n, this.n);
+      } else if (this.discrete) {
+        this._new_centroid(x, n, nearest.cumn);
+      } else {
+        var p = nearest.mean_cumn / this.n;
+        var max_n = Math.floor(4 * this.n * this.delta * p * (1 - p));
+        if (max_n - nearest.n >= n) {
+          this._addweight(nearest, x, n);
+        } else {
+          this._new_centroid(x, n, nearest.cumn);
+        }
+      }
+      this._cumulate(false);
+      if (!this.discrete && this.K && this.size() > this.K / this.delta) {
+        this.compress();
+      }
+    };
+    TDigest.prototype.bound_mean = function(x) {
+      var iter = this.centroids.upperBound({ mean: x });
+      var lower = iter.prev();
+      var upper = lower.mean === x ? lower : iter.next();
+      return [lower, upper];
+    };
+    TDigest.prototype.p_rank = function(x_or_xlist) {
+      var xs = Array.isArray(x_or_xlist) ? x_or_xlist : [x_or_xlist];
+      var ps = xs.map(this._p_rank, this);
+      return Array.isArray(x_or_xlist) ? ps : ps[0];
+    };
+    TDigest.prototype._p_rank = function(x) {
+      if (this.size() === 0) {
+        return void 0;
+      } else if (x < this.centroids.min().mean) {
+        return 0;
+      } else if (x > this.centroids.max().mean) {
+        return 1;
+      }
+      this._cumulate(true);
+      var bound = this.bound_mean(x);
+      var lower = bound[0], upper = bound[1];
+      if (this.discrete) {
+        return lower.cumn / this.n;
+      } else {
+        var cumn = lower.mean_cumn;
+        if (lower !== upper) {
+          cumn += (x - lower.mean) * (upper.mean_cumn - lower.mean_cumn) / (upper.mean - lower.mean);
+        }
+        return cumn / this.n;
+      }
+    };
+    TDigest.prototype.bound_mean_cumn = function(cumn) {
+      this.centroids._comparator = compare_centroid_mean_cumns;
+      var iter = this.centroids.upperBound({ mean_cumn: cumn });
+      this.centroids._comparator = compare_centroid_means;
+      var lower = iter.prev();
+      var upper = lower && lower.mean_cumn === cumn ? lower : iter.next();
+      return [lower, upper];
+    };
+    TDigest.prototype.percentile = function(p_or_plist) {
+      var ps = Array.isArray(p_or_plist) ? p_or_plist : [p_or_plist];
+      var qs = ps.map(this._percentile, this);
+      return Array.isArray(p_or_plist) ? qs : qs[0];
+    };
+    TDigest.prototype._percentile = function(p) {
+      if (this.size() === 0) {
+        return void 0;
+      }
+      this._cumulate(true);
+      var h = this.n * p;
+      var bound = this.bound_mean_cumn(h);
+      var lower = bound[0], upper = bound[1];
+      if (upper === lower || lower === null || upper === null) {
+        return (lower || upper).mean;
+      } else if (!this.discrete) {
+        return lower.mean + (h - lower.mean_cumn) * (upper.mean - lower.mean) / (upper.mean_cumn - lower.mean_cumn);
+      } else if (h <= lower.cumn) {
+        return lower.mean;
+      } else {
+        return upper.mean;
+      }
+    };
+    function pop_random(choices) {
+      var idx = Math.floor(Math.random() * choices.length);
+      return choices.splice(idx, 1)[0];
+    }
+    TDigest.prototype.compress = function() {
+      if (this.compressing) {
+        return;
+      }
+      var points = this.toArray();
+      this.reset();
+      this.compressing = true;
+      while (points.length > 0) {
+        this.push_centroid(pop_random(points));
+      }
+      this._cumulate(true);
+      this.compressing = false;
+    };
+    function Digest(config) {
+      this.config = config || {};
+      this.mode = this.config.mode || "auto";
+      TDigest.call(this, this.mode === "cont" ? config.delta : false);
+      this.digest_ratio = this.config.ratio || 0.9;
+      this.digest_thresh = this.config.thresh || 1e3;
+      this.n_unique = 0;
+    }
+    Digest.prototype = Object.create(TDigest.prototype);
+    Digest.prototype.constructor = Digest;
+    Digest.prototype.push = function(x_or_xlist) {
+      TDigest.prototype.push.call(this, x_or_xlist);
+      this.check_continuous();
+    };
+    Digest.prototype._new_centroid = function(x, n, cumn) {
+      this.n_unique += 1;
+      TDigest.prototype._new_centroid.call(this, x, n, cumn);
+    };
+    Digest.prototype._addweight = function(nearest, x, n) {
+      if (nearest.n === 1) {
+        this.n_unique -= 1;
+      }
+      TDigest.prototype._addweight.call(this, nearest, x, n);
+    };
+    Digest.prototype.check_continuous = function() {
+      if (this.mode !== "auto" || this.size() < this.digest_thresh) {
+        return false;
+      }
+      if (this.n_unique / this.size() > this.digest_ratio) {
+        this.mode = "cont";
+        this.discrete = false;
+        this.delta = this.config.delta || 0.01;
+        this.compress();
+        return true;
+      }
+      return false;
+    };
+    module2.exports = {
+      "TDigest": TDigest,
+      "Digest": Digest
+    };
+  }
+});
+
+// node_modules/prom-client/lib/timeWindowQuantiles.js
+var require_timeWindowQuantiles = __commonJS({
+  "node_modules/prom-client/lib/timeWindowQuantiles.js"(exports2, module2) {
+    "use strict";
+    var { TDigest } = require_tdigest();
+    var TimeWindowQuantiles = class {
+      constructor(maxAgeSeconds, ageBuckets) {
+        this.maxAgeSeconds = maxAgeSeconds || 0;
+        this.ageBuckets = ageBuckets || 0;
+        this.shouldRotate = maxAgeSeconds && ageBuckets;
+        this.ringBuffer = Array(ageBuckets).fill(new TDigest());
+        this.currentBuffer = 0;
+        this.lastRotateTimestampMillis = Date.now();
+        this.durationBetweenRotatesMillis = maxAgeSeconds * 1e3 / ageBuckets || Infinity;
+      }
+      size() {
+        const bucket = rotate.call(this);
+        return bucket.size();
+      }
+      percentile(quantile) {
+        const bucket = rotate.call(this);
+        return bucket.percentile(quantile);
+      }
+      push(value) {
+        rotate.call(this);
+        this.ringBuffer.forEach((bucket) => {
+          bucket.push(value);
+        });
+      }
+      reset() {
+        this.ringBuffer.forEach((bucket) => {
+          bucket.reset();
+        });
+      }
+      compress() {
+        this.ringBuffer.forEach((bucket) => {
+          bucket.compress();
+        });
+      }
+    };
+    function rotate() {
+      let timeSinceLastRotateMillis = Date.now() - this.lastRotateTimestampMillis;
+      while (timeSinceLastRotateMillis > this.durationBetweenRotatesMillis && this.shouldRotate) {
+        this.ringBuffer[this.currentBuffer] = new TDigest();
+        if (++this.currentBuffer >= this.ringBuffer.length) {
+          this.currentBuffer = 0;
+        }
+        timeSinceLastRotateMillis -= this.durationBetweenRotatesMillis;
+        this.lastRotateTimestampMillis += this.durationBetweenRotatesMillis;
+      }
+      return this.ringBuffer[this.currentBuffer];
+    }
+    module2.exports = TimeWindowQuantiles;
+  }
+});
+
+// node_modules/prom-client/lib/summary.js
+var require_summary = __commonJS({
+  "node_modules/prom-client/lib/summary.js"(exports2, module2) {
+    "use strict";
+    var util = require("util");
+    var { getLabels, hashObject, removeLabels } = require_util();
+    var { validateLabel } = require_validation();
+    var { Metric } = require_metric();
+    var timeWindowQuantiles = require_timeWindowQuantiles();
+    var DEFAULT_COMPRESS_COUNT = 1e3;
+    var Summary = class extends Metric {
+      constructor(config) {
+        super(config, {
+          percentiles: [0.01, 0.05, 0.5, 0.9, 0.95, 0.99, 0.999],
+          compressCount: DEFAULT_COMPRESS_COUNT,
+          hashMap: {}
+        });
+        this.type = "summary";
+        for (const label of this.labelNames) {
+          if (label === "quantile")
+            throw new Error("quantile is a reserved label keyword");
+        }
+        if (this.labelNames.length === 0) {
+          this.hashMap = {
+            [hashObject({})]: {
+              labels: {},
+              td: new timeWindowQuantiles(this.maxAgeSeconds, this.ageBuckets),
+              count: 0,
+              sum: 0
+            }
+          };
+        }
+      }
+      /**
+       * Observe a value
+       * @param {object} labels - Object with labels where key is the label key and value is label value. Can only be one level deep
+       * @param {Number} value - Value to observe
+       * @returns {void}
+       */
+      observe(labels, value) {
+        observe.call(this, labels === 0 ? 0 : labels || {})(value);
+      }
+      async get() {
+        if (this.collect) {
+          const v = this.collect();
+          if (v instanceof Promise) await v;
+        }
+        const hashKeys = Object.keys(this.hashMap);
+        const values = [];
+        hashKeys.forEach((hashKey) => {
+          const s = this.hashMap[hashKey];
+          if (s) {
+            if (this.pruneAgedBuckets && s.td.size() === 0) {
+              delete this.hashMap[hashKey];
+            } else {
+              extractSummariesForExport(s, this.percentiles).forEach((v) => {
+                values.push(v);
+              });
+              values.push(getSumForExport(s, this));
+              values.push(getCountForExport(s, this));
+            }
+          }
+        });
+        return {
+          name: this.name,
+          help: this.help,
+          type: this.type,
+          values,
+          aggregator: this.aggregator
+        };
+      }
+      reset() {
+        const data = Object.values(this.hashMap);
+        data.forEach((s) => {
+          s.td.reset();
+          s.count = 0;
+          s.sum = 0;
+        });
+      }
+      /**
+       * Start a timer that could be used to logging durations
+       * @param {object} labels - Object with labels where key is the label key and value is label value. Can only be one level deep
+       * @returns {function} - Function to invoke when you want to stop the timer and observe the duration in seconds
+       * @example
+       * var end = summary.startTimer();
+       * makeExpensiveXHRRequest(function(err, res) {
+       *	end(); //Observe the duration of expensiveXHRRequest
+       * });
+       */
+      startTimer(labels) {
+        return startTimer.call(this, labels)();
+      }
+      labels(...args) {
+        const labels = getLabels(this.labelNames, args);
+        validateLabel(this.labelNames, labels);
+        return {
+          observe: observe.call(this, labels),
+          startTimer: startTimer.call(this, labels)
+        };
+      }
+      remove(...args) {
+        const labels = getLabels(this.labelNames, args);
+        validateLabel(this.labelNames, labels);
+        removeLabels.call(this, this.hashMap, labels, this.sortedLabelNames);
+      }
+    };
+    function extractSummariesForExport(summaryOfLabels, percentiles) {
+      summaryOfLabels.td.compress();
+      return percentiles.map((percentile) => {
+        const percentileValue = summaryOfLabels.td.percentile(percentile);
+        return {
+          labels: Object.assign({ quantile: percentile }, summaryOfLabels.labels),
+          value: percentileValue ? percentileValue : 0
+        };
+      });
+    }
+    function getCountForExport(value, summary) {
+      return {
+        metricName: `${summary.name}_count`,
+        labels: value.labels,
+        value: value.count
+      };
+    }
+    function getSumForExport(value, summary) {
+      return {
+        metricName: `${summary.name}_sum`,
+        labels: value.labels,
+        value: value.sum
+      };
+    }
+    function startTimer(startLabels) {
+      return () => {
+        const start = process.hrtime();
+        return (endLabels) => {
+          const delta = process.hrtime(start);
+          const value = delta[0] + delta[1] / 1e9;
+          this.observe(Object.assign({}, startLabels, endLabels), value);
+          return value;
+        };
+      };
+    }
+    function observe(labels) {
+      return (value) => {
+        const labelValuePair = convertLabelsAndValues(labels, value);
+        validateLabel(this.labelNames, labels);
+        if (!Number.isFinite(labelValuePair.value)) {
+          throw new TypeError(
+            `Value is not a valid number: ${util.format(labelValuePair.value)}`
+          );
+        }
+        const hash = hashObject(labelValuePair.labels, this.sortedLabelNames);
+        let summaryOfLabel = this.hashMap[hash];
+        if (!summaryOfLabel) {
+          summaryOfLabel = {
+            labels: labelValuePair.labels,
+            td: new timeWindowQuantiles(this.maxAgeSeconds, this.ageBuckets),
+            count: 0,
+            sum: 0
+          };
+        }
+        summaryOfLabel.td.push(labelValuePair.value);
+        summaryOfLabel.count++;
+        if (summaryOfLabel.count % this.compressCount === 0) {
+          summaryOfLabel.td.compress();
+        }
+        summaryOfLabel.sum += labelValuePair.value;
+        this.hashMap[hash] = summaryOfLabel;
+      };
+    }
+    function convertLabelsAndValues(labels, value) {
+      if (value === void 0) {
+        return {
+          value: labels,
+          labels: {}
+        };
+      }
+      return {
+        labels,
+        value
+      };
+    }
+    module2.exports = Summary;
+  }
+});
+
+// node_modules/prom-client/lib/pushgateway.js
+var require_pushgateway = __commonJS({
+  "node_modules/prom-client/lib/pushgateway.js"(exports2, module2) {
+    "use strict";
+    var url = require("url");
+    var http = require("http");
+    var https = require("https");
+    var { gzipSync } = require("zlib");
+    var { globalRegistry } = require_registry();
+    var Pushgateway = class {
+      constructor(gatewayUrl, options, registry) {
+        if (!registry) {
+          registry = globalRegistry;
+        }
+        this.registry = registry;
+        this.gatewayUrl = gatewayUrl;
+        const { requireJobName, ...requestOptions } = {
+          requireJobName: true,
+          ...options
+        };
+        this.requireJobName = requireJobName;
+        this.requestOptions = requestOptions;
+      }
+      pushAdd(params = {}) {
+        if (this.requireJobName && !params.jobName) {
+          throw new Error("Missing jobName parameter");
+        }
+        return useGateway.call(this, "POST", params.jobName, params.groupings);
+      }
+      push(params = {}) {
+        if (this.requireJobName && !params.jobName) {
+          throw new Error("Missing jobName parameter");
+        }
+        return useGateway.call(this, "PUT", params.jobName, params.groupings);
+      }
+      delete(params = {}) {
+        if (this.requireJobName && !params.jobName) {
+          throw new Error("Missing jobName parameter");
+        }
+        return useGateway.call(this, "DELETE", params.jobName, params.groupings);
+      }
+    };
+    async function useGateway(method, job, groupings) {
+      const gatewayUrlParsed = url.parse(this.gatewayUrl);
+      const gatewayUrlPath = gatewayUrlParsed.pathname && gatewayUrlParsed.pathname !== "/" ? gatewayUrlParsed.pathname : "";
+      const jobPath = job ? `/job/${encodeURIComponent(job)}${generateGroupings(groupings)}` : "";
+      const path2 = `${gatewayUrlPath}/metrics${jobPath}`;
+      const target = url.resolve(this.gatewayUrl, path2);
+      const requestParams = url.parse(target);
+      const httpModule = isHttps(requestParams.href) ? https : http;
+      const options = Object.assign(requestParams, this.requestOptions, {
+        method
+      });
+      return new Promise((resolve, reject) => {
+        if (method === "DELETE" && options.headers) {
+          delete options.headers["Content-Encoding"];
+        }
+        const req = httpModule.request(options, (resp) => {
+          let body = "";
+          resp.setEncoding("utf8");
+          resp.on("data", (chunk) => {
+            body += chunk;
+          });
+          resp.on("end", () => {
+            if (resp.statusCode >= 400) {
+              reject(
+                new Error(`push failed with status ${resp.statusCode}, ${body}`)
+              );
+            } else {
+              resolve({ resp, body });
+            }
+          });
+        });
+        req.on("error", (err) => {
+          reject(err);
+        });
+        req.on("timeout", () => {
+          req.destroy(new Error("Pushgateway request timed out"));
+        });
+        if (method !== "DELETE") {
+          this.registry.metrics().then((metrics2) => {
+            if (options.headers && options.headers["Content-Encoding"] === "gzip") {
+              metrics2 = gzipSync(metrics2);
+            }
+            req.write(metrics2);
+            req.end();
+          }).catch((err) => {
+            reject(err);
+          });
+        } else {
+          req.end();
+        }
+      });
+    }
+    function generateGroupings(groupings) {
+      if (!groupings) {
+        return "";
+      }
+      return Object.keys(groupings).map(
+        (key) => `/${encodeURIComponent(key)}/${encodeURIComponent(groupings[key])}`
+      ).join("");
+    }
+    function isHttps(href) {
+      return href.search(/^https/) !== -1;
+    }
+    module2.exports = Pushgateway;
+  }
+});
+
+// node_modules/prom-client/lib/bucketGenerators.js
+var require_bucketGenerators = __commonJS({
+  "node_modules/prom-client/lib/bucketGenerators.js"(exports2) {
+    "use strict";
+    exports2.linearBuckets = (start, width, count) => {
+      if (count < 1) {
+        throw new Error("Linear buckets needs a positive count");
+      }
+      const buckets = new Array(count);
+      for (let i = 0; i < count; i++) {
+        buckets[i] = start + i * width;
+      }
+      return buckets;
+    };
+    exports2.exponentialBuckets = (start, factor, count) => {
+      if (start <= 0) {
+        throw new Error("Exponential buckets needs a positive start");
+      }
+      if (count < 1) {
+        throw new Error("Exponential buckets needs a positive count");
+      }
+      if (factor <= 1) {
+        throw new Error("Exponential buckets needs a factor greater than 1");
+      }
+      const buckets = new Array(count);
+      for (let i = 0; i < count; i++) {
+        buckets[i] = start;
+        start *= factor;
+      }
+      return buckets;
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/version.js
+var VERSION;
+var init_version = __esm({
+  "node_modules/@opentelemetry/api/build/esm/version.js"() {
+    VERSION = "1.9.1";
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/internal/semver.js
+function _makeCompatibilityCheck(ownVersion) {
+  const acceptedVersions = /* @__PURE__ */ new Set([ownVersion]);
+  const rejectedVersions = /* @__PURE__ */ new Set();
+  const myVersionMatch = ownVersion.match(re);
+  if (!myVersionMatch) {
+    return () => false;
+  }
+  const ownVersionParsed = {
+    major: +myVersionMatch[1],
+    minor: +myVersionMatch[2],
+    patch: +myVersionMatch[3],
+    prerelease: myVersionMatch[4]
+  };
+  if (ownVersionParsed.prerelease != null) {
+    return function isExactmatch(globalVersion) {
+      return globalVersion === ownVersion;
+    };
+  }
+  function _reject(v) {
+    rejectedVersions.add(v);
+    return false;
+  }
+  function _accept(v) {
+    acceptedVersions.add(v);
+    return true;
+  }
+  return function isCompatible2(globalVersion) {
+    if (acceptedVersions.has(globalVersion)) {
+      return true;
+    }
+    if (rejectedVersions.has(globalVersion)) {
+      return false;
+    }
+    const globalVersionMatch = globalVersion.match(re);
+    if (!globalVersionMatch) {
+      return _reject(globalVersion);
+    }
+    const globalVersionParsed = {
+      major: +globalVersionMatch[1],
+      minor: +globalVersionMatch[2],
+      patch: +globalVersionMatch[3],
+      prerelease: globalVersionMatch[4]
+    };
+    if (globalVersionParsed.prerelease != null) {
+      return _reject(globalVersion);
+    }
+    if (ownVersionParsed.major !== globalVersionParsed.major) {
+      return _reject(globalVersion);
+    }
+    if (ownVersionParsed.major === 0) {
+      if (ownVersionParsed.minor === globalVersionParsed.minor && ownVersionParsed.patch <= globalVersionParsed.patch) {
+        return _accept(globalVersion);
+      }
+      return _reject(globalVersion);
+    }
+    if (ownVersionParsed.minor <= globalVersionParsed.minor) {
+      return _accept(globalVersion);
+    }
+    return _reject(globalVersion);
+  };
+}
+var re, isCompatible;
+var init_semver = __esm({
+  "node_modules/@opentelemetry/api/build/esm/internal/semver.js"() {
+    init_version();
+    re = /^(\d+)\.(\d+)\.(\d+)(-(.+))?$/;
+    isCompatible = _makeCompatibilityCheck(VERSION);
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/internal/global-utils.js
+function registerGlobal(type, instance, diag3, allowOverride = false) {
+  var _a;
+  const api = _global[GLOBAL_OPENTELEMETRY_API_KEY] = (_a = _global[GLOBAL_OPENTELEMETRY_API_KEY]) !== null && _a !== void 0 ? _a : {
+    version: VERSION
+  };
+  if (!allowOverride && api[type]) {
+    const err = new Error(`@opentelemetry/api: Attempted duplicate registration of API: ${type}`);
+    diag3.error(err.stack || err.message);
+    return false;
+  }
+  if (api.version !== VERSION) {
+    const err = new Error(`@opentelemetry/api: Registration of version v${api.version} for ${type} does not match previously registered API v${VERSION}`);
+    diag3.error(err.stack || err.message);
+    return false;
+  }
+  api[type] = instance;
+  diag3.debug(`@opentelemetry/api: Registered a global for ${type} v${VERSION}.`);
+  return true;
+}
+function getGlobal(type) {
+  var _a, _b;
+  const globalVersion = (_a = _global[GLOBAL_OPENTELEMETRY_API_KEY]) === null || _a === void 0 ? void 0 : _a.version;
+  if (!globalVersion || !isCompatible(globalVersion)) {
+    return;
+  }
+  return (_b = _global[GLOBAL_OPENTELEMETRY_API_KEY]) === null || _b === void 0 ? void 0 : _b[type];
+}
+function unregisterGlobal(type, diag3) {
+  diag3.debug(`@opentelemetry/api: Unregistering a global for ${type} v${VERSION}.`);
+  const api = _global[GLOBAL_OPENTELEMETRY_API_KEY];
+  if (api) {
+    delete api[type];
+  }
+}
+var major, GLOBAL_OPENTELEMETRY_API_KEY, _global;
+var init_global_utils = __esm({
+  "node_modules/@opentelemetry/api/build/esm/internal/global-utils.js"() {
+    init_version();
+    init_semver();
+    major = VERSION.split(".")[0];
+    GLOBAL_OPENTELEMETRY_API_KEY = Symbol.for(`opentelemetry.js.api.${major}`);
+    _global = typeof globalThis === "object" ? globalThis : typeof self === "object" ? self : typeof window === "object" ? window : typeof global === "object" ? global : {};
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/diag/ComponentLogger.js
+function logProxy(funcName, namespace, args) {
+  const logger = getGlobal("diag");
+  if (!logger) {
+    return;
+  }
+  return logger[funcName](namespace, ...args);
+}
+var DiagComponentLogger;
+var init_ComponentLogger = __esm({
+  "node_modules/@opentelemetry/api/build/esm/diag/ComponentLogger.js"() {
+    init_global_utils();
+    DiagComponentLogger = class {
+      constructor(props) {
+        this._namespace = props.namespace || "DiagComponentLogger";
+      }
+      debug(...args) {
+        return logProxy("debug", this._namespace, args);
+      }
+      error(...args) {
+        return logProxy("error", this._namespace, args);
+      }
+      info(...args) {
+        return logProxy("info", this._namespace, args);
+      }
+      warn(...args) {
+        return logProxy("warn", this._namespace, args);
+      }
+      verbose(...args) {
+        return logProxy("verbose", this._namespace, args);
+      }
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/diag/types.js
+var DiagLogLevel;
+var init_types = __esm({
+  "node_modules/@opentelemetry/api/build/esm/diag/types.js"() {
+    (function(DiagLogLevel2) {
+      DiagLogLevel2[DiagLogLevel2["NONE"] = 0] = "NONE";
+      DiagLogLevel2[DiagLogLevel2["ERROR"] = 30] = "ERROR";
+      DiagLogLevel2[DiagLogLevel2["WARN"] = 50] = "WARN";
+      DiagLogLevel2[DiagLogLevel2["INFO"] = 60] = "INFO";
+      DiagLogLevel2[DiagLogLevel2["DEBUG"] = 70] = "DEBUG";
+      DiagLogLevel2[DiagLogLevel2["VERBOSE"] = 80] = "VERBOSE";
+      DiagLogLevel2[DiagLogLevel2["ALL"] = 9999] = "ALL";
+    })(DiagLogLevel || (DiagLogLevel = {}));
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/diag/internal/logLevelLogger.js
+function createLogLevelDiagLogger(maxLevel, logger) {
+  if (maxLevel < DiagLogLevel.NONE) {
+    maxLevel = DiagLogLevel.NONE;
+  } else if (maxLevel > DiagLogLevel.ALL) {
+    maxLevel = DiagLogLevel.ALL;
+  }
+  logger = logger || {};
+  function _filterFunc(funcName, theLevel) {
+    const theFunc = logger[funcName];
+    if (typeof theFunc === "function" && maxLevel >= theLevel) {
+      return theFunc.bind(logger);
+    }
+    return function() {
+    };
+  }
+  return {
+    error: _filterFunc("error", DiagLogLevel.ERROR),
+    warn: _filterFunc("warn", DiagLogLevel.WARN),
+    info: _filterFunc("info", DiagLogLevel.INFO),
+    debug: _filterFunc("debug", DiagLogLevel.DEBUG),
+    verbose: _filterFunc("verbose", DiagLogLevel.VERBOSE)
+  };
+}
+var init_logLevelLogger = __esm({
+  "node_modules/@opentelemetry/api/build/esm/diag/internal/logLevelLogger.js"() {
+    init_types();
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/api/diag.js
+var API_NAME, DiagAPI;
+var init_diag = __esm({
+  "node_modules/@opentelemetry/api/build/esm/api/diag.js"() {
+    init_ComponentLogger();
+    init_logLevelLogger();
+    init_types();
+    init_global_utils();
+    API_NAME = "diag";
+    DiagAPI = class _DiagAPI {
+      /** Get the singleton instance of the DiagAPI API */
+      static instance() {
+        if (!this._instance) {
+          this._instance = new _DiagAPI();
+        }
+        return this._instance;
+      }
+      /**
+       * Private internal constructor
+       * @private
+       */
+      constructor() {
+        function _logProxy(funcName) {
+          return function(...args) {
+            const logger = getGlobal("diag");
+            if (!logger)
+              return;
+            return logger[funcName](...args);
+          };
+        }
+        const self2 = this;
+        const setLogger = (logger, optionsOrLogLevel = { logLevel: DiagLogLevel.INFO }) => {
+          var _a, _b, _c;
+          if (logger === self2) {
+            const err = new Error("Cannot use diag as the logger for itself. Please use a DiagLogger implementation like ConsoleDiagLogger or a custom implementation");
+            self2.error((_a = err.stack) !== null && _a !== void 0 ? _a : err.message);
+            return false;
+          }
+          if (typeof optionsOrLogLevel === "number") {
+            optionsOrLogLevel = {
+              logLevel: optionsOrLogLevel
+            };
+          }
+          const oldLogger = getGlobal("diag");
+          const newLogger = createLogLevelDiagLogger((_b = optionsOrLogLevel.logLevel) !== null && _b !== void 0 ? _b : DiagLogLevel.INFO, logger);
+          if (oldLogger && !optionsOrLogLevel.suppressOverrideMessage) {
+            const stack = (_c = new Error().stack) !== null && _c !== void 0 ? _c : "<failed to generate stacktrace>";
+            oldLogger.warn(`Current logger will be overwritten from ${stack}`);
+            newLogger.warn(`Current logger will overwrite one already registered from ${stack}`);
+          }
+          return registerGlobal("diag", newLogger, self2, true);
+        };
+        self2.setLogger = setLogger;
+        self2.disable = () => {
+          unregisterGlobal(API_NAME, self2);
+        };
+        self2.createComponentLogger = (options) => {
+          return new DiagComponentLogger(options);
+        };
+        self2.verbose = _logProxy("verbose");
+        self2.debug = _logProxy("debug");
+        self2.info = _logProxy("info");
+        self2.warn = _logProxy("warn");
+        self2.error = _logProxy("error");
+      }
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/baggage/internal/baggage-impl.js
+var BaggageImpl;
+var init_baggage_impl = __esm({
+  "node_modules/@opentelemetry/api/build/esm/baggage/internal/baggage-impl.js"() {
+    BaggageImpl = class _BaggageImpl {
+      constructor(entries) {
+        this._entries = entries ? new Map(entries) : /* @__PURE__ */ new Map();
+      }
+      getEntry(key) {
+        const entry = this._entries.get(key);
+        if (!entry) {
+          return void 0;
+        }
+        return Object.assign({}, entry);
+      }
+      getAllEntries() {
+        return Array.from(this._entries.entries());
+      }
+      setEntry(key, entry) {
+        const newBaggage = new _BaggageImpl(this._entries);
+        newBaggage._entries.set(key, entry);
+        return newBaggage;
+      }
+      removeEntry(key) {
+        const newBaggage = new _BaggageImpl(this._entries);
+        newBaggage._entries.delete(key);
+        return newBaggage;
+      }
+      removeEntries(...keys) {
+        const newBaggage = new _BaggageImpl(this._entries);
+        for (const key of keys) {
+          newBaggage._entries.delete(key);
+        }
+        return newBaggage;
+      }
+      clear() {
+        return new _BaggageImpl();
+      }
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/baggage/internal/symbol.js
+var baggageEntryMetadataSymbol;
+var init_symbol = __esm({
+  "node_modules/@opentelemetry/api/build/esm/baggage/internal/symbol.js"() {
+    baggageEntryMetadataSymbol = Symbol("BaggageEntryMetadata");
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/baggage/utils.js
+function createBaggage(entries = {}) {
+  return new BaggageImpl(new Map(Object.entries(entries)));
+}
+function baggageEntryMetadataFromString(str) {
+  if (typeof str !== "string") {
+    diag.error(`Cannot create baggage metadata from unknown type: ${typeof str}`);
+    str = "";
+  }
+  return {
+    __TYPE__: baggageEntryMetadataSymbol,
+    toString() {
+      return str;
+    }
+  };
+}
+var diag;
+var init_utils = __esm({
+  "node_modules/@opentelemetry/api/build/esm/baggage/utils.js"() {
+    init_diag();
+    init_baggage_impl();
+    init_symbol();
+    diag = DiagAPI.instance();
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/context/context.js
+function createContextKey(description) {
+  return Symbol.for(description);
+}
+var BaseContext, ROOT_CONTEXT;
+var init_context = __esm({
+  "node_modules/@opentelemetry/api/build/esm/context/context.js"() {
+    BaseContext = class _BaseContext {
+      /**
+       * Construct a new context which inherits values from an optional parent context.
+       *
+       * @param parentContext a context from which to inherit values
+       */
+      constructor(parentContext) {
+        const self2 = this;
+        self2._currentContext = parentContext ? new Map(parentContext) : /* @__PURE__ */ new Map();
+        self2.getValue = (key) => self2._currentContext.get(key);
+        self2.setValue = (key, value) => {
+          const context2 = new _BaseContext(self2._currentContext);
+          context2._currentContext.set(key, value);
+          return context2;
+        };
+        self2.deleteValue = (key) => {
+          const context2 = new _BaseContext(self2._currentContext);
+          context2._currentContext.delete(key);
+          return context2;
+        };
+      }
+    };
+    ROOT_CONTEXT = new BaseContext();
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/diag/consoleLogger.js
+var consoleMap, _originalConsoleMethods, DiagConsoleLogger;
+var init_consoleLogger = __esm({
+  "node_modules/@opentelemetry/api/build/esm/diag/consoleLogger.js"() {
+    consoleMap = [
+      { n: "error", c: "error" },
+      { n: "warn", c: "warn" },
+      { n: "info", c: "info" },
+      { n: "debug", c: "debug" },
+      { n: "verbose", c: "trace" }
+    ];
+    _originalConsoleMethods = {};
+    if (typeof console !== "undefined") {
+      const keys = [
+        "error",
+        "warn",
+        "info",
+        "debug",
+        "trace",
+        "log"
+      ];
+      for (const key of keys) {
+        if (typeof console[key] === "function") {
+          _originalConsoleMethods[key] = console[key];
+        }
+      }
+    }
+    DiagConsoleLogger = class {
+      constructor() {
+        function _consoleFunc(funcName) {
+          return function(...args) {
+            let theFunc = _originalConsoleMethods[funcName];
+            if (typeof theFunc !== "function") {
+              theFunc = _originalConsoleMethods["log"];
+            }
+            if (typeof theFunc !== "function" && console) {
+              theFunc = console[funcName];
+              if (typeof theFunc !== "function") {
+                theFunc = console.log;
+              }
+            }
+            if (typeof theFunc === "function") {
+              return theFunc.apply(console, args);
+            }
+          };
+        }
+        for (let i = 0; i < consoleMap.length; i++) {
+          this[consoleMap[i].n] = _consoleFunc(consoleMap[i].c);
+        }
+      }
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/metrics/NoopMeter.js
+function createNoopMeter() {
+  return NOOP_METER;
+}
+var NoopMeter, NoopMetric, NoopCounterMetric, NoopUpDownCounterMetric, NoopGaugeMetric, NoopHistogramMetric, NoopObservableMetric, NoopObservableCounterMetric, NoopObservableGaugeMetric, NoopObservableUpDownCounterMetric, NOOP_METER, NOOP_COUNTER_METRIC, NOOP_GAUGE_METRIC, NOOP_HISTOGRAM_METRIC, NOOP_UP_DOWN_COUNTER_METRIC, NOOP_OBSERVABLE_COUNTER_METRIC, NOOP_OBSERVABLE_GAUGE_METRIC, NOOP_OBSERVABLE_UP_DOWN_COUNTER_METRIC;
+var init_NoopMeter = __esm({
+  "node_modules/@opentelemetry/api/build/esm/metrics/NoopMeter.js"() {
+    NoopMeter = class {
+      constructor() {
+      }
+      /**
+       * @see {@link Meter.createGauge}
+       */
+      createGauge(_name, _options) {
+        return NOOP_GAUGE_METRIC;
+      }
+      /**
+       * @see {@link Meter.createHistogram}
+       */
+      createHistogram(_name, _options) {
+        return NOOP_HISTOGRAM_METRIC;
+      }
+      /**
+       * @see {@link Meter.createCounter}
+       */
+      createCounter(_name, _options) {
+        return NOOP_COUNTER_METRIC;
+      }
+      /**
+       * @see {@link Meter.createUpDownCounter}
+       */
+      createUpDownCounter(_name, _options) {
+        return NOOP_UP_DOWN_COUNTER_METRIC;
+      }
+      /**
+       * @see {@link Meter.createObservableGauge}
+       */
+      createObservableGauge(_name, _options) {
+        return NOOP_OBSERVABLE_GAUGE_METRIC;
+      }
+      /**
+       * @see {@link Meter.createObservableCounter}
+       */
+      createObservableCounter(_name, _options) {
+        return NOOP_OBSERVABLE_COUNTER_METRIC;
+      }
+      /**
+       * @see {@link Meter.createObservableUpDownCounter}
+       */
+      createObservableUpDownCounter(_name, _options) {
+        return NOOP_OBSERVABLE_UP_DOWN_COUNTER_METRIC;
+      }
+      /**
+       * @see {@link Meter.addBatchObservableCallback}
+       */
+      addBatchObservableCallback(_callback, _observables) {
+      }
+      /**
+       * @see {@link Meter.removeBatchObservableCallback}
+       */
+      removeBatchObservableCallback(_callback) {
+      }
+    };
+    NoopMetric = class {
+    };
+    NoopCounterMetric = class extends NoopMetric {
+      add(_value, _attributes) {
+      }
+    };
+    NoopUpDownCounterMetric = class extends NoopMetric {
+      add(_value, _attributes) {
+      }
+    };
+    NoopGaugeMetric = class extends NoopMetric {
+      record(_value, _attributes) {
+      }
+    };
+    NoopHistogramMetric = class extends NoopMetric {
+      record(_value, _attributes) {
+      }
+    };
+    NoopObservableMetric = class {
+      addCallback(_callback) {
+      }
+      removeCallback(_callback) {
+      }
+    };
+    NoopObservableCounterMetric = class extends NoopObservableMetric {
+    };
+    NoopObservableGaugeMetric = class extends NoopObservableMetric {
+    };
+    NoopObservableUpDownCounterMetric = class extends NoopObservableMetric {
+    };
+    NOOP_METER = new NoopMeter();
+    NOOP_COUNTER_METRIC = new NoopCounterMetric();
+    NOOP_GAUGE_METRIC = new NoopGaugeMetric();
+    NOOP_HISTOGRAM_METRIC = new NoopHistogramMetric();
+    NOOP_UP_DOWN_COUNTER_METRIC = new NoopUpDownCounterMetric();
+    NOOP_OBSERVABLE_COUNTER_METRIC = new NoopObservableCounterMetric();
+    NOOP_OBSERVABLE_GAUGE_METRIC = new NoopObservableGaugeMetric();
+    NOOP_OBSERVABLE_UP_DOWN_COUNTER_METRIC = new NoopObservableUpDownCounterMetric();
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/metrics/Metric.js
+var ValueType;
+var init_Metric = __esm({
+  "node_modules/@opentelemetry/api/build/esm/metrics/Metric.js"() {
+    (function(ValueType2) {
+      ValueType2[ValueType2["INT"] = 0] = "INT";
+      ValueType2[ValueType2["DOUBLE"] = 1] = "DOUBLE";
+    })(ValueType || (ValueType = {}));
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/propagation/TextMapPropagator.js
+var defaultTextMapGetter, defaultTextMapSetter;
+var init_TextMapPropagator = __esm({
+  "node_modules/@opentelemetry/api/build/esm/propagation/TextMapPropagator.js"() {
+    defaultTextMapGetter = {
+      get(carrier, key) {
+        if (carrier == null) {
+          return void 0;
+        }
+        return carrier[key];
+      },
+      keys(carrier) {
+        if (carrier == null) {
+          return [];
+        }
+        return Object.keys(carrier);
+      }
+    };
+    defaultTextMapSetter = {
+      set(carrier, key, value) {
+        if (carrier == null) {
+          return;
+        }
+        carrier[key] = value;
+      }
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/context/NoopContextManager.js
+var NoopContextManager;
+var init_NoopContextManager = __esm({
+  "node_modules/@opentelemetry/api/build/esm/context/NoopContextManager.js"() {
+    init_context();
+    NoopContextManager = class {
+      active() {
+        return ROOT_CONTEXT;
+      }
+      with(_context, fn, thisArg, ...args) {
+        return fn.call(thisArg, ...args);
+      }
+      bind(_context, target) {
+        return target;
+      }
+      enable() {
+        return this;
+      }
+      disable() {
+        return this;
+      }
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/api/context.js
+var API_NAME2, NOOP_CONTEXT_MANAGER, ContextAPI;
+var init_context2 = __esm({
+  "node_modules/@opentelemetry/api/build/esm/api/context.js"() {
+    init_NoopContextManager();
+    init_global_utils();
+    init_diag();
+    API_NAME2 = "context";
+    NOOP_CONTEXT_MANAGER = new NoopContextManager();
+    ContextAPI = class _ContextAPI {
+      /** Empty private constructor prevents end users from constructing a new instance of the API */
+      constructor() {
+      }
+      /** Get the singleton instance of the Context API */
+      static getInstance() {
+        if (!this._instance) {
+          this._instance = new _ContextAPI();
+        }
+        return this._instance;
+      }
+      /**
+       * Set the current context manager.
+       *
+       * @returns true if the context manager was successfully registered, else false
+       */
+      setGlobalContextManager(contextManager) {
+        return registerGlobal(API_NAME2, contextManager, DiagAPI.instance());
+      }
+      /**
+       * Get the currently active context
+       */
+      active() {
+        return this._getContextManager().active();
+      }
+      /**
+       * Execute a function with an active context
+       *
+       * @param context context to be active during function execution
+       * @param fn function to execute in a context
+       * @param thisArg optional receiver to be used for calling fn
+       * @param args optional arguments forwarded to fn
+       */
+      with(context2, fn, thisArg, ...args) {
+        return this._getContextManager().with(context2, fn, thisArg, ...args);
+      }
+      /**
+       * Bind a context to a target function or event emitter
+       *
+       * @param context context to bind to the event emitter or function. Defaults to the currently active context
+       * @param target function or event emitter to bind
+       */
+      bind(context2, target) {
+        return this._getContextManager().bind(context2, target);
+      }
+      _getContextManager() {
+        return getGlobal(API_NAME2) || NOOP_CONTEXT_MANAGER;
+      }
+      /** Disable and remove the global context manager */
+      disable() {
+        this._getContextManager().disable();
+        unregisterGlobal(API_NAME2, DiagAPI.instance());
+      }
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/trace/trace_flags.js
+var TraceFlags;
+var init_trace_flags = __esm({
+  "node_modules/@opentelemetry/api/build/esm/trace/trace_flags.js"() {
+    (function(TraceFlags2) {
+      TraceFlags2[TraceFlags2["NONE"] = 0] = "NONE";
+      TraceFlags2[TraceFlags2["SAMPLED"] = 1] = "SAMPLED";
+    })(TraceFlags || (TraceFlags = {}));
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/trace/invalid-span-constants.js
+var INVALID_SPANID, INVALID_TRACEID, INVALID_SPAN_CONTEXT;
+var init_invalid_span_constants = __esm({
+  "node_modules/@opentelemetry/api/build/esm/trace/invalid-span-constants.js"() {
+    init_trace_flags();
+    INVALID_SPANID = "0000000000000000";
+    INVALID_TRACEID = "00000000000000000000000000000000";
+    INVALID_SPAN_CONTEXT = {
+      traceId: INVALID_TRACEID,
+      spanId: INVALID_SPANID,
+      traceFlags: TraceFlags.NONE
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/trace/NonRecordingSpan.js
+var NonRecordingSpan;
+var init_NonRecordingSpan = __esm({
+  "node_modules/@opentelemetry/api/build/esm/trace/NonRecordingSpan.js"() {
+    init_invalid_span_constants();
+    NonRecordingSpan = class {
+      constructor(spanContext = INVALID_SPAN_CONTEXT) {
+        this._spanContext = spanContext;
+      }
+      // Returns a SpanContext.
+      spanContext() {
+        return this._spanContext;
+      }
+      // By default does nothing
+      setAttribute(_key, _value) {
+        return this;
+      }
+      // By default does nothing
+      setAttributes(_attributes) {
+        return this;
+      }
+      // By default does nothing
+      addEvent(_name, _attributes) {
+        return this;
+      }
+      addLink(_link) {
+        return this;
+      }
+      addLinks(_links) {
+        return this;
+      }
+      // By default does nothing
+      setStatus(_status) {
+        return this;
+      }
+      // By default does nothing
+      updateName(_name) {
+        return this;
+      }
+      // By default does nothing
+      end(_endTime) {
+      }
+      // isRecording always returns false for NonRecordingSpan.
+      isRecording() {
+        return false;
+      }
+      // By default does nothing
+      recordException(_exception, _time) {
+      }
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/trace/context-utils.js
+function getSpan(context2) {
+  return context2.getValue(SPAN_KEY) || void 0;
+}
+function getActiveSpan() {
+  return getSpan(ContextAPI.getInstance().active());
+}
+function setSpan(context2, span) {
+  return context2.setValue(SPAN_KEY, span);
+}
+function deleteSpan(context2) {
+  return context2.deleteValue(SPAN_KEY);
+}
+function setSpanContext(context2, spanContext) {
+  return setSpan(context2, new NonRecordingSpan(spanContext));
+}
+function getSpanContext(context2) {
+  var _a;
+  return (_a = getSpan(context2)) === null || _a === void 0 ? void 0 : _a.spanContext();
+}
+var SPAN_KEY;
+var init_context_utils = __esm({
+  "node_modules/@opentelemetry/api/build/esm/trace/context-utils.js"() {
+    init_context();
+    init_NonRecordingSpan();
+    init_context2();
+    SPAN_KEY = createContextKey("OpenTelemetry Context Key SPAN");
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/trace/spancontext-utils.js
+function isValidHex(id, length) {
+  if (typeof id !== "string" || id.length !== length)
+    return false;
+  let r = 0;
+  for (let i = 0; i < id.length; i += 4) {
+    r += (isHex[id.charCodeAt(i)] | 0) + (isHex[id.charCodeAt(i + 1)] | 0) + (isHex[id.charCodeAt(i + 2)] | 0) + (isHex[id.charCodeAt(i + 3)] | 0);
+  }
+  return r === length;
+}
+function isValidTraceId(traceId) {
+  return isValidHex(traceId, 32) && traceId !== INVALID_TRACEID;
+}
+function isValidSpanId(spanId) {
+  return isValidHex(spanId, 16) && spanId !== INVALID_SPANID;
+}
+function isSpanContextValid(spanContext) {
+  return isValidTraceId(spanContext.traceId) && isValidSpanId(spanContext.spanId);
+}
+function wrapSpanContext(spanContext) {
+  return new NonRecordingSpan(spanContext);
+}
+var isHex;
+var init_spancontext_utils = __esm({
+  "node_modules/@opentelemetry/api/build/esm/trace/spancontext-utils.js"() {
+    init_invalid_span_constants();
+    init_NonRecordingSpan();
+    isHex = new Uint8Array([
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]);
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/trace/NoopTracer.js
+function isSpanContext(spanContext) {
+  return spanContext !== null && typeof spanContext === "object" && "spanId" in spanContext && typeof spanContext["spanId"] === "string" && "traceId" in spanContext && typeof spanContext["traceId"] === "string" && "traceFlags" in spanContext && typeof spanContext["traceFlags"] === "number";
+}
+var contextApi, NoopTracer;
+var init_NoopTracer = __esm({
+  "node_modules/@opentelemetry/api/build/esm/trace/NoopTracer.js"() {
+    init_context2();
+    init_context_utils();
+    init_NonRecordingSpan();
+    init_spancontext_utils();
+    contextApi = ContextAPI.getInstance();
+    NoopTracer = class {
+      // startSpan starts a noop span.
+      startSpan(name, options, context2 = contextApi.active()) {
+        const root = Boolean(options === null || options === void 0 ? void 0 : options.root);
+        if (root) {
+          return new NonRecordingSpan();
+        }
+        const parentFromContext = context2 && getSpanContext(context2);
+        if (isSpanContext(parentFromContext) && isSpanContextValid(parentFromContext)) {
+          return new NonRecordingSpan(parentFromContext);
+        } else {
+          return new NonRecordingSpan();
+        }
+      }
+      startActiveSpan(name, arg2, arg3, arg4) {
+        let opts;
+        let ctx;
+        let fn;
+        if (arguments.length < 2) {
+          return;
+        } else if (arguments.length === 2) {
+          fn = arg2;
+        } else if (arguments.length === 3) {
+          opts = arg2;
+          fn = arg3;
+        } else {
+          opts = arg2;
+          ctx = arg3;
+          fn = arg4;
+        }
+        const parentContext = ctx !== null && ctx !== void 0 ? ctx : contextApi.active();
+        const span = this.startSpan(name, opts, parentContext);
+        const contextWithSpanSet = setSpan(parentContext, span);
+        return contextApi.with(contextWithSpanSet, fn, void 0, span);
+      }
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/trace/ProxyTracer.js
+var NOOP_TRACER, ProxyTracer;
+var init_ProxyTracer = __esm({
+  "node_modules/@opentelemetry/api/build/esm/trace/ProxyTracer.js"() {
+    init_NoopTracer();
+    NOOP_TRACER = new NoopTracer();
+    ProxyTracer = class {
+      constructor(provider, name, version, options) {
+        this._provider = provider;
+        this.name = name;
+        this.version = version;
+        this.options = options;
+      }
+      startSpan(name, options, context2) {
+        return this._getTracer().startSpan(name, options, context2);
+      }
+      startActiveSpan(_name, _options, _context, _fn) {
+        const tracer = this._getTracer();
+        return Reflect.apply(tracer.startActiveSpan, tracer, arguments);
+      }
+      /**
+       * Try to get a tracer from the proxy tracer provider.
+       * If the proxy tracer provider has no delegate, return a noop tracer.
+       */
+      _getTracer() {
+        if (this._delegate) {
+          return this._delegate;
+        }
+        const tracer = this._provider.getDelegateTracer(this.name, this.version, this.options);
+        if (!tracer) {
+          return NOOP_TRACER;
+        }
+        this._delegate = tracer;
+        return this._delegate;
+      }
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/trace/NoopTracerProvider.js
+var NoopTracerProvider;
+var init_NoopTracerProvider = __esm({
+  "node_modules/@opentelemetry/api/build/esm/trace/NoopTracerProvider.js"() {
+    init_NoopTracer();
+    NoopTracerProvider = class {
+      getTracer(_name, _version, _options) {
+        return new NoopTracer();
+      }
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/trace/ProxyTracerProvider.js
+var NOOP_TRACER_PROVIDER, ProxyTracerProvider;
+var init_ProxyTracerProvider = __esm({
+  "node_modules/@opentelemetry/api/build/esm/trace/ProxyTracerProvider.js"() {
+    init_ProxyTracer();
+    init_NoopTracerProvider();
+    NOOP_TRACER_PROVIDER = new NoopTracerProvider();
+    ProxyTracerProvider = class {
+      /**
+       * Get a {@link ProxyTracer}
+       */
+      getTracer(name, version, options) {
+        var _a;
+        return (_a = this.getDelegateTracer(name, version, options)) !== null && _a !== void 0 ? _a : new ProxyTracer(this, name, version, options);
+      }
+      getDelegate() {
+        var _a;
+        return (_a = this._delegate) !== null && _a !== void 0 ? _a : NOOP_TRACER_PROVIDER;
+      }
+      /**
+       * Set the delegate tracer provider
+       */
+      setDelegate(delegate) {
+        this._delegate = delegate;
+      }
+      getDelegateTracer(name, version, options) {
+        var _a;
+        return (_a = this._delegate) === null || _a === void 0 ? void 0 : _a.getTracer(name, version, options);
+      }
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/trace/SamplingResult.js
+var SamplingDecision;
+var init_SamplingResult = __esm({
+  "node_modules/@opentelemetry/api/build/esm/trace/SamplingResult.js"() {
+    (function(SamplingDecision2) {
+      SamplingDecision2[SamplingDecision2["NOT_RECORD"] = 0] = "NOT_RECORD";
+      SamplingDecision2[SamplingDecision2["RECORD"] = 1] = "RECORD";
+      SamplingDecision2[SamplingDecision2["RECORD_AND_SAMPLED"] = 2] = "RECORD_AND_SAMPLED";
+    })(SamplingDecision || (SamplingDecision = {}));
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/trace/span_kind.js
+var SpanKind;
+var init_span_kind = __esm({
+  "node_modules/@opentelemetry/api/build/esm/trace/span_kind.js"() {
+    (function(SpanKind2) {
+      SpanKind2[SpanKind2["INTERNAL"] = 0] = "INTERNAL";
+      SpanKind2[SpanKind2["SERVER"] = 1] = "SERVER";
+      SpanKind2[SpanKind2["CLIENT"] = 2] = "CLIENT";
+      SpanKind2[SpanKind2["PRODUCER"] = 3] = "PRODUCER";
+      SpanKind2[SpanKind2["CONSUMER"] = 4] = "CONSUMER";
+    })(SpanKind || (SpanKind = {}));
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/trace/status.js
+var SpanStatusCode;
+var init_status = __esm({
+  "node_modules/@opentelemetry/api/build/esm/trace/status.js"() {
+    (function(SpanStatusCode2) {
+      SpanStatusCode2[SpanStatusCode2["UNSET"] = 0] = "UNSET";
+      SpanStatusCode2[SpanStatusCode2["OK"] = 1] = "OK";
+      SpanStatusCode2[SpanStatusCode2["ERROR"] = 2] = "ERROR";
+    })(SpanStatusCode || (SpanStatusCode = {}));
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/trace/internal/tracestate-validators.js
+function validateKey(key) {
+  return VALID_KEY_REGEX.test(key);
+}
+function validateValue(value) {
+  return VALID_VALUE_BASE_REGEX.test(value) && !INVALID_VALUE_COMMA_EQUAL_REGEX.test(value);
+}
+var VALID_KEY_CHAR_RANGE, VALID_KEY, VALID_VENDOR_KEY, VALID_KEY_REGEX, VALID_VALUE_BASE_REGEX, INVALID_VALUE_COMMA_EQUAL_REGEX;
+var init_tracestate_validators = __esm({
+  "node_modules/@opentelemetry/api/build/esm/trace/internal/tracestate-validators.js"() {
+    VALID_KEY_CHAR_RANGE = "[_0-9a-z-*/]";
+    VALID_KEY = `[a-z]${VALID_KEY_CHAR_RANGE}{0,255}`;
+    VALID_VENDOR_KEY = `[a-z0-9]${VALID_KEY_CHAR_RANGE}{0,240}@[a-z]${VALID_KEY_CHAR_RANGE}{0,13}`;
+    VALID_KEY_REGEX = new RegExp(`^(?:${VALID_KEY}|${VALID_VENDOR_KEY})$`);
+    VALID_VALUE_BASE_REGEX = /^[ -~]{0,255}[!-~]$/;
+    INVALID_VALUE_COMMA_EQUAL_REGEX = /,|=/;
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/trace/internal/tracestate-impl.js
+var MAX_TRACE_STATE_ITEMS, MAX_TRACE_STATE_LEN, LIST_MEMBERS_SEPARATOR, LIST_MEMBER_KEY_VALUE_SPLITTER, TraceStateImpl;
+var init_tracestate_impl = __esm({
+  "node_modules/@opentelemetry/api/build/esm/trace/internal/tracestate-impl.js"() {
+    init_tracestate_validators();
+    MAX_TRACE_STATE_ITEMS = 32;
+    MAX_TRACE_STATE_LEN = 512;
+    LIST_MEMBERS_SEPARATOR = ",";
+    LIST_MEMBER_KEY_VALUE_SPLITTER = "=";
+    TraceStateImpl = class _TraceStateImpl {
+      constructor(rawTraceState) {
+        this._internalState = /* @__PURE__ */ new Map();
+        if (rawTraceState)
+          this._parse(rawTraceState);
+      }
+      set(key, value) {
+        const traceState = this._clone();
+        if (traceState._internalState.has(key)) {
+          traceState._internalState.delete(key);
+        }
+        traceState._internalState.set(key, value);
+        return traceState;
+      }
+      unset(key) {
+        const traceState = this._clone();
+        traceState._internalState.delete(key);
+        return traceState;
+      }
+      get(key) {
+        return this._internalState.get(key);
+      }
+      serialize() {
+        return Array.from(this._internalState.keys()).reduceRight((agg, key) => {
+          agg.push(key + LIST_MEMBER_KEY_VALUE_SPLITTER + this.get(key));
+          return agg;
+        }, []).join(LIST_MEMBERS_SEPARATOR);
+      }
+      _parse(rawTraceState) {
+        if (rawTraceState.length > MAX_TRACE_STATE_LEN)
+          return;
+        this._internalState = rawTraceState.split(LIST_MEMBERS_SEPARATOR).reduceRight((agg, part) => {
+          const listMember = part.trim();
+          const i = listMember.indexOf(LIST_MEMBER_KEY_VALUE_SPLITTER);
+          if (i !== -1) {
+            const key = listMember.slice(0, i);
+            const value = listMember.slice(i + 1, part.length);
+            if (validateKey(key) && validateValue(value)) {
+              agg.set(key, value);
+            } else {
+            }
+          }
+          return agg;
+        }, /* @__PURE__ */ new Map());
+        if (this._internalState.size > MAX_TRACE_STATE_ITEMS) {
+          this._internalState = new Map(Array.from(this._internalState.entries()).reverse().slice(0, MAX_TRACE_STATE_ITEMS));
+        }
+      }
+      // @ts-expect-error TS6133 Accessed in tests only.
+      _keys() {
+        return Array.from(this._internalState.keys()).reverse();
+      }
+      _clone() {
+        const traceState = new _TraceStateImpl();
+        traceState._internalState = new Map(this._internalState);
+        return traceState;
+      }
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/trace/internal/utils.js
+function createTraceState(rawTraceState) {
+  return new TraceStateImpl(rawTraceState);
+}
+var init_utils2 = __esm({
+  "node_modules/@opentelemetry/api/build/esm/trace/internal/utils.js"() {
+    init_tracestate_impl();
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/context-api.js
+var context;
+var init_context_api = __esm({
+  "node_modules/@opentelemetry/api/build/esm/context-api.js"() {
+    init_context2();
+    context = ContextAPI.getInstance();
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/diag-api.js
+var diag2;
+var init_diag_api = __esm({
+  "node_modules/@opentelemetry/api/build/esm/diag-api.js"() {
+    init_diag();
+    diag2 = DiagAPI.instance();
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/metrics/NoopMeterProvider.js
+var NoopMeterProvider, NOOP_METER_PROVIDER;
+var init_NoopMeterProvider = __esm({
+  "node_modules/@opentelemetry/api/build/esm/metrics/NoopMeterProvider.js"() {
+    init_NoopMeter();
+    NoopMeterProvider = class {
+      getMeter(_name, _version, _options) {
+        return NOOP_METER;
+      }
+    };
+    NOOP_METER_PROVIDER = new NoopMeterProvider();
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/api/metrics.js
+var API_NAME3, MetricsAPI;
+var init_metrics = __esm({
+  "node_modules/@opentelemetry/api/build/esm/api/metrics.js"() {
+    init_NoopMeterProvider();
+    init_global_utils();
+    init_diag();
+    API_NAME3 = "metrics";
+    MetricsAPI = class _MetricsAPI {
+      /** Empty private constructor prevents end users from constructing a new instance of the API */
+      constructor() {
+      }
+      /** Get the singleton instance of the Metrics API */
+      static getInstance() {
+        if (!this._instance) {
+          this._instance = new _MetricsAPI();
+        }
+        return this._instance;
+      }
+      /**
+       * Set the current global meter provider.
+       * Returns true if the meter provider was successfully registered, else false.
+       */
+      setGlobalMeterProvider(provider) {
+        return registerGlobal(API_NAME3, provider, DiagAPI.instance());
+      }
+      /**
+       * Returns the global meter provider.
+       */
+      getMeterProvider() {
+        return getGlobal(API_NAME3) || NOOP_METER_PROVIDER;
+      }
+      /**
+       * Returns a meter from the global meter provider.
+       */
+      getMeter(name, version, options) {
+        return this.getMeterProvider().getMeter(name, version, options);
+      }
+      /** Remove the global meter provider */
+      disable() {
+        unregisterGlobal(API_NAME3, DiagAPI.instance());
+      }
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/metrics-api.js
+var metrics;
+var init_metrics_api = __esm({
+  "node_modules/@opentelemetry/api/build/esm/metrics-api.js"() {
+    init_metrics();
+    metrics = MetricsAPI.getInstance();
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/propagation/NoopTextMapPropagator.js
+var NoopTextMapPropagator;
+var init_NoopTextMapPropagator = __esm({
+  "node_modules/@opentelemetry/api/build/esm/propagation/NoopTextMapPropagator.js"() {
+    NoopTextMapPropagator = class {
+      /** Noop inject function does nothing */
+      inject(_context, _carrier) {
+      }
+      /** Noop extract function does nothing and returns the input context */
+      extract(context2, _carrier) {
+        return context2;
+      }
+      fields() {
+        return [];
+      }
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/baggage/context-helpers.js
+function getBaggage(context2) {
+  return context2.getValue(BAGGAGE_KEY) || void 0;
+}
+function getActiveBaggage() {
+  return getBaggage(ContextAPI.getInstance().active());
+}
+function setBaggage(context2, baggage) {
+  return context2.setValue(BAGGAGE_KEY, baggage);
+}
+function deleteBaggage(context2) {
+  return context2.deleteValue(BAGGAGE_KEY);
+}
+var BAGGAGE_KEY;
+var init_context_helpers = __esm({
+  "node_modules/@opentelemetry/api/build/esm/baggage/context-helpers.js"() {
+    init_context2();
+    init_context();
+    BAGGAGE_KEY = createContextKey("OpenTelemetry Baggage Key");
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/api/propagation.js
+var API_NAME4, NOOP_TEXT_MAP_PROPAGATOR, PropagationAPI;
+var init_propagation = __esm({
+  "node_modules/@opentelemetry/api/build/esm/api/propagation.js"() {
+    init_global_utils();
+    init_NoopTextMapPropagator();
+    init_TextMapPropagator();
+    init_context_helpers();
+    init_utils();
+    init_diag();
+    API_NAME4 = "propagation";
+    NOOP_TEXT_MAP_PROPAGATOR = new NoopTextMapPropagator();
+    PropagationAPI = class _PropagationAPI {
+      /** Empty private constructor prevents end users from constructing a new instance of the API */
+      constructor() {
+        this.createBaggage = createBaggage;
+        this.getBaggage = getBaggage;
+        this.getActiveBaggage = getActiveBaggage;
+        this.setBaggage = setBaggage;
+        this.deleteBaggage = deleteBaggage;
+      }
+      /** Get the singleton instance of the Propagator API */
+      static getInstance() {
+        if (!this._instance) {
+          this._instance = new _PropagationAPI();
+        }
+        return this._instance;
+      }
+      /**
+       * Set the current propagator.
+       *
+       * @returns true if the propagator was successfully registered, else false
+       */
+      setGlobalPropagator(propagator) {
+        return registerGlobal(API_NAME4, propagator, DiagAPI.instance());
+      }
+      /**
+       * Inject context into a carrier to be propagated inter-process
+       *
+       * @param context Context carrying tracing data to inject
+       * @param carrier carrier to inject context into
+       * @param setter Function used to set values on the carrier
+       */
+      inject(context2, carrier, setter = defaultTextMapSetter) {
+        return this._getGlobalPropagator().inject(context2, carrier, setter);
+      }
+      /**
+       * Extract context from a carrier
+       *
+       * @param context Context which the newly created context will inherit from
+       * @param carrier Carrier to extract context from
+       * @param getter Function used to extract keys from a carrier
+       */
+      extract(context2, carrier, getter = defaultTextMapGetter) {
+        return this._getGlobalPropagator().extract(context2, carrier, getter);
+      }
+      /**
+       * Return a list of all fields which may be used by the propagator.
+       */
+      fields() {
+        return this._getGlobalPropagator().fields();
+      }
+      /** Remove the global propagator */
+      disable() {
+        unregisterGlobal(API_NAME4, DiagAPI.instance());
+      }
+      _getGlobalPropagator() {
+        return getGlobal(API_NAME4) || NOOP_TEXT_MAP_PROPAGATOR;
+      }
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/propagation-api.js
+var propagation;
+var init_propagation_api = __esm({
+  "node_modules/@opentelemetry/api/build/esm/propagation-api.js"() {
+    init_propagation();
+    propagation = PropagationAPI.getInstance();
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/api/trace.js
+var API_NAME5, TraceAPI;
+var init_trace = __esm({
+  "node_modules/@opentelemetry/api/build/esm/api/trace.js"() {
+    init_global_utils();
+    init_ProxyTracerProvider();
+    init_spancontext_utils();
+    init_context_utils();
+    init_diag();
+    API_NAME5 = "trace";
+    TraceAPI = class _TraceAPI {
+      /** Empty private constructor prevents end users from constructing a new instance of the API */
+      constructor() {
+        this._proxyTracerProvider = new ProxyTracerProvider();
+        this.wrapSpanContext = wrapSpanContext;
+        this.isSpanContextValid = isSpanContextValid;
+        this.deleteSpan = deleteSpan;
+        this.getSpan = getSpan;
+        this.getActiveSpan = getActiveSpan;
+        this.getSpanContext = getSpanContext;
+        this.setSpan = setSpan;
+        this.setSpanContext = setSpanContext;
+      }
+      /** Get the singleton instance of the Trace API */
+      static getInstance() {
+        if (!this._instance) {
+          this._instance = new _TraceAPI();
+        }
+        return this._instance;
+      }
+      /**
+       * Set the current global tracer.
+       *
+       * @returns true if the tracer provider was successfully registered, else false
+       */
+      setGlobalTracerProvider(provider) {
+        const success = registerGlobal(API_NAME5, this._proxyTracerProvider, DiagAPI.instance());
+        if (success) {
+          this._proxyTracerProvider.setDelegate(provider);
+        }
+        return success;
+      }
+      /**
+       * Returns the global tracer provider.
+       */
+      getTracerProvider() {
+        return getGlobal(API_NAME5) || this._proxyTracerProvider;
+      }
+      /**
+       * Returns a tracer from the global tracer provider.
+       */
+      getTracer(name, version) {
+        return this.getTracerProvider().getTracer(name, version);
+      }
+      /** Remove the global tracer provider */
+      disable() {
+        unregisterGlobal(API_NAME5, DiagAPI.instance());
+        this._proxyTracerProvider = new ProxyTracerProvider();
+      }
+    };
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/trace-api.js
+var trace;
+var init_trace_api = __esm({
+  "node_modules/@opentelemetry/api/build/esm/trace-api.js"() {
+    init_trace();
+    trace = TraceAPI.getInstance();
+  }
+});
+
+// node_modules/@opentelemetry/api/build/esm/index.js
+var esm_exports = {};
+__export(esm_exports, {
+  DiagConsoleLogger: () => DiagConsoleLogger,
+  DiagLogLevel: () => DiagLogLevel,
+  INVALID_SPANID: () => INVALID_SPANID,
+  INVALID_SPAN_CONTEXT: () => INVALID_SPAN_CONTEXT,
+  INVALID_TRACEID: () => INVALID_TRACEID,
+  ProxyTracer: () => ProxyTracer,
+  ProxyTracerProvider: () => ProxyTracerProvider,
+  ROOT_CONTEXT: () => ROOT_CONTEXT,
+  SamplingDecision: () => SamplingDecision,
+  SpanKind: () => SpanKind,
+  SpanStatusCode: () => SpanStatusCode,
+  TraceFlags: () => TraceFlags,
+  ValueType: () => ValueType,
+  baggageEntryMetadataFromString: () => baggageEntryMetadataFromString,
+  context: () => context,
+  createContextKey: () => createContextKey,
+  createNoopMeter: () => createNoopMeter,
+  createTraceState: () => createTraceState,
+  default: () => esm_default,
+  defaultTextMapGetter: () => defaultTextMapGetter,
+  defaultTextMapSetter: () => defaultTextMapSetter,
+  diag: () => diag2,
+  isSpanContextValid: () => isSpanContextValid,
+  isValidSpanId: () => isValidSpanId,
+  isValidTraceId: () => isValidTraceId,
+  metrics: () => metrics,
+  propagation: () => propagation,
+  trace: () => trace
+});
+var esm_default;
+var init_esm = __esm({
+  "node_modules/@opentelemetry/api/build/esm/index.js"() {
+    init_utils();
+    init_context();
+    init_consoleLogger();
+    init_types();
+    init_NoopMeter();
+    init_Metric();
+    init_TextMapPropagator();
+    init_ProxyTracer();
+    init_ProxyTracerProvider();
+    init_SamplingResult();
+    init_span_kind();
+    init_status();
+    init_trace_flags();
+    init_utils2();
+    init_spancontext_utils();
+    init_invalid_span_constants();
+    init_context_api();
+    init_diag_api();
+    init_metrics_api();
+    init_propagation_api();
+    init_trace_api();
+    esm_default = {
+      context,
+      diag: diag2,
+      metrics,
+      propagation,
+      trace
+    };
+  }
+});
+
+// node_modules/prom-client/lib/metrics/processCpuTotal.js
+var require_processCpuTotal = __commonJS({
+  "node_modules/prom-client/lib/metrics/processCpuTotal.js"(exports2, module2) {
+    "use strict";
+    var OtelApi = (init_esm(), __toCommonJS(esm_exports));
+    var Counter = require_counter();
+    var PROCESS_CPU_USER_SECONDS = "process_cpu_user_seconds_total";
+    var PROCESS_CPU_SYSTEM_SECONDS = "process_cpu_system_seconds_total";
+    var PROCESS_CPU_SECONDS = "process_cpu_seconds_total";
+    module2.exports = (registry, config = {}) => {
+      const registers = registry ? [registry] : void 0;
+      const namePrefix = config.prefix ? config.prefix : "";
+      const labels = config.labels ? config.labels : {};
+      const exemplars = config.enableExemplars ? config.enableExemplars : false;
+      const labelNames = Object.keys(labels);
+      let lastCpuUsage = process.cpuUsage();
+      const cpuUserUsageCounter = new Counter({
+        name: namePrefix + PROCESS_CPU_USER_SECONDS,
+        help: "Total user CPU time spent in seconds.",
+        enableExemplars: exemplars,
+        registers,
+        labelNames,
+        // Use this one metric's `collect` to set all metrics' values.
+        collect() {
+          const cpuUsage = process.cpuUsage();
+          const userUsageMicros = cpuUsage.user - lastCpuUsage.user;
+          const systemUsageMicros = cpuUsage.system - lastCpuUsage.system;
+          lastCpuUsage = cpuUsage;
+          if (this.enableExemplars) {
+            let exemplarLabels = {};
+            const currentSpan = OtelApi.trace.getSpan(OtelApi.context.active());
+            if (currentSpan) {
+              exemplarLabels = {
+                traceId: currentSpan.spanContext().traceId,
+                spanId: currentSpan.spanContext().spanId
+              };
+            }
+            cpuUserUsageCounter.inc({
+              labels,
+              value: userUsageMicros / 1e6,
+              exemplarLabels
+            });
+            cpuSystemUsageCounter.inc({
+              labels,
+              value: systemUsageMicros / 1e6,
+              exemplarLabels
+            });
+            cpuUsageCounter.inc({
+              labels,
+              value: (userUsageMicros + systemUsageMicros) / 1e6,
+              exemplarLabels
+            });
+          } else {
+            cpuUserUsageCounter.inc(labels, userUsageMicros / 1e6);
+            cpuSystemUsageCounter.inc(labels, systemUsageMicros / 1e6);
+            cpuUsageCounter.inc(
+              labels,
+              (userUsageMicros + systemUsageMicros) / 1e6
+            );
+          }
+        }
+      });
+      const cpuSystemUsageCounter = new Counter({
+        name: namePrefix + PROCESS_CPU_SYSTEM_SECONDS,
+        help: "Total system CPU time spent in seconds.",
+        enableExemplars: exemplars,
+        registers,
+        labelNames
+      });
+      const cpuUsageCounter = new Counter({
+        name: namePrefix + PROCESS_CPU_SECONDS,
+        help: "Total user and system CPU time spent in seconds.",
+        enableExemplars: exemplars,
+        registers,
+        labelNames
+      });
+    };
+    module2.exports.metricNames = [
+      PROCESS_CPU_USER_SECONDS,
+      PROCESS_CPU_SYSTEM_SECONDS,
+      PROCESS_CPU_SECONDS
+    ];
+  }
+});
+
+// node_modules/prom-client/lib/metrics/processStartTime.js
+var require_processStartTime = __commonJS({
+  "node_modules/prom-client/lib/metrics/processStartTime.js"(exports2, module2) {
+    "use strict";
+    var Gauge = require_gauge();
+    var startInSeconds = Math.round(Date.now() / 1e3 - process.uptime());
+    var PROCESS_START_TIME = "process_start_time_seconds";
+    module2.exports = (registry, config = {}) => {
+      const namePrefix = config.prefix ? config.prefix : "";
+      const labels = config.labels ? config.labels : {};
+      const labelNames = Object.keys(labels);
+      new Gauge({
+        name: namePrefix + PROCESS_START_TIME,
+        help: "Start time of the process since unix epoch in seconds.",
+        registers: registry ? [registry] : void 0,
+        labelNames,
+        aggregator: "omit",
+        collect() {
+          this.set(labels, startInSeconds);
+        }
+      });
+    };
+    module2.exports.metricNames = [PROCESS_START_TIME];
+  }
+});
+
+// node_modules/prom-client/lib/metrics/osMemoryHeapLinux.js
+var require_osMemoryHeapLinux = __commonJS({
+  "node_modules/prom-client/lib/metrics/osMemoryHeapLinux.js"(exports2, module2) {
+    "use strict";
+    var Gauge = require_gauge();
+    var fs = require("fs");
+    var values = ["VmSize", "VmRSS", "VmData"];
+    var PROCESS_RESIDENT_MEMORY = "process_resident_memory_bytes";
+    var PROCESS_VIRTUAL_MEMORY = "process_virtual_memory_bytes";
+    var PROCESS_HEAP = "process_heap_bytes";
+    function structureOutput(input) {
+      return input.split("\n").reduce((acc, string) => {
+        if (!values.some((value2) => string.startsWith(value2))) {
+          return acc;
+        }
+        const split = string.split(":");
+        let value = split[1].trim();
+        value = value.substr(0, value.length - 3);
+        value = Number(value) * 1024;
+        acc[split[0]] = value;
+        return acc;
+      }, {});
+    }
+    module2.exports = (registry, config = {}) => {
+      const registers = registry ? [registry] : void 0;
+      const namePrefix = config.prefix ? config.prefix : "";
+      const labels = config.labels ? config.labels : {};
+      const labelNames = Object.keys(labels);
+      const residentMemGauge = new Gauge({
+        name: namePrefix + PROCESS_RESIDENT_MEMORY,
+        help: "Resident memory size in bytes.",
+        registers,
+        labelNames,
+        // Use this one metric's `collect` to set all metrics' values.
+        collect() {
+          try {
+            const stat = fs.readFileSync("/proc/self/status", "utf8");
+            const structuredOutput = structureOutput(stat);
+            residentMemGauge.set(labels, structuredOutput.VmRSS);
+            virtualMemGauge.set(labels, structuredOutput.VmSize);
+            heapSizeMemGauge.set(labels, structuredOutput.VmData);
+          } catch {
+          }
+        }
+      });
+      const virtualMemGauge = new Gauge({
+        name: namePrefix + PROCESS_VIRTUAL_MEMORY,
+        help: "Virtual memory size in bytes.",
+        registers,
+        labelNames
+      });
+      const heapSizeMemGauge = new Gauge({
+        name: namePrefix + PROCESS_HEAP,
+        help: "Process heap size in bytes.",
+        registers,
+        labelNames
+      });
+    };
+    module2.exports.metricNames = [
+      PROCESS_RESIDENT_MEMORY,
+      PROCESS_VIRTUAL_MEMORY,
+      PROCESS_HEAP
+    ];
+  }
+});
+
+// node_modules/prom-client/lib/metrics/helpers/safeMemoryUsage.js
+var require_safeMemoryUsage = __commonJS({
+  "node_modules/prom-client/lib/metrics/helpers/safeMemoryUsage.js"(exports2, module2) {
+    "use strict";
+    function safeMemoryUsage() {
+      try {
+        return process.memoryUsage();
+      } catch {
+        return;
+      }
+    }
+    module2.exports = safeMemoryUsage;
+  }
+});
+
+// node_modules/prom-client/lib/metrics/osMemoryHeap.js
+var require_osMemoryHeap = __commonJS({
+  "node_modules/prom-client/lib/metrics/osMemoryHeap.js"(exports2, module2) {
+    "use strict";
+    var Gauge = require_gauge();
+    var linuxVariant = require_osMemoryHeapLinux();
+    var safeMemoryUsage = require_safeMemoryUsage();
+    var PROCESS_RESIDENT_MEMORY = "process_resident_memory_bytes";
+    function notLinuxVariant(registry, config = {}) {
+      const namePrefix = config.prefix ? config.prefix : "";
+      const labels = config.labels ? config.labels : {};
+      const labelNames = Object.keys(labels);
+      new Gauge({
+        name: namePrefix + PROCESS_RESIDENT_MEMORY,
+        help: "Resident memory size in bytes.",
+        registers: registry ? [registry] : void 0,
+        labelNames,
+        collect() {
+          const memUsage = safeMemoryUsage();
+          if (memUsage) {
+            this.set(labels, memUsage.rss);
+          }
+        }
+      });
+    }
+    module2.exports = (registry, config) => process.platform === "linux" ? linuxVariant(registry, config) : notLinuxVariant(registry, config);
+    module2.exports.metricNames = process.platform === "linux" ? linuxVariant.metricNames : [PROCESS_RESIDENT_MEMORY];
+  }
+});
+
+// node_modules/prom-client/lib/metrics/processOpenFileDescriptors.js
+var require_processOpenFileDescriptors = __commonJS({
+  "node_modules/prom-client/lib/metrics/processOpenFileDescriptors.js"(exports2, module2) {
+    "use strict";
+    var Gauge = require_gauge();
+    var fs = require("fs");
+    var process2 = require("process");
+    var PROCESS_OPEN_FDS = "process_open_fds";
+    module2.exports = (registry, config = {}) => {
+      if (process2.platform !== "linux") {
+        return;
+      }
+      const namePrefix = config.prefix ? config.prefix : "";
+      const labels = config.labels ? config.labels : {};
+      const labelNames = Object.keys(labels);
+      new Gauge({
+        name: namePrefix + PROCESS_OPEN_FDS,
+        help: "Number of open file descriptors.",
+        registers: registry ? [registry] : void 0,
+        labelNames,
+        collect() {
+          try {
+            const fds = fs.readdirSync("/proc/self/fd");
+            this.set(labels, fds.length - 1);
+          } catch {
+          }
+        }
+      });
+    };
+    module2.exports.metricNames = [PROCESS_OPEN_FDS];
+  }
+});
+
+// node_modules/prom-client/lib/metrics/processMaxFileDescriptors.js
+var require_processMaxFileDescriptors = __commonJS({
+  "node_modules/prom-client/lib/metrics/processMaxFileDescriptors.js"(exports2, module2) {
+    "use strict";
+    var Gauge = require_gauge();
+    var fs = require("fs");
+    var PROCESS_MAX_FDS = "process_max_fds";
+    var maxFds;
+    module2.exports = (registry, config = {}) => {
+      if (maxFds === void 0) {
+        try {
+          const limits = fs.readFileSync("/proc/self/limits", "utf8");
+          const lines = limits.split("\n");
+          for (const line of lines) {
+            if (line.startsWith("Max open files")) {
+              const parts = line.split(/  +/);
+              maxFds = Number(parts[1]);
+              break;
+            }
+          }
+        } catch {
+          return;
+        }
+      }
+      if (maxFds === void 0) return;
+      const namePrefix = config.prefix ? config.prefix : "";
+      const labels = config.labels ? config.labels : {};
+      const labelNames = Object.keys(labels);
+      new Gauge({
+        name: namePrefix + PROCESS_MAX_FDS,
+        help: "Maximum number of open file descriptors.",
+        registers: registry ? [registry] : void 0,
+        labelNames,
+        collect() {
+          if (maxFds !== void 0) this.set(labels, maxFds);
+        }
+      });
+    };
+    module2.exports.metricNames = [PROCESS_MAX_FDS];
+  }
+});
+
+// node_modules/prom-client/lib/metrics/eventLoopLag.js
+var require_eventLoopLag = __commonJS({
+  "node_modules/prom-client/lib/metrics/eventLoopLag.js"(exports2, module2) {
+    "use strict";
+    var Gauge = require_gauge();
+    var perf_hooks;
+    try {
+      perf_hooks = require("perf_hooks");
+    } catch {
+    }
+    var NODEJS_EVENTLOOP_LAG = "nodejs_eventloop_lag_seconds";
+    var NODEJS_EVENTLOOP_LAG_MIN = "nodejs_eventloop_lag_min_seconds";
+    var NODEJS_EVENTLOOP_LAG_MAX = "nodejs_eventloop_lag_max_seconds";
+    var NODEJS_EVENTLOOP_LAG_MEAN = "nodejs_eventloop_lag_mean_seconds";
+    var NODEJS_EVENTLOOP_LAG_STDDEV = "nodejs_eventloop_lag_stddev_seconds";
+    var NODEJS_EVENTLOOP_LAG_P50 = "nodejs_eventloop_lag_p50_seconds";
+    var NODEJS_EVENTLOOP_LAG_P90 = "nodejs_eventloop_lag_p90_seconds";
+    var NODEJS_EVENTLOOP_LAG_P99 = "nodejs_eventloop_lag_p99_seconds";
+    function reportEventloopLag(start, gauge, labels) {
+      const delta = process.hrtime(start);
+      const nanosec = delta[0] * 1e9 + delta[1];
+      const seconds = nanosec / 1e9;
+      gauge.set(labels, seconds);
+    }
+    module2.exports = (registry, config = {}) => {
+      const namePrefix = config.prefix ? config.prefix : "";
+      const labels = config.labels ? config.labels : {};
+      const labelNames = Object.keys(labels);
+      const registers = registry ? [registry] : void 0;
+      let collect = () => {
+        const start = process.hrtime();
+        setImmediate(reportEventloopLag, start, lag, labels);
+      };
+      if (perf_hooks && perf_hooks.monitorEventLoopDelay) {
+        try {
+          const histogram = perf_hooks.monitorEventLoopDelay({
+            resolution: config.eventLoopMonitoringPrecision
+          });
+          histogram.enable();
+          collect = () => {
+            const start = process.hrtime();
+            setImmediate(reportEventloopLag, start, lag, labels);
+            lagMin.set(labels, histogram.min / 1e9);
+            lagMax.set(labels, histogram.max / 1e9);
+            lagMean.set(labels, histogram.mean / 1e9);
+            lagStddev.set(labels, histogram.stddev / 1e9);
+            lagP50.set(labels, histogram.percentile(50) / 1e9);
+            lagP90.set(labels, histogram.percentile(90) / 1e9);
+            lagP99.set(labels, histogram.percentile(99) / 1e9);
+            histogram.reset();
+          };
+        } catch (e) {
+          if (e.code === "ERR_NOT_IMPLEMENTED") {
+            return;
+          }
+          throw e;
+        }
+      }
+      const lag = new Gauge({
+        name: namePrefix + NODEJS_EVENTLOOP_LAG,
+        help: "Lag of event loop in seconds.",
+        registers,
+        labelNames,
+        aggregator: "average",
+        // Use this one metric's `collect` to set all metrics' values.
+        collect
+      });
+      const lagMin = new Gauge({
+        name: namePrefix + NODEJS_EVENTLOOP_LAG_MIN,
+        help: "The minimum recorded event loop delay.",
+        registers,
+        labelNames,
+        aggregator: "min"
+      });
+      const lagMax = new Gauge({
+        name: namePrefix + NODEJS_EVENTLOOP_LAG_MAX,
+        help: "The maximum recorded event loop delay.",
+        registers,
+        labelNames,
+        aggregator: "max"
+      });
+      const lagMean = new Gauge({
+        name: namePrefix + NODEJS_EVENTLOOP_LAG_MEAN,
+        help: "The mean of the recorded event loop delays.",
+        registers,
+        labelNames,
+        aggregator: "average"
+      });
+      const lagStddev = new Gauge({
+        name: namePrefix + NODEJS_EVENTLOOP_LAG_STDDEV,
+        help: "The standard deviation of the recorded event loop delays.",
+        registers,
+        labelNames,
+        aggregator: "average"
+      });
+      const lagP50 = new Gauge({
+        name: namePrefix + NODEJS_EVENTLOOP_LAG_P50,
+        help: "The 50th percentile of the recorded event loop delays.",
+        registers,
+        labelNames,
+        aggregator: "average"
+      });
+      const lagP90 = new Gauge({
+        name: namePrefix + NODEJS_EVENTLOOP_LAG_P90,
+        help: "The 90th percentile of the recorded event loop delays.",
+        registers,
+        labelNames,
+        aggregator: "average"
+      });
+      const lagP99 = new Gauge({
+        name: namePrefix + NODEJS_EVENTLOOP_LAG_P99,
+        help: "The 99th percentile of the recorded event loop delays.",
+        registers,
+        labelNames,
+        aggregator: "average"
+      });
+    };
+    module2.exports.metricNames = [
+      NODEJS_EVENTLOOP_LAG,
+      NODEJS_EVENTLOOP_LAG_MIN,
+      NODEJS_EVENTLOOP_LAG_MAX,
+      NODEJS_EVENTLOOP_LAG_MEAN,
+      NODEJS_EVENTLOOP_LAG_STDDEV,
+      NODEJS_EVENTLOOP_LAG_P50,
+      NODEJS_EVENTLOOP_LAG_P90,
+      NODEJS_EVENTLOOP_LAG_P99
+    ];
+  }
+});
+
+// node_modules/prom-client/lib/metrics/helpers/processMetricsHelpers.js
+var require_processMetricsHelpers = __commonJS({
+  "node_modules/prom-client/lib/metrics/helpers/processMetricsHelpers.js"(exports2, module2) {
+    "use strict";
+    function aggregateByObjectName(list) {
+      const data = {};
+      for (let i = 0; i < list.length; i++) {
+        const listElement = list[i];
+        if (!listElement || typeof listElement.constructor === "undefined") {
+          continue;
+        }
+        if (Object.hasOwnProperty.call(data, listElement.constructor.name)) {
+          data[listElement.constructor.name] += 1;
+        } else {
+          data[listElement.constructor.name] = 1;
+        }
+      }
+      return data;
+    }
+    function updateMetrics(gauge, data, labels) {
+      gauge.reset();
+      for (const key in data) {
+        gauge.set(Object.assign({ type: key }, labels || {}), data[key]);
+      }
+    }
+    module2.exports = {
+      aggregateByObjectName,
+      updateMetrics
+    };
+  }
+});
+
+// node_modules/prom-client/lib/metrics/processHandles.js
+var require_processHandles = __commonJS({
+  "node_modules/prom-client/lib/metrics/processHandles.js"(exports2, module2) {
+    "use strict";
+    var { aggregateByObjectName } = require_processMetricsHelpers();
+    var { updateMetrics } = require_processMetricsHelpers();
+    var Gauge = require_gauge();
+    var NODEJS_ACTIVE_HANDLES = "nodejs_active_handles";
+    var NODEJS_ACTIVE_HANDLES_TOTAL = "nodejs_active_handles_total";
+    module2.exports = (registry, config = {}) => {
+      if (typeof process._getActiveHandles !== "function") {
+        return;
+      }
+      const registers = registry ? [registry] : void 0;
+      const namePrefix = config.prefix ? config.prefix : "";
+      const labels = config.labels ? config.labels : {};
+      const labelNames = Object.keys(labels);
+      new Gauge({
+        name: namePrefix + NODEJS_ACTIVE_HANDLES,
+        help: "Number of active libuv handles grouped by handle type. Every handle type is C++ class name.",
+        labelNames: ["type", ...labelNames],
+        registers,
+        collect() {
+          const handles = process._getActiveHandles();
+          updateMetrics(this, aggregateByObjectName(handles), labels);
+        }
+      });
+      new Gauge({
+        name: namePrefix + NODEJS_ACTIVE_HANDLES_TOTAL,
+        help: "Total number of active handles.",
+        registers,
+        labelNames,
+        collect() {
+          const handles = process._getActiveHandles();
+          this.set(labels, handles.length);
+        }
+      });
+    };
+    module2.exports.metricNames = [
+      NODEJS_ACTIVE_HANDLES,
+      NODEJS_ACTIVE_HANDLES_TOTAL
+    ];
+  }
+});
+
+// node_modules/prom-client/lib/metrics/processRequests.js
+var require_processRequests = __commonJS({
+  "node_modules/prom-client/lib/metrics/processRequests.js"(exports2, module2) {
+    "use strict";
+    var Gauge = require_gauge();
+    var { aggregateByObjectName } = require_processMetricsHelpers();
+    var { updateMetrics } = require_processMetricsHelpers();
+    var NODEJS_ACTIVE_REQUESTS = "nodejs_active_requests";
+    var NODEJS_ACTIVE_REQUESTS_TOTAL = "nodejs_active_requests_total";
+    module2.exports = (registry, config = {}) => {
+      if (typeof process._getActiveRequests !== "function") {
+        return;
+      }
+      const namePrefix = config.prefix ? config.prefix : "";
+      const labels = config.labels ? config.labels : {};
+      const labelNames = Object.keys(labels);
+      new Gauge({
+        name: namePrefix + NODEJS_ACTIVE_REQUESTS,
+        help: "Number of active libuv requests grouped by request type. Every request type is C++ class name.",
+        labelNames: ["type", ...labelNames],
+        registers: registry ? [registry] : void 0,
+        collect() {
+          const requests = process._getActiveRequests();
+          updateMetrics(this, aggregateByObjectName(requests), labels);
+        }
+      });
+      new Gauge({
+        name: namePrefix + NODEJS_ACTIVE_REQUESTS_TOTAL,
+        help: "Total number of active requests.",
+        registers: registry ? [registry] : void 0,
+        labelNames,
+        collect() {
+          const requests = process._getActiveRequests();
+          this.set(labels, requests.length);
+        }
+      });
+    };
+    module2.exports.metricNames = [
+      NODEJS_ACTIVE_REQUESTS,
+      NODEJS_ACTIVE_REQUESTS_TOTAL
+    ];
+  }
+});
+
+// node_modules/prom-client/lib/metrics/processResources.js
+var require_processResources = __commonJS({
+  "node_modules/prom-client/lib/metrics/processResources.js"(exports2, module2) {
+    "use strict";
+    var Gauge = require_gauge();
+    var { updateMetrics } = require_processMetricsHelpers();
+    var NODEJS_ACTIVE_RESOURCES = "nodejs_active_resources";
+    var NODEJS_ACTIVE_RESOURCES_TOTAL = "nodejs_active_resources_total";
+    module2.exports = (registry, config = {}) => {
+      if (typeof process.getActiveResourcesInfo !== "function") {
+        return;
+      }
+      const namePrefix = config.prefix ? config.prefix : "";
+      const labels = config.labels ? config.labels : {};
+      const labelNames = Object.keys(labels);
+      new Gauge({
+        name: namePrefix + NODEJS_ACTIVE_RESOURCES,
+        help: "Number of active resources that are currently keeping the event loop alive, grouped by async resource type.",
+        labelNames: ["type", ...labelNames],
+        registers: registry ? [registry] : void 0,
+        collect() {
+          const resources = process.getActiveResourcesInfo();
+          const data = {};
+          for (let i = 0; i < resources.length; i++) {
+            const resource = resources[i];
+            if (Object.hasOwn(data, resource)) {
+              data[resource] += 1;
+            } else {
+              data[resource] = 1;
+            }
+          }
+          updateMetrics(this, data, labels);
+        }
+      });
+      new Gauge({
+        name: namePrefix + NODEJS_ACTIVE_RESOURCES_TOTAL,
+        help: "Total number of active resources.",
+        registers: registry ? [registry] : void 0,
+        labelNames,
+        collect() {
+          const resources = process.getActiveResourcesInfo();
+          this.set(labels, resources.length);
+        }
+      });
+    };
+    module2.exports.metricNames = [
+      NODEJS_ACTIVE_RESOURCES,
+      NODEJS_ACTIVE_RESOURCES_TOTAL
+    ];
+  }
+});
+
+// node_modules/prom-client/lib/metrics/heapSizeAndUsed.js
+var require_heapSizeAndUsed = __commonJS({
+  "node_modules/prom-client/lib/metrics/heapSizeAndUsed.js"(exports2, module2) {
+    "use strict";
+    var Gauge = require_gauge();
+    var safeMemoryUsage = require_safeMemoryUsage();
+    var NODEJS_HEAP_SIZE_TOTAL = "nodejs_heap_size_total_bytes";
+    var NODEJS_HEAP_SIZE_USED = "nodejs_heap_size_used_bytes";
+    var NODEJS_EXTERNAL_MEMORY = "nodejs_external_memory_bytes";
+    module2.exports = (registry, config = {}) => {
+      if (typeof process.memoryUsage !== "function") {
+        return;
+      }
+      const labels = config.labels ? config.labels : {};
+      const labelNames = Object.keys(labels);
+      const registers = registry ? [registry] : void 0;
+      const namePrefix = config.prefix ? config.prefix : "";
+      const collect = () => {
+        const memUsage = safeMemoryUsage();
+        if (memUsage) {
+          heapSizeTotal.set(labels, memUsage.heapTotal);
+          heapSizeUsed.set(labels, memUsage.heapUsed);
+          if (memUsage.external !== void 0) {
+            externalMemUsed.set(labels, memUsage.external);
+          }
+        }
+      };
+      const heapSizeTotal = new Gauge({
+        name: namePrefix + NODEJS_HEAP_SIZE_TOTAL,
+        help: "Process heap size from Node.js in bytes.",
+        registers,
+        labelNames,
+        // Use this one metric's `collect` to set all metrics' values.
+        collect
+      });
+      const heapSizeUsed = new Gauge({
+        name: namePrefix + NODEJS_HEAP_SIZE_USED,
+        help: "Process heap size used from Node.js in bytes.",
+        registers,
+        labelNames
+      });
+      const externalMemUsed = new Gauge({
+        name: namePrefix + NODEJS_EXTERNAL_MEMORY,
+        help: "Node.js external memory size in bytes.",
+        registers,
+        labelNames
+      });
+    };
+    module2.exports.metricNames = [
+      NODEJS_HEAP_SIZE_TOTAL,
+      NODEJS_HEAP_SIZE_USED,
+      NODEJS_EXTERNAL_MEMORY
+    ];
+  }
+});
+
+// node_modules/prom-client/lib/metrics/heapSpacesSizeAndUsed.js
+var require_heapSpacesSizeAndUsed = __commonJS({
+  "node_modules/prom-client/lib/metrics/heapSpacesSizeAndUsed.js"(exports2, module2) {
+    "use strict";
+    var Gauge = require_gauge();
+    var v8 = require("v8");
+    var METRICS = ["total", "used", "available"];
+    var NODEJS_HEAP_SIZE = {};
+    METRICS.forEach((metricType) => {
+      NODEJS_HEAP_SIZE[metricType] = `nodejs_heap_space_size_${metricType}_bytes`;
+    });
+    module2.exports = (registry, config = {}) => {
+      try {
+        v8.getHeapSpaceStatistics();
+      } catch (e) {
+        if (e.code === "ERR_NOT_IMPLEMENTED") {
+          return;
+        }
+        throw e;
+      }
+      const registers = registry ? [registry] : void 0;
+      const namePrefix = config.prefix ? config.prefix : "";
+      const labels = config.labels ? config.labels : {};
+      const labelNames = ["space", ...Object.keys(labels)];
+      const gauges = {};
+      METRICS.forEach((metricType) => {
+        gauges[metricType] = new Gauge({
+          name: namePrefix + NODEJS_HEAP_SIZE[metricType],
+          help: `Process heap space size ${metricType} from Node.js in bytes.`,
+          labelNames,
+          registers
+        });
+      });
+      gauges.total.collect = () => {
+        for (const space of v8.getHeapSpaceStatistics()) {
+          const spaceName = space.space_name.substr(
+            0,
+            space.space_name.indexOf("_space")
+          );
+          gauges.total.set({ space: spaceName, ...labels }, space.space_size);
+          gauges.used.set({ space: spaceName, ...labels }, space.space_used_size);
+          gauges.available.set(
+            { space: spaceName, ...labels },
+            space.space_available_size
+          );
+        }
+      };
+    };
+    module2.exports.metricNames = Object.values(NODEJS_HEAP_SIZE);
+  }
+});
+
+// node_modules/prom-client/lib/metrics/version.js
+var require_version = __commonJS({
+  "node_modules/prom-client/lib/metrics/version.js"(exports2, module2) {
+    "use strict";
+    var Gauge = require_gauge();
+    var version = process.version;
+    var versionSegments = version.slice(1).split(".").map(Number);
+    var NODE_VERSION_INFO = "nodejs_version_info";
+    module2.exports = (registry, config = {}) => {
+      const namePrefix = config.prefix ? config.prefix : "";
+      const labels = config.labels ? config.labels : {};
+      const labelNames = Object.keys(labels);
+      new Gauge({
+        name: namePrefix + NODE_VERSION_INFO,
+        help: "Node.js version info.",
+        labelNames: ["version", "major", "minor", "patch", ...labelNames],
+        registers: registry ? [registry] : void 0,
+        aggregator: "first",
+        collect() {
+          this.labels(
+            version,
+            versionSegments[0],
+            versionSegments[1],
+            versionSegments[2],
+            ...Object.values(labels)
+          ).set(1);
+        }
+      });
+    };
+    module2.exports.metricNames = [NODE_VERSION_INFO];
+  }
+});
+
+// node_modules/prom-client/lib/metrics/gc.js
+var require_gc = __commonJS({
+  "node_modules/prom-client/lib/metrics/gc.js"(exports2, module2) {
+    "use strict";
+    var Histogram = require_histogram();
+    var perf_hooks;
+    try {
+      perf_hooks = require("perf_hooks");
+    } catch {
+    }
+    var NODEJS_GC_DURATION_SECONDS = "nodejs_gc_duration_seconds";
+    var DEFAULT_GC_DURATION_BUCKETS = [1e-3, 0.01, 0.1, 1, 2, 5];
+    var kinds = [];
+    if (perf_hooks && perf_hooks.constants) {
+      kinds[perf_hooks.constants.NODE_PERFORMANCE_GC_MAJOR] = "major";
+      kinds[perf_hooks.constants.NODE_PERFORMANCE_GC_MINOR] = "minor";
+      kinds[perf_hooks.constants.NODE_PERFORMANCE_GC_INCREMENTAL] = "incremental";
+      kinds[perf_hooks.constants.NODE_PERFORMANCE_GC_WEAKCB] = "weakcb";
+    }
+    module2.exports = (registry, config = {}) => {
+      if (!perf_hooks) {
+        return;
+      }
+      const namePrefix = config.prefix ? config.prefix : "";
+      const labels = config.labels ? config.labels : {};
+      const labelNames = Object.keys(labels);
+      const buckets = config.gcDurationBuckets ? config.gcDurationBuckets : DEFAULT_GC_DURATION_BUCKETS;
+      const gcHistogram = new Histogram({
+        name: namePrefix + NODEJS_GC_DURATION_SECONDS,
+        help: "Garbage collection duration by kind, one of major, minor, incremental or weakcb.",
+        labelNames: ["kind", ...labelNames],
+        enableExemplars: false,
+        buckets,
+        registers: registry ? [registry] : void 0
+      });
+      const obs = new perf_hooks.PerformanceObserver((list) => {
+        const entry = list.getEntries()[0];
+        const kind = entry.detail ? kinds[entry.detail.kind] : kinds[entry.kind];
+        gcHistogram.observe(Object.assign({ kind }, labels), entry.duration / 1e3);
+      });
+      obs.observe({ entryTypes: ["gc"] });
+    };
+    module2.exports.metricNames = [NODEJS_GC_DURATION_SECONDS];
+  }
+});
+
+// node_modules/prom-client/lib/defaultMetrics.js
+var require_defaultMetrics = __commonJS({
+  "node_modules/prom-client/lib/defaultMetrics.js"(exports2, module2) {
+    "use strict";
+    var { isObject } = require_util();
+    var processCpuTotal = require_processCpuTotal();
+    var processStartTime = require_processStartTime();
+    var osMemoryHeap = require_osMemoryHeap();
+    var processOpenFileDescriptors = require_processOpenFileDescriptors();
+    var processMaxFileDescriptors = require_processMaxFileDescriptors();
+    var eventLoopLag = require_eventLoopLag();
+    var processHandles = require_processHandles();
+    var processRequests = require_processRequests();
+    var processResources = require_processResources();
+    var heapSizeAndUsed = require_heapSizeAndUsed();
+    var heapSpacesSizeAndUsed = require_heapSpacesSizeAndUsed();
+    var version = require_version();
+    var gc = require_gc();
+    var metrics2 = {
+      processCpuTotal,
+      processStartTime,
+      osMemoryHeap,
+      processOpenFileDescriptors,
+      processMaxFileDescriptors,
+      eventLoopLag,
+      ...typeof process.getActiveResourcesInfo === "function" ? { processResources } : {},
+      processHandles,
+      processRequests,
+      heapSizeAndUsed,
+      heapSpacesSizeAndUsed,
+      version,
+      gc
+    };
+    var metricsList = Object.keys(metrics2);
+    module2.exports = function collectDefaultMetrics(config) {
+      if (config !== null && config !== void 0 && !isObject(config)) {
+        throw new TypeError("config must be null, undefined, or an object");
+      }
+      config = { eventLoopMonitoringPrecision: 10, ...config };
+      for (const metric of Object.values(metrics2)) {
+        metric(config.register, config);
+      }
+    };
+    module2.exports.metricsList = metricsList;
+  }
+});
+
+// node_modules/prom-client/lib/metricAggregators.js
+var require_metricAggregators = __commonJS({
+  "node_modules/prom-client/lib/metricAggregators.js"(exports2) {
+    "use strict";
+    var { Grouper, hashObject } = require_util();
+    function AggregatorFactory(aggregatorFn) {
+      return (metrics2) => {
+        if (metrics2.length === 0) return;
+        const result = {
+          help: metrics2[0].help,
+          name: metrics2[0].name,
+          type: metrics2[0].type,
+          values: [],
+          aggregator: metrics2[0].aggregator
+        };
+        const byLabels = new Grouper();
+        metrics2.forEach((metric) => {
+          metric.values.forEach((value) => {
+            const key = hashObject(value.labels);
+            byLabels.add(`${value.metricName}_${key}`, value);
+          });
+        });
+        byLabels.forEach((values) => {
+          if (values.length === 0) return;
+          const valObj = {
+            value: aggregatorFn(values),
+            labels: values[0].labels
+          };
+          if (values[0].metricName) {
+            valObj.metricName = values[0].metricName;
+          }
+          result.values.push(valObj);
+        });
+        return result;
+      };
+    }
+    exports2.AggregatorFactory = AggregatorFactory;
+    exports2.aggregators = {
+      /**
+       * @return The sum of values.
+       */
+      sum: AggregatorFactory((v) => v.reduce((p, c) => p + c.value, 0)),
+      /**
+       * @return The first value.
+       */
+      first: AggregatorFactory((v) => v[0].value),
+      /**
+       * @return {undefined} Undefined; omits the metric.
+       */
+      omit: () => {
+      },
+      /**
+       * @return The arithmetic mean of the values.
+       */
+      average: AggregatorFactory(
+        (v) => v.reduce((p, c) => p + c.value, 0) / v.length
+      ),
+      /**
+       * @return The minimum of the values.
+       */
+      min: AggregatorFactory(
+        (v) => v.reduce((p, c) => Math.min(p, c.value), Infinity)
+      ),
+      /**
+       * @return The maximum of the values.
+       */
+      max: AggregatorFactory(
+        (v) => v.reduce((p, c) => Math.max(p, c.value), -Infinity)
+      )
+    };
+  }
+});
+
+// node_modules/prom-client/lib/cluster.js
+var require_cluster = __commonJS({
+  "node_modules/prom-client/lib/cluster.js"(exports2, module2) {
+    "use strict";
+    var Registry = require_registry();
+    var { Grouper } = require_util();
+    var { aggregators } = require_metricAggregators();
+    var cluster = () => {
+      const data = require("cluster");
+      cluster = () => data;
+      return data;
+    };
+    var GET_METRICS_REQ = "prom-client:getMetricsReq";
+    var GET_METRICS_RES = "prom-client:getMetricsRes";
+    var registries = [Registry.globalRegistry];
+    var requestCtr = 0;
+    var listenersAdded = false;
+    var requests = /* @__PURE__ */ new Map();
+    var AggregatorRegistry = class extends Registry {
+      constructor(regContentType = Registry.PROMETHEUS_CONTENT_TYPE) {
+        super(regContentType);
+        addListeners();
+      }
+      /**
+       * Gets aggregated metrics for all workers. The optional callback and
+       * returned Promise resolve with the same value; either may be used.
+       * @return {Promise<string>} Promise that resolves with the aggregated
+       *   metrics.
+       */
+      clusterMetrics() {
+        const requestId = requestCtr++;
+        return new Promise((resolve, reject) => {
+          let settled = false;
+          function done(err, result) {
+            if (settled) return;
+            settled = true;
+            if (err) reject(err);
+            else resolve(result);
+          }
+          const request = {
+            responses: [],
+            pending: 0,
+            done,
+            errorTimeout: setTimeout(() => {
+              const err = new Error("Operation timed out.");
+              request.done(err);
+            }, 5e3)
+          };
+          requests.set(requestId, request);
+          const message = {
+            type: GET_METRICS_REQ,
+            requestId
+          };
+          for (const id in cluster().workers) {
+            if (cluster().workers[id].isConnected()) {
+              cluster().workers[id].send(message);
+              request.pending++;
+            }
+          }
+          if (request.pending === 0) {
+            clearTimeout(request.errorTimeout);
+            process.nextTick(() => done(null, ""));
+          }
+        });
+      }
+      get contentType() {
+        return super.contentType;
+      }
+      /**
+       * Creates a new Registry instance from an array of metrics that were
+       * created by `registry.getMetricsAsJSON()`. Metrics are aggregated using
+       * the method specified by their `aggregator` property, or by summation if
+       * `aggregator` is undefined.
+       * @param {Array} metricsArr Array of metrics, each of which created by
+       *   `registry.getMetricsAsJSON()`.
+       * @param {string} registryType content type of the new registry. Defaults
+       * to PROMETHEUS_CONTENT_TYPE.
+       * @return {Registry} aggregated registry.
+       */
+      static aggregate(metricsArr, registryType = Registry.PROMETHEUS_CONTENT_TYPE) {
+        const aggregatedRegistry = new Registry();
+        const metricsByName = new Grouper();
+        aggregatedRegistry.setContentType(registryType);
+        metricsArr.forEach((metrics2) => {
+          metrics2.forEach((metric) => {
+            metricsByName.add(metric.name, metric);
+          });
+        });
+        metricsByName.forEach((metrics2) => {
+          const aggregatorName = metrics2[0].aggregator;
+          const aggregatorFn = aggregators[aggregatorName];
+          if (typeof aggregatorFn !== "function") {
+            throw new Error(`'${aggregatorName}' is not a defined aggregator.`);
+          }
+          const aggregatedMetric = aggregatorFn(metrics2);
+          if (aggregatedMetric) {
+            const aggregatedMetricWrapper = Object.assign(
+              {
+                get: () => aggregatedMetric
+              },
+              aggregatedMetric
+            );
+            aggregatedRegistry.registerMetric(aggregatedMetricWrapper);
+          }
+        });
+        return aggregatedRegistry;
+      }
+      /**
+       * Sets the registry or registries to be aggregated. Call from workers to
+       * use a registry/registries other than the default global registry.
+       * @param {Array<Registry>|Registry} regs Registry or registries to be
+       *   aggregated.
+       * @return {void}
+       */
+      static setRegistries(regs) {
+        if (!Array.isArray(regs)) regs = [regs];
+        regs.forEach((reg) => {
+          if (!(reg instanceof Registry)) {
+            throw new TypeError(`Expected Registry, got ${typeof reg}`);
+          }
+        });
+        registries = regs;
+      }
+    };
+    function addListeners() {
+      if (listenersAdded) return;
+      listenersAdded = true;
+      if (cluster().isMaster) {
+        cluster().on("message", (worker, message) => {
+          if (message.type === GET_METRICS_RES) {
+            const request = requests.get(message.requestId);
+            if (message.error) {
+              request.done(new Error(message.error));
+              return;
+            }
+            message.metrics.forEach((registry) => request.responses.push(registry));
+            request.pending--;
+            if (request.pending === 0) {
+              requests.delete(message.requestId);
+              clearTimeout(request.errorTimeout);
+              const registry = AggregatorRegistry.aggregate(request.responses);
+              const promString = registry.metrics();
+              request.done(null, promString);
+            }
+          }
+        });
+      }
+      if (cluster().isWorker) {
+        process.on("message", (message) => {
+          if (message.type === GET_METRICS_REQ) {
+            Promise.all(registries.map((r) => r.getMetricsAsJSON())).then((metrics2) => {
+              process.send({
+                type: GET_METRICS_RES,
+                requestId: message.requestId,
+                metrics: metrics2
+              });
+            }).catch((error) => {
+              process.send({
+                type: GET_METRICS_RES,
+                requestId: message.requestId,
+                error: error.message
+              });
+            });
+          }
+        });
+      }
+    }
+    module2.exports = AggregatorRegistry;
+  }
+});
+
+// node_modules/prom-client/index.js
+var require_prom_client = __commonJS({
+  "node_modules/prom-client/index.js"(exports2) {
+    "use strict";
+    exports2.register = require_registry().globalRegistry;
+    exports2.Registry = require_registry();
+    Object.defineProperty(exports2, "contentType", {
+      configurable: false,
+      enumerable: true,
+      get() {
+        return exports2.register.contentType;
+      },
+      set(value) {
+        exports2.register.setContentType(value);
+      }
+    });
+    exports2.prometheusContentType = exports2.Registry.PROMETHEUS_CONTENT_TYPE;
+    exports2.openMetricsContentType = exports2.Registry.OPENMETRICS_CONTENT_TYPE;
+    exports2.validateMetricName = require_validation().validateMetricName;
+    exports2.Counter = require_counter();
+    exports2.Gauge = require_gauge();
+    exports2.Histogram = require_histogram();
+    exports2.Summary = require_summary();
+    exports2.Pushgateway = require_pushgateway();
+    exports2.linearBuckets = require_bucketGenerators().linearBuckets;
+    exports2.exponentialBuckets = require_bucketGenerators().exponentialBuckets;
+    exports2.collectDefaultMetrics = require_defaultMetrics();
+    exports2.aggregators = require_metricAggregators().aggregators;
+    exports2.AggregatorRegistry = require_cluster();
+  }
+});
+
+// src/utils/metrics.js
+var require_metrics = __commonJS({
+  "src/utils/metrics.js"(exports2, module2) {
+    var client = require_prom_client();
+    var register2 = new client.Registry();
+    client.collectDefaultMetrics({ register: register2 });
+    var httpRequestCounter2 = new client.Counter({
+      name: "http_requests_total",
+      help: "Total number of HTTP requests",
+      labelNames: ["method", "route", "status"],
+      registers: [register2]
+    });
+    module2.exports = { register: register2, httpRequestCounter: httpRequestCounter2 };
   }
 });
 
@@ -24025,6 +29464,16 @@ var require_ledgerRepository = __commonJS({
       delete(id) {
         const db = getDb();
         return db.prepare("DELETE FROM ledgers WHERE id = ?").run(id);
+      }
+      findCash() {
+        const db = getDb();
+        return db.prepare(`
+      SELECT l.*, lt.name AS type_name, lt.behaviour
+      FROM ledgers l
+      JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      WHERE l.is_system = 1 AND l.name = 'CASH'
+      LIMIT 1
+    `).get();
       }
       search(query) {
         const db = getDb();
@@ -24193,10 +29642,6 @@ var require_ledgerService = __commonJS({
       deleteLedger(id) {
         const existing = ledgerRepository.findById(id);
         if (!existing) throw new AppError("Ledger not found", 404);
-        const db = require_connection().getDb();
-        const txCount = db.prepare("SELECT COUNT(*) AS cnt FROM transactions WHERE ledger_id = ?").get(id);
-        if (txCount && txCount.cnt > 0)
-          throw new AppError("Cannot delete a ledger that has transactions. Close it instead.", 400);
         ledgerRepository.delete(id);
         return { message: "Ledger deleted successfully" };
       }
@@ -24215,6 +29660,22 @@ var require_ledgerService = __commonJS({
       }
       getLedgersWithPendingInterest() {
         return ledgerRepository.getWithPendingInterest();
+      }
+      bulkCreateLedgers(items) {
+        const results = { created: 0, skipped: 0, errors: [] };
+        for (const item of items) {
+          try {
+            this.createLedger(item);
+            results.created++;
+          } catch (err) {
+            results.skipped++;
+            results.errors.push({ name: item.name, reason: err.message });
+          }
+        }
+        return results;
+      }
+      getCashLedger() {
+        return ledgerRepository.findCash();
       }
     };
     module2.exports = new LedgerService();
@@ -24276,10 +29737,34 @@ var require_ledgerController = __commonJS({
           next(err);
         }
       }
+      bulkCreate(req, res, next) {
+        try {
+          const { ledgers } = req.body;
+          if (!Array.isArray(ledgers) || ledgers.length === 0) {
+            return res.status(400).json({ success: false, message: "ledgers array is required" });
+          }
+          if (ledgers.length > 500) {
+            return res.status(400).json({ success: false, message: "Cannot import more than 500 ledgers at once" });
+          }
+          const results = ledgerService.bulkCreateLedgers(ledgers);
+          res.status(201).json({ success: true, data: results });
+        } catch (err) {
+          next(err);
+        }
+      }
       getCounts(req, res, next) {
         try {
           const counts = ledgerService.getLedgerCounts();
           res.json({ success: true, data: counts });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getCash(req, res, next) {
+        try {
+          const cash = ledgerService.getCashLedger();
+          if (!cash) return res.status(404).json({ success: false, message: "CASH ledger not found" });
+          res.json({ success: true, data: cash });
         } catch (err) {
           next(err);
         }
@@ -24323,8 +29808,10 @@ var require_ledgerRoutes = __commonJS({
     router.get("/outstanding/type/:typeId", (req, res, next) => ledgerController.getOutstandingByType(req, res, next));
     router.get("/pending-interest", (req, res, next) => ledgerController.getPendingInterest(req, res, next));
     router.get("/counts", (req, res, next) => ledgerController.getCounts(req, res, next));
+    router.get("/cash", (req, res, next) => ledgerController.getCash(req, res, next));
     router.get("/:id", (req, res, next) => ledgerController.getById(req, res, next));
     router.get("/", (req, res, next) => ledgerController.getAll(req, res, next));
+    router.post("/bulk", (req, res, next) => ledgerController.bulkCreate(req, res, next));
     router.post("/", (req, res, next) => ledgerController.create(req, res, next));
     router.put("/:id", (req, res, next) => ledgerController.update(req, res, next));
     router.delete("/:id", (req, res, next) => ledgerController.delete(req, res, next));
@@ -24450,14 +29937,16 @@ var require_paymentRepository = __commonJS({
   "src/repositories/paymentRepository.js"(exports2, module2) {
     var { getDb } = require_database();
     var TransactionRepository = class {
-      findAll({ ledgerId, entryType, fromDate, toDate, ledgerTypeId, behaviour, interestSchemeId } = {}) {
+      findAll({ ledgerId, entryType, fromDate, toDate, ledgerTypeId, behaviour, interestSchemeId, categoryId } = {}) {
         const db = getDb();
         let query = `
       SELECT t.*, l.name AS ledger_name, lt.name AS type_name, lt.behaviour,
-             l.phone AS ledger_phone, l.place AS ledger_place
+             l.phone AS ledger_phone, l.place AS ledger_place,
+             tc.name AS category_name
       FROM transactions t
       JOIN ledgers l ON t.ledger_id = l.id
       JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      LEFT JOIN transaction_categories tc ON tc.id = t.category_id
       WHERE 1=1
     `;
         const params = [];
@@ -24489,30 +29978,39 @@ var require_paymentRepository = __commonJS({
           query += " AND l.interest_scheme_id = ?";
           params.push(interestSchemeId);
         }
+        if (categoryId) {
+          query += " AND t.category_id = ?";
+          params.push(categoryId);
+        }
         query += " ORDER BY t.date DESC, t.id DESC";
         return db.prepare(query).all(...params);
       }
       findById(id) {
         const db = getDb();
         return db.prepare(`
-      SELECT t.*, l.name AS ledger_name, lt.name AS type_name, lt.behaviour
+      SELECT t.*, l.name AS ledger_name, lt.name AS type_name, lt.behaviour,
+             tc.name AS category_name
       FROM transactions t
       JOIN ledgers l ON t.ledger_id = l.id
       JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      LEFT JOIN transaction_categories tc ON tc.id = t.category_id
       WHERE t.id = ?
     `).get(id);
       }
       findByLedgerId(ledgerId) {
         const db = getDb();
         return db.prepare(`
-      SELECT t.* FROM transactions t WHERE t.ledger_id = ? ORDER BY t.date DESC, t.id DESC
+      SELECT t.*, tc.name AS category_name
+      FROM transactions t
+      LEFT JOIN transaction_categories tc ON tc.id = t.category_id
+      WHERE t.ledger_id = ? ORDER BY t.date DESC, t.id DESC
     `).all(ledgerId);
       }
-      create({ ledger_id, entry_type, amount, date, reference, notes, running_number, interest_entry_id }) {
+      create({ ledger_id, entry_type, amount, date, reference, notes, running_number, interest_entry_id, category_id }) {
         const db = getDb();
         const stmt = db.prepare(`
-      INSERT INTO transactions (ledger_id, entry_type, amount, date, reference, notes, running_number, interest_entry_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO transactions (ledger_id, entry_type, amount, date, reference, notes, running_number, interest_entry_id, category_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
         const result = stmt.run(
           ledger_id,
@@ -24522,7 +30020,8 @@ var require_paymentRepository = __commonJS({
           reference || "",
           notes || "",
           running_number,
-          interest_entry_id || null
+          interest_entry_id || null,
+          category_id || null
         );
         return this.findById(result.lastInsertRowid);
       }
@@ -24561,13 +30060,24 @@ var require_paymentRepository = __commonJS({
       getRecentTransactions(limit = 10) {
         const db = getDb();
         return db.prepare(`
-      SELECT t.*, l.name AS ledger_name, lt.name AS type_name, lt.behaviour
+      SELECT t.*, l.name AS ledger_name, lt.name AS type_name, lt.behaviour,
+             tc.name AS category_name
       FROM transactions t
       JOIN ledgers l ON t.ledger_id = l.id
       JOIN ledger_types lt ON l.ledger_type_id = lt.id
+      LEFT JOIN transaction_categories tc ON tc.id = t.category_id
       ORDER BY t.date DESC, t.id DESC
       LIMIT ?
     `).all(limit);
+      }
+      update(id, { entry_type, amount, date, reference, notes, category_id }) {
+        const db = getDb();
+        db.prepare(`
+      UPDATE transactions
+      SET entry_type = ?, amount = ?, date = ?, reference = ?, notes = ?, category_id = ?
+      WHERE id = ?
+    `).run(entry_type, amount, date, reference || "", notes || "", category_id || null, id);
+        return this.findById(id);
       }
       deleteById(id) {
         const db = getDb();
@@ -24750,7 +30260,7 @@ var require_paymentService = __commonJS({
        *   customer behaviour: payment ADDS to balance, receipt SUBTRACTS
        *   supplier behaviour: payment SUBTRACTS from balance, receipt ADDS
        */
-      createTransaction({ ledger_id, entry_type, amount, date, reference, notes, interest_entry_id }) {
+      createTransaction({ ledger_id, entry_type, amount, date, reference, notes, interest_entry_id, category_id }) {
         const db = getDb();
         const ledger = ledgerRepository.findById(ledger_id);
         if (!ledger) throw new AppError("Ledger not found", 404);
@@ -24776,7 +30286,8 @@ var require_paymentService = __commonJS({
             reference: reference || "",
             notes: notes || "",
             running_number: runningNumber,
-            interest_entry_id: interest_entry_id || null
+            interest_entry_id: interest_entry_id || null,
+            category_id: category_id || null
           });
           let newBalance = ledger.current_balance;
           if (behaviour === "customer") {
@@ -24832,6 +30343,34 @@ var require_paymentService = __commonJS({
         });
         run();
       }
+      updateTransaction(id, { entry_type, amount, date, reference, notes, category_id }) {
+        const db = getDb();
+        const tx = transactionRepository.findById(id);
+        if (!tx) throw new AppError("Transaction not found", 404);
+        const ledger = ledgerRepository.findById(tx.ledger_id);
+        if (!ledger) throw new AppError("Ledger not found", 404);
+        if (!["payment", "receipt"].includes(entry_type)) throw new AppError('entry_type must be "payment" or "receipt"', 400);
+        const amt = parseFloat(amount);
+        if (isNaN(amt) || amt <= 0) throw new AppError("Amount must be a positive number", 400);
+        const behaviour = ledger.behaviour || "customer";
+        const oldAmt = parseFloat(tx.amount);
+        const run = db.transaction(() => {
+          let newBalance = ledger.current_balance;
+          if (behaviour === "customer") {
+            newBalance = tx.entry_type === "payment" ? newBalance - oldAmt : newBalance + oldAmt;
+          } else {
+            newBalance = tx.entry_type === "payment" ? newBalance + oldAmt : newBalance - oldAmt;
+          }
+          if (behaviour === "customer") {
+            newBalance = entry_type === "payment" ? newBalance + amt : newBalance - amt;
+          } else {
+            newBalance = entry_type === "payment" ? newBalance - amt : newBalance + amt;
+          }
+          ledgerRepository.updateBalance(tx.ledger_id, newBalance);
+          return transactionRepository.update(id, { entry_type, amount: amt, date, reference, notes, category_id });
+        });
+        return run();
+      }
     };
     module2.exports = new TransactionService();
   }
@@ -24844,7 +30383,7 @@ var require_paymentController = __commonJS({
     var TransactionController = class {
       getAll(req, res, next) {
         try {
-          const { ledgerId, entryType, fromDate, toDate, ledgerTypeId, behaviour, interestSchemeId } = req.query;
+          const { ledgerId, entryType, fromDate, toDate, ledgerTypeId, behaviour, interestSchemeId, categoryId } = req.query;
           const transactions = transactionService.getTransactions({
             ledgerId: ledgerId ? parseInt(ledgerId) : void 0,
             entryType: entryType || void 0,
@@ -24852,7 +30391,8 @@ var require_paymentController = __commonJS({
             toDate: toDate || void 0,
             ledgerTypeId: ledgerTypeId ? parseInt(ledgerTypeId) : void 0,
             behaviour: behaviour || void 0,
-            interestSchemeId: interestSchemeId ? parseInt(interestSchemeId) : void 0
+            interestSchemeId: interestSchemeId ? parseInt(interestSchemeId) : void 0,
+            categoryId: categoryId ? parseInt(categoryId) : void 0
           });
           res.json({ success: true, data: transactions });
         } catch (err) {
@@ -24909,6 +30449,14 @@ var require_paymentController = __commonJS({
           next(err);
         }
       }
+      update(req, res, next) {
+        try {
+          const tx = transactionService.updateTransaction(parseInt(req.params.id), req.body);
+          res.json({ success: true, data: tx });
+        } catch (err) {
+          next(err);
+        }
+      }
       delete(req, res, next) {
         try {
           transactionService.deleteTransaction(parseInt(req.params.id));
@@ -24935,6 +30483,7 @@ var require_paymentRoutes = __commonJS({
     router.get("/:id", (req, res, next) => transactionController.getById(req, res, next));
     router.get("/", (req, res, next) => transactionController.getAll(req, res, next));
     router.post("/", (req, res, next) => transactionController.create(req, res, next));
+    router.put("/:id", (req, res, next) => transactionController.update(req, res, next));
     router.delete("/:id", (req, res, next) => transactionController.delete(req, res, next));
     module2.exports = router;
   }
@@ -24973,7 +30522,7 @@ var require_settingsService = __commonJS({
       clearData() {
         const { getDb } = require_database();
         const db = getDb();
-        const tables = ["interest_entries", "transactions", "expenses", "ledgers", "ledger_types", "schema_version"];
+        const tables = ["interest_entries", "transactions", "expenses", "ledgers", "transaction_categories"];
         db.transaction(() => {
           for (const table of tables) {
             try {
@@ -24982,7 +30531,64 @@ var require_settingsService = __commonJS({
             }
           }
           try {
-            db.prepare(`DELETE FROM sqlite_sequence WHERE name IN ('interest_entries','transactions','expenses','ledgers','ledger_types')`).run();
+            db.prepare(`DELETE FROM ledger_types WHERE is_system = 0`).run();
+          } catch (_) {
+          }
+          try {
+            db.prepare(`DELETE FROM interest_schemes WHERE is_system = 0`).run();
+          } catch (_) {
+          }
+          try {
+            db.prepare(`DELETE FROM sqlite_sequence WHERE name IN ('interest_entries','transactions','expenses','ledgers')`).run();
+          } catch (_) {
+          }
+        })();
+      }
+      /**
+       * Clear transactional data while preserving master records.
+       *
+       * KEPT (masters): ledgers, items, ledger_types, interest_schemes,
+       *   transaction_categories, expense_categories, staffs, settings, users.
+       * CLEARED (transactional): sales, purchases, returns, estimations,
+       *   services, interest entries, transactions, expenses and item IMEIs.
+       *
+       * Ledger balances are reset back to their opening balance so the
+       * surviving masters stay internally consistent.
+       */
+      clearTransactions() {
+        const { getDb } = require_database();
+        const db = getDb();
+        const tables = [
+          "item_imeis",
+          "sale_items",
+          "sales",
+          "purchase_items",
+          "purchases",
+          "sales_return_items",
+          "sales_returns",
+          "purchase_return_items",
+          "purchase_returns",
+          "estimation_items",
+          "estimations",
+          "services",
+          "interest_entries",
+          "transactions",
+          "expenses"
+        ];
+        db.transaction(() => {
+          for (const table of tables) {
+            try {
+              db.prepare(`DELETE FROM ${table}`).run();
+            } catch (_) {
+            }
+          }
+          try {
+            db.prepare(`UPDATE ledgers SET current_balance = opening_balance`).run();
+          } catch (_) {
+          }
+          try {
+            const names = tables.map((t) => `'${t}'`).join(",");
+            db.prepare(`DELETE FROM sqlite_sequence WHERE name IN (${names})`).run();
           } catch (_) {
           }
         })();
@@ -25056,6 +30662,14 @@ var require_settingsController = __commonJS({
         try {
           settingsService.clearData();
           res.json({ success: true, data: { message: "All data cleared" } });
+        } catch (err) {
+          next(err);
+        }
+      }
+      clearTransactions(req, res, next) {
+        try {
+          settingsService.clearTransactions();
+          res.json({ success: true, data: { message: "Transactional data cleared" } });
         } catch (err) {
           next(err);
         }
@@ -25167,6 +30781,7 @@ var require_settingsRoutes = __commonJS({
       }
     });
     router.post("/data/clear", (req, res, next) => settingsController.clearData(req, res, next));
+    router.post("/data/clear-transactions", (req, res, next) => settingsController.clearTransactions(req, res, next));
     router.post("/reset", (req, res, next) => settingsController.resetSettings(req, res, next));
     router.get("/:key", (req, res, next) => settingsController.get(req, res, next));
     router.put("/batch", (req, res, next) => settingsController.updateMultiple(req, res, next));
@@ -25255,12 +30870,23 @@ var require_expenseRepository = __commonJS({
       WHERE e.id = ?
     `).get(id);
       }
-      create({ expense_name, expense_category_id, amount, date, notes }) {
+      // Next sequential voucher number (shared by all rows of one entry)
+      getNextVoucherNumber() {
         const db = getDb();
+        const row = db.prepare(`
+      SELECT COALESCE(MAX(CAST(voucher_number AS INTEGER)), 0) + 1 AS next
+      FROM expenses
+    `).get();
+        return String(row.next);
+      }
+      create({ expense_name, expense_category_id, amount, date, notes, voucher_number }) {
+        const db = getDb();
+        const vno = voucher_number || this.getNextVoucherNumber();
         const info = db.prepare(`
-      INSERT INTO expenses (expense_name, expense_category_id, amount, date, notes)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO expenses (voucher_number, expense_name, expense_category_id, amount, date, notes)
+      VALUES (?, ?, ?, ?, ?, ?)
     `).run(
+          vno,
           expense_name.trim(),
           expense_category_id || null,
           amount,
@@ -25268,6 +30894,34 @@ var require_expenseRepository = __commonJS({
           (notes || "").trim()
         );
         return this.getById(info.lastInsertRowid);
+      }
+      // Create multiple expense rows sharing a single voucher number (one entry)
+      createBatch({ date, lines, voucher_number }) {
+        const db = getDb();
+        const run = db.transaction(() => {
+          const vno = voucher_number || this.getNextVoucherNumber();
+          const stmt = db.prepare(`
+        INSERT INTO expenses (voucher_number, expense_name, expense_category_id, amount, date, notes)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+          const ids = [];
+          for (const line of lines) {
+            const info = stmt.run(
+              vno,
+              line.expense_name.trim(),
+              line.expense_category_id || null,
+              line.amount,
+              date,
+              (line.notes || "").trim()
+            );
+            ids.push(info.lastInsertRowid);
+          }
+          return { vno, ids };
+        })();
+        return {
+          voucher_number: run.vno,
+          expenses: run.ids.map((id) => this.getById(id))
+        };
       }
       update(id, { expense_name, expense_category_id, amount, date, notes }) {
         const db = getDb();
@@ -25375,6 +31029,32 @@ var require_expenseService = __commonJS({
         if (!amount || Number(amount) <= 0) throw new Error("Amount must be greater than zero");
         if (!date) throw new Error("Date is required");
         return expenseRepository.create({ ...data, amount: parseFloat(amount) });
+      }
+      getNextVoucherNumber() {
+        return expenseRepository.getNextVoucherNumber();
+      }
+      // Create multiple expense rows that share one voucher number
+      createBatch(data = {}) {
+        const { date, lines } = data;
+        if (!date) throw new Error("Date is required");
+        if (!Array.isArray(lines) || lines.length === 0) {
+          throw new Error("At least one expense line is required");
+        }
+        const cleaned = lines.map((line, i) => {
+          if (!line.expense_name || !line.expense_name.trim()) {
+            throw new Error(`Row ${i + 1}: expense name is required`);
+          }
+          if (!line.amount || Number(line.amount) <= 0) {
+            throw new Error(`Row ${i + 1}: amount must be greater than zero`);
+          }
+          return {
+            expense_name: line.expense_name,
+            expense_category_id: line.expense_category_id || null,
+            amount: parseFloat(line.amount),
+            notes: line.notes || ""
+          };
+        });
+        return expenseRepository.createBatch({ date, lines: cleaned });
       }
       update(id, data) {
         const { expense_name, amount, date } = data;
@@ -25903,6 +31583,21 @@ var require_expenseController = __commonJS({
           next(err);
         }
       }
+      getNextVoucher(req, res, next) {
+        try {
+          res.json({ success: true, data: { voucher_number: expenseService.getNextVoucherNumber() } });
+        } catch (err) {
+          next(err);
+        }
+      }
+      createBatch(req, res, next) {
+        try {
+          const result = expenseService.createBatch(req.body);
+          res.status(201).json({ success: true, data: result });
+        } catch (err) {
+          next(err);
+        }
+      }
       update(req, res, next) {
         try {
           const expense = expenseService.update(parseInt(req.params.id), req.body);
@@ -25953,8 +31648,10 @@ var require_expenseRoutes = __commonJS({
     router.delete("/categories/:id", (req, res, next) => expenseController.deleteCategory(req, res, next));
     router.get("/suggestions", (req, res, next) => expenseController.getSuggestions(req, res, next));
     router.get("/summary", (req, res, next) => expenseController.getSummary(req, res, next));
+    router.get("/next-voucher", (req, res, next) => expenseController.getNextVoucher(req, res, next));
     router.get("/", (req, res, next) => expenseController.getAll(req, res, next));
     router.get("/:id", (req, res, next) => expenseController.getById(req, res, next));
+    router.post("/batch", (req, res, next) => expenseController.createBatch(req, res, next));
     router.post("/", (req, res, next) => expenseController.create(req, res, next));
     router.put("/:id", (req, res, next) => expenseController.update(req, res, next));
     router.delete("/:id", (req, res, next) => expenseController.delete(req, res, next));
@@ -26096,14 +31793,3922 @@ var require_interestSchemeRoutes = __commonJS({
   }
 });
 
+// src/repositories/transactionCategoryRepository.js
+var require_transactionCategoryRepository = __commonJS({
+  "src/repositories/transactionCategoryRepository.js"(exports2, module2) {
+    var { getDb } = require_database();
+    var TransactionCategoryRepository = class {
+      getAll() {
+        const db = getDb();
+        return db.prepare("SELECT * FROM transaction_categories ORDER BY name ASC").all();
+      }
+      getById(id) {
+        const db = getDb();
+        return db.prepare("SELECT * FROM transaction_categories WHERE id = ?").get(id);
+      }
+      create(name) {
+        const db = getDb();
+        const info = db.prepare("INSERT INTO transaction_categories (name) VALUES (?)").run(name.trim());
+        return this.getById(info.lastInsertRowid);
+      }
+      update(id, name) {
+        const db = getDb();
+        db.prepare("UPDATE transaction_categories SET name = ? WHERE id = ?").run(name.trim(), id);
+        return this.getById(id);
+      }
+      delete(id) {
+        const db = getDb();
+        db.prepare("UPDATE transactions SET category_id = NULL WHERE category_id = ?").run(id);
+        return db.prepare("DELETE FROM transaction_categories WHERE id = ?").run(id);
+      }
+    };
+    module2.exports = new TransactionCategoryRepository();
+  }
+});
+
+// src/services/transactionCategoryService.js
+var require_transactionCategoryService = __commonJS({
+  "src/services/transactionCategoryService.js"(exports2, module2) {
+    var transactionCategoryRepository = require_transactionCategoryRepository();
+    var { AppError } = require_errorHandler();
+    var TransactionCategoryService = class {
+      getAll() {
+        return transactionCategoryRepository.getAll();
+      }
+      getById(id) {
+        const cat = transactionCategoryRepository.getById(id);
+        if (!cat) throw new AppError("Transaction category not found", 404);
+        return cat;
+      }
+      create(name) {
+        if (!name || !name.trim()) throw new AppError("Category name is required", 400);
+        return transactionCategoryRepository.create(name);
+      }
+      update(id, name) {
+        if (!name || !name.trim()) throw new AppError("Category name is required", 400);
+        const existing = transactionCategoryRepository.getById(id);
+        if (!existing) throw new AppError("Transaction category not found", 404);
+        return transactionCategoryRepository.update(id, name);
+      }
+      delete(id) {
+        const existing = transactionCategoryRepository.getById(id);
+        if (!existing) throw new AppError("Transaction category not found", 404);
+        return transactionCategoryRepository.delete(id);
+      }
+    };
+    module2.exports = new TransactionCategoryService();
+  }
+});
+
+// src/controllers/transactionCategoryController.js
+var require_transactionCategoryController = __commonJS({
+  "src/controllers/transactionCategoryController.js"(exports2, module2) {
+    var transactionCategoryService = require_transactionCategoryService();
+    var TransactionCategoryController = class {
+      getAll(req, res, next) {
+        try {
+          const categories = transactionCategoryService.getAll();
+          res.json({ success: true, data: categories });
+        } catch (err) {
+          next(err);
+        }
+      }
+      create(req, res, next) {
+        try {
+          const { name } = req.body;
+          const category = transactionCategoryService.create(name);
+          res.status(201).json({ success: true, data: category });
+        } catch (err) {
+          next(err);
+        }
+      }
+      update(req, res, next) {
+        try {
+          const category = transactionCategoryService.update(parseInt(req.params.id), req.body.name);
+          res.json({ success: true, data: category });
+        } catch (err) {
+          next(err);
+        }
+      }
+      delete(req, res, next) {
+        try {
+          transactionCategoryService.delete(parseInt(req.params.id));
+          res.json({ success: true });
+        } catch (err) {
+          next(err);
+        }
+      }
+    };
+    module2.exports = new TransactionCategoryController();
+  }
+});
+
+// src/routes/transactionCategoryRoutes.js
+var require_transactionCategoryRoutes = __commonJS({
+  "src/routes/transactionCategoryRoutes.js"(exports2, module2) {
+    var express2 = require_express2();
+    var router = express2.Router();
+    var transactionCategoryController = require_transactionCategoryController();
+    router.get("/", (req, res, next) => transactionCategoryController.getAll(req, res, next));
+    router.post("/", (req, res, next) => transactionCategoryController.create(req, res, next));
+    router.put("/:id", (req, res, next) => transactionCategoryController.update(req, res, next));
+    router.delete("/:id", (req, res, next) => transactionCategoryController.delete(req, res, next));
+    module2.exports = router;
+  }
+});
+
+// src/repositories/itemRepository.js
+var require_itemRepository = __commonJS({
+  "src/repositories/itemRepository.js"(exports2, module2) {
+    var { getDb } = require_database();
+    var ItemRepository = class {
+      getAll({ search } = {}) {
+        const db = getDb();
+        const lpJoin = `
+      LEFT JOIN (
+        SELECT pi.item_id,
+               pi.rate        AS last_purchase_rate,
+               pi.gst_percent AS last_purchase_gst,
+               ROW_NUMBER() OVER (
+                 PARTITION BY pi.item_id
+                 ORDER BY p.date DESC, p.id DESC, pi.id DESC
+               ) AS rn
+        FROM purchase_items pi
+        INNER JOIN purchases p ON p.id = pi.purchase_id
+        WHERE pi.item_id IS NOT NULL
+      ) lp ON lp.item_id = i.id AND lp.rn = 1
+    `;
+        if (search) {
+          const q = `%${search.toLowerCase()}%`;
+          return db.prepare(`
+        SELECT i.*, lp.last_purchase_rate, lp.last_purchase_gst
+        FROM items i
+        ${lpJoin}
+        WHERE i.status = 'active'
+          AND (LOWER(i.name) LIKE ?
+            OR LOWER(i.brand) LIKE ?
+            OR LOWER(i.category) LIKE ?
+            OR LOWER(i.item_code) LIKE ?)
+        ORDER BY i.name ASC
+      `).all(q, q, q, q);
+        }
+        return db.prepare(`
+      SELECT i.*, lp.last_purchase_rate, lp.last_purchase_gst
+      FROM items i
+      ${lpJoin}
+      ORDER BY i.name ASC
+    `).all();
+      }
+      getById(id) {
+        const db = getDb();
+        return db.prepare("SELECT * FROM items WHERE id = ?").get(id);
+      }
+      create({ name, unit, mrp, sales_rate, brand, category, gst_percent, item_code, imei_enabled }) {
+        const db = getDb();
+        const info = db.prepare(`
+      INSERT INTO items (name, unit, mrp, sales_rate, brand, category, gst_percent, item_code, imei_enabled)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+          name.trim(),
+          (unit || "Nos").trim(),
+          parseFloat(mrp) || 0,
+          sales_rate != null && sales_rate !== "" ? parseFloat(sales_rate) : null,
+          (brand || "").trim(),
+          (category || "").trim(),
+          parseFloat(gst_percent) || 0,
+          (item_code || "").trim(),
+          imei_enabled ? 1 : 0
+        );
+        return this.getById(info.lastInsertRowid);
+      }
+      update(id, { name, unit, mrp, sales_rate, brand, category, gst_percent, item_code, status, imei_enabled }) {
+        const db = getDb();
+        db.prepare(`
+      UPDATE items
+      SET name = ?, unit = ?, mrp = ?, sales_rate = ?, brand = ?, category = ?, gst_percent = ?,
+          item_code = ?,
+          imei_enabled = ?,
+          status = COALESCE(?, status),
+          updated_at = datetime('now', 'localtime')
+      WHERE id = ?
+    `).run(
+          name.trim(),
+          (unit || "Nos").trim(),
+          parseFloat(mrp) || 0,
+          sales_rate != null && sales_rate !== "" ? parseFloat(sales_rate) : null,
+          (brand || "").trim(),
+          (category || "").trim(),
+          parseFloat(gst_percent) || 0,
+          (item_code || "").trim(),
+          imei_enabled ? 1 : 0,
+          status || null,
+          id
+        );
+        return this.getById(id);
+      }
+      delete(id) {
+        const db = getDb();
+        return db.prepare("DELETE FROM items WHERE id = ?").run(id);
+      }
+      /**
+       * Atomically increment (or decrement, with negative delta) an item's
+       * on-hand stock. No-op when itemId is falsy (e.g. ad-hoc lines without a
+       * linked item master record).
+       */
+      adjustStock(itemId, delta) {
+        if (!itemId) return;
+        const qty = parseFloat(delta);
+        if (!qty || isNaN(qty)) return;
+        const db = getDb();
+        db.prepare(`
+      UPDATE items
+      SET current_stock = current_stock + ?,
+          updated_at    = datetime('now', 'localtime')
+      WHERE id = ?
+    `).run(qty, itemId);
+      }
+      /**
+       * Overwrite the on-hand stock of multiple items in a single transaction.
+       * Each adjustment is `{ id, stock }`; the absolute new value is stored.
+       */
+      bulkSetStock(adjustments) {
+        const db = getDb();
+        const stmt = db.prepare(`
+      UPDATE items
+      SET current_stock = ?,
+          updated_at    = datetime('now', 'localtime')
+      WHERE id = ?
+    `);
+        const run = db.transaction((list) => {
+          let updated = 0;
+          for (const a of list) {
+            const info = stmt.run(a.stock, a.id);
+            updated += info.changes;
+          }
+          return updated;
+        });
+        return run(adjustments);
+      }
+      // Distinct brand/category lists for datalist suggestions
+      getDistinctBrands() {
+        const db = getDb();
+        return db.prepare(`
+      SELECT DISTINCT brand FROM items
+      WHERE brand <> '' ORDER BY brand ASC
+    `).all().map((r) => r.brand);
+      }
+      getDistinctCategories() {
+        const db = getDb();
+        return db.prepare(`
+      SELECT DISTINCT category FROM items
+      WHERE category <> '' ORDER BY category ASC
+    `).all().map((r) => r.category);
+      }
+      /**
+       * Stock report — for each active item returns the running on-hand stock
+       * along with movement summaries (total purchased / sold / returned).
+       * Optionally filter by free-text search, brand or category.
+       */
+      getStockReport({ search, brand, category, lowStockOnly } = {}) {
+        const db = getDb();
+        const conds = ["i.status = 'active'"];
+        const params = [];
+        if (search) {
+          const q = `%${search.toLowerCase()}%`;
+          conds.push(`(LOWER(i.name) LIKE ?
+                OR LOWER(i.brand) LIKE ?
+                OR LOWER(i.category) LIKE ?
+                OR LOWER(i.item_code) LIKE ?)`);
+          params.push(q, q, q, q);
+        }
+        if (brand) {
+          conds.push("i.brand = ?");
+          params.push(brand);
+        }
+        if (category) {
+          conds.push("i.category = ?");
+          params.push(category);
+        }
+        if (lowStockOnly) conds.push("i.current_stock <= 0");
+        const where = `WHERE ${conds.join(" AND ")}`;
+        return db.prepare(`
+      SELECT
+        i.id,
+        i.item_code,
+        i.name,
+        i.unit,
+        i.brand,
+        i.category,
+        i.mrp,
+        i.gst_percent,
+        i.current_stock,
+        COALESCE(p.total_purchased, 0)      AS total_purchased,
+        COALESCE(s.total_sold, 0)           AS total_sold,
+        COALESCE(sr.total_sales_return, 0)  AS total_sales_return,
+        COALESCE(pr.total_purchase_return, 0) AS total_purchase_return,
+        COALESCE(im.imei_count, 0)          AS imei_count,
+        (i.mrp * i.current_stock)           AS stock_value
+      FROM items i
+      LEFT JOIN (
+        SELECT item_id, SUM(quantity) AS total_purchased
+        FROM purchase_items WHERE item_id IS NOT NULL GROUP BY item_id
+      ) p ON p.item_id = i.id
+      LEFT JOIN (
+        SELECT item_id, SUM(quantity) AS total_sold
+        FROM sale_items WHERE item_id IS NOT NULL GROUP BY item_id
+      ) s ON s.item_id = i.id
+      LEFT JOIN (
+        SELECT item_id, SUM(quantity) AS total_sales_return
+        FROM sales_return_items WHERE item_id IS NOT NULL GROUP BY item_id
+      ) sr ON sr.item_id = i.id
+      LEFT JOIN (
+        SELECT item_id, SUM(quantity) AS total_purchase_return
+        FROM purchase_return_items WHERE item_id IS NOT NULL GROUP BY item_id
+      ) pr ON pr.item_id = i.id
+      LEFT JOIN (
+        SELECT item_id, COUNT(*) AS imei_count
+        FROM item_imeis GROUP BY item_id
+      ) im ON im.item_id = i.id
+      ${where}
+      ORDER BY i.name ASC
+    `).all(...params);
+      }
+    };
+    module2.exports = new ItemRepository();
+  }
+});
+
+// src/repositories/imeiRepository.js
+var require_imeiRepository = __commonJS({
+  "src/repositories/imeiRepository.js"(exports2, module2) {
+    var { getDb } = require_database();
+    var { AppError } = require_errorHandler();
+    var ImeiRepository = class {
+      /** All in-stock (available-to-sell) IMEIs for an item. */
+      getAvailableByItem(itemId) {
+        if (!itemId) return [];
+        const db = getDb();
+        return db.prepare(`
+      SELECT id, item_id, imei, status, purchase_id, sale_id
+      FROM item_imeis
+      WHERE item_id = ? AND status = 'in_stock'
+      ORDER BY created_at ASC, id ASC
+    `).all(itemId);
+      }
+      /** Every IMEI ever registered for an item, regardless of status. */
+      getAllByItem(itemId) {
+        if (!itemId) return [];
+        const db = getDb();
+        return db.prepare(`
+      SELECT id, item_id, imei, status, purchase_id, sale_id
+      FROM item_imeis
+      WHERE item_id = ?
+      ORDER BY created_at ASC, id ASC
+    `).all(itemId);
+      }
+      /** Every IMEI registered by a given purchase. */
+      getByPurchase(purchaseId) {
+        if (!purchaseId) return [];
+        const db = getDb();
+        return db.prepare(`
+      SELECT id, item_id, imei, status, purchase_id, sale_id
+      FROM item_imeis
+      WHERE purchase_id = ?
+      ORDER BY item_id ASC, id ASC
+    `).all(purchaseId);
+      }
+      /** Every IMEI consumed by a given sale. */
+      getBySale(saleId) {
+        if (!saleId) return [];
+        const db = getDb();
+        return db.prepare(`
+      SELECT id, item_id, imei, status, purchase_id, sale_id
+      FROM item_imeis
+      WHERE sale_id = ?
+      ORDER BY item_id ASC, id ASC
+    `).all(saleId);
+      }
+      /** Insert a batch of fresh in-stock IMEIs for a purchase line. */
+      addForPurchase(itemId, purchaseId, imeis) {
+        if (!itemId || !Array.isArray(imeis) || imeis.length === 0) return;
+        const db = getDb();
+        const stmt = db.prepare(`
+      INSERT OR IGNORE INTO item_imeis (item_id, imei, status, purchase_id)
+      VALUES (?, ?, 'in_stock', ?)
+    `);
+        for (const raw of imeis) {
+          const imei = String(raw || "").trim();
+          if (!imei) continue;
+          stmt.run(itemId, imei, purchaseId);
+        }
+      }
+      /**
+       * Remove the still-in-stock IMEIs registered by a purchase. IMEIs that were
+       * already sold are left untouched (they cannot be un-sold by editing the
+       * purchase). Returns the list of IMEI strings that could NOT be removed
+       * because they are already sold.
+       */
+      removeInStockByPurchase(purchaseId) {
+        if (!purchaseId) return [];
+        const db = getDb();
+        const sold = db.prepare(`
+      SELECT imei FROM item_imeis WHERE purchase_id = ? AND status = 'sold'
+    `).all(purchaseId).map((r) => r.imei);
+        db.prepare(`
+      DELETE FROM item_imeis WHERE purchase_id = ? AND status = 'in_stock'
+    `).run(purchaseId);
+        return sold;
+      }
+      /**
+       * Mark the supplied IMEIs as sold for an item and link them to a sale.
+       * Only flips rows that are currently in stock for that item. Throws when an
+       * IMEI is missing or already sold.
+       */
+      markSold(itemId, saleId, imeis) {
+        if (!itemId || !Array.isArray(imeis) || imeis.length === 0) return;
+        const db = getDb();
+        const stmt = db.prepare(`
+      UPDATE item_imeis
+      SET status = 'sold', sale_id = ?, updated_at = datetime('now', 'localtime')
+      WHERE item_id = ? AND imei = ? AND status = 'in_stock'
+    `);
+        for (const raw of imeis) {
+          const imei = String(raw || "").trim();
+          if (!imei) continue;
+          const info = stmt.run(saleId, itemId, imei);
+          if (info.changes === 0) {
+            throw new AppError(`IMEI "${imei}" is not available for sale`, 400);
+          }
+        }
+      }
+      /** Restore every IMEI consumed by a sale back to in-stock. */
+      restoreBySale(saleId) {
+        if (!saleId) return;
+        const db = getDb();
+        db.prepare(`
+      UPDATE item_imeis
+      SET status = 'in_stock', sale_id = NULL, updated_at = datetime('now', 'localtime')
+      WHERE sale_id = ?
+    `).run(saleId);
+      }
+    };
+    module2.exports = new ImeiRepository();
+  }
+});
+
+// src/services/itemService.js
+var require_itemService = __commonJS({
+  "src/services/itemService.js"(exports2, module2) {
+    var itemRepository = require_itemRepository();
+    var imeiRepository = require_imeiRepository();
+    var { AppError } = require_errorHandler();
+    var ItemService = class {
+      getAll(filters = {}) {
+        return itemRepository.getAll(filters);
+      }
+      getById(id) {
+        const item = itemRepository.getById(id);
+        if (!item) throw new AppError("Item not found", 404);
+        return item;
+      }
+      create(data) {
+        if (!data || !data.name || !data.name.trim()) {
+          throw new AppError("Item name is required", 400);
+        }
+        return itemRepository.create(data);
+      }
+      update(id, data) {
+        if (!data || !data.name || !data.name.trim()) {
+          throw new AppError("Item name is required", 400);
+        }
+        this.getById(id);
+        return itemRepository.update(id, data);
+      }
+      delete(id) {
+        this.getById(id);
+        return itemRepository.delete(id);
+      }
+      getBrands() {
+        return itemRepository.getDistinctBrands();
+      }
+      getCategories() {
+        return itemRepository.getDistinctCategories();
+      }
+      getStockReport(filters = {}) {
+        return itemRepository.getStockReport(filters);
+      }
+      /**
+       * Bulk-overwrite the on-hand stock of items. Accepts an array of
+       * `{ id, stock }`; validates each entry and applies them atomically.
+       * Returns the number of items updated.
+       */
+      adjustStocks(adjustments) {
+        if (!Array.isArray(adjustments) || adjustments.length === 0) {
+          throw new AppError("No stock adjustments provided", 400);
+        }
+        const clean = adjustments.map((a) => {
+          const id = parseInt(a && a.id, 10);
+          const stock = Number(a && a.stock);
+          if (!id || isNaN(id)) {
+            throw new AppError("Invalid item in stock adjustment", 400);
+          }
+          if (a == null || a.stock === "" || a.stock == null || isNaN(stock)) {
+            throw new AppError("Invalid stock value in adjustment", 400);
+          }
+          return { id, stock };
+        });
+        return itemRepository.bulkSetStock(clean);
+      }
+      getAvailableImeis(id) {
+        this.getById(id);
+        return imeiRepository.getAvailableByItem(id);
+      }
+      /** Breakdown of an item's IMEIs into purchased (all), sold and remaining. */
+      getImeiBreakdown(id) {
+        const rows = imeiRepository.getAllByItem(id);
+        return {
+          purchased: rows.map((r) => r.imei),
+          sold: rows.filter((r) => r.status === "sold").map((r) => r.imei),
+          remaining: rows.filter((r) => r.status === "in_stock").map((r) => r.imei)
+        };
+      }
+    };
+    module2.exports = new ItemService();
+  }
+});
+
+// src/controllers/itemController.js
+var require_itemController = __commonJS({
+  "src/controllers/itemController.js"(exports2, module2) {
+    var itemService = require_itemService();
+    var ItemController = class {
+      getAll(req, res, next) {
+        try {
+          const items = itemService.getAll({ search: req.query.search });
+          res.json({ success: true, data: items });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getById(req, res, next) {
+        try {
+          const item = itemService.getById(parseInt(req.params.id));
+          res.json({ success: true, data: item });
+        } catch (err) {
+          next(err);
+        }
+      }
+      create(req, res, next) {
+        try {
+          const item = itemService.create(req.body);
+          res.status(201).json({ success: true, data: item });
+        } catch (err) {
+          next(err);
+        }
+      }
+      update(req, res, next) {
+        try {
+          const item = itemService.update(parseInt(req.params.id), req.body);
+          res.json({ success: true, data: item });
+        } catch (err) {
+          next(err);
+        }
+      }
+      delete(req, res, next) {
+        try {
+          itemService.delete(parseInt(req.params.id));
+          res.json({ success: true });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getBrands(req, res, next) {
+        try {
+          res.json({ success: true, data: itemService.getBrands() });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getCategories(req, res, next) {
+        try {
+          res.json({ success: true, data: itemService.getCategories() });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getStockReport(req, res, next) {
+        try {
+          const { search, brand, category, lowStockOnly } = req.query;
+          const rows = itemService.getStockReport({
+            search,
+            brand,
+            category,
+            lowStockOnly: lowStockOnly === "true" || lowStockOnly === "1"
+          });
+          res.json({ success: true, data: rows });
+        } catch (err) {
+          next(err);
+        }
+      }
+      adjustStocks(req, res, next) {
+        try {
+          const updated = itemService.adjustStocks(req.body && req.body.adjustments);
+          res.json({ success: true, data: { updated } });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getImeis(req, res, next) {
+        try {
+          const imeis = itemService.getAvailableImeis(parseInt(req.params.id));
+          res.json({ success: true, data: imeis });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getImeiBreakdown(req, res, next) {
+        try {
+          const data = itemService.getImeiBreakdown(parseInt(req.params.id));
+          res.json({ success: true, data });
+        } catch (err) {
+          next(err);
+        }
+      }
+    };
+    module2.exports = new ItemController();
+  }
+});
+
+// src/routes/itemRoutes.js
+var require_itemRoutes = __commonJS({
+  "src/routes/itemRoutes.js"(exports2, module2) {
+    var express2 = require_express2();
+    var router = express2.Router();
+    var itemController = require_itemController();
+    router.get("/brands", (req, res, next) => itemController.getBrands(req, res, next));
+    router.get("/categories", (req, res, next) => itemController.getCategories(req, res, next));
+    router.get("/stock-report", (req, res, next) => itemController.getStockReport(req, res, next));
+    router.get("/", (req, res, next) => itemController.getAll(req, res, next));
+    router.get("/:id/imeis/breakdown", (req, res, next) => itemController.getImeiBreakdown(req, res, next));
+    router.get("/:id/imeis", (req, res, next) => itemController.getImeis(req, res, next));
+    router.get("/:id", (req, res, next) => itemController.getById(req, res, next));
+    router.post("/adjust-stock", (req, res, next) => itemController.adjustStocks(req, res, next));
+    router.post("/", (req, res, next) => itemController.create(req, res, next));
+    router.put("/:id", (req, res, next) => itemController.update(req, res, next));
+    router.delete("/:id", (req, res, next) => itemController.delete(req, res, next));
+    module2.exports = router;
+  }
+});
+
+// src/repositories/saleRepository.js
+var require_saleRepository = __commonJS({
+  "src/repositories/saleRepository.js"(exports2, module2) {
+    var { getDb } = require_database();
+    var imeiRepository = require_imeiRepository();
+    var SaleRepository = class {
+      getNextSaleNumber() {
+        const db = getDb();
+        const row = db.prepare(`
+      SELECT COALESCE(MAX(CAST(sale_number AS INTEGER)), 0) + 1 AS next
+      FROM sales
+    `).get();
+        return String(row.next);
+      }
+      create({ sale_number, ledger_id, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, items }) {
+        const db = getDb();
+        const info = db.prepare(`
+      INSERT INTO sales (sale_number, ledger_id, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+          sale_number,
+          ledger_id,
+          date,
+          time || "",
+          total_amount,
+          total_discount || 0,
+          bill_discount || 0,
+          total_gst || 0,
+          item_count || (items ? items.length : 0),
+          notes || "",
+          customer_name || "",
+          customer_mobile || "",
+          customer_place || "",
+          customer_id || null
+        );
+        const saleId = info.lastInsertRowid;
+        if (Array.isArray(items)) {
+          const stmt = db.prepare(`
+        INSERT INTO sale_items (sale_id, item_id, item_name, unit, mrp, rate, quantity, discount_percent, gst_percent, gst_amount, amount, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+          items.forEach((line, idx) => {
+            stmt.run(
+              saleId,
+              line.item_id || null,
+              line.item_name,
+              line.unit || "Nos",
+              parseFloat(line.mrp) || 0,
+              parseFloat(line.rate) || 0,
+              parseFloat(line.quantity) || 1,
+              parseFloat(line.discount_percent) || 0,
+              parseFloat(line.gst_percent) || 0,
+              parseFloat(line.gst_amount) || 0,
+              parseFloat(line.amount) || 0,
+              idx
+            );
+          });
+        }
+        return this.getById(saleId);
+      }
+      getById(id) {
+        const db = getDb();
+        const sale = db.prepare(`
+      SELECT s.*, l.name AS ledger_name
+      FROM sales s
+      JOIN ledgers l ON l.id = s.ledger_id
+      WHERE s.id = ?
+    `).get(id);
+        if (!sale) return null;
+        sale.items = db.prepare(`
+      SELECT * FROM sale_items WHERE sale_id = ? ORDER BY sort_order ASC, id ASC
+    `).all(id);
+        const imeiRows = imeiRepository.getBySale(id);
+        const byItem = /* @__PURE__ */ new Map();
+        for (const row of imeiRows) {
+          if (!byItem.has(row.item_id)) byItem.set(row.item_id, []);
+          byItem.get(row.item_id).push(row.imei);
+        }
+        sale.items = sale.items.map((line) => ({
+          ...line,
+          imeis: line.item_id ? byItem.get(line.item_id) || [] : []
+        }));
+        return sale;
+      }
+      getAll({ ledgerId, fromDate, toDate, search, limit } = {}) {
+        const db = getDb();
+        const conds = [];
+        const params = [];
+        if (ledgerId) {
+          conds.push("s.ledger_id = ?");
+          params.push(ledgerId);
+        }
+        if (fromDate) {
+          conds.push("s.date >= ?");
+          params.push(fromDate);
+        }
+        if (toDate) {
+          conds.push("s.date <= ?");
+          params.push(toDate);
+        }
+        if (search && String(search).trim()) {
+          const like = `%${String(search).trim()}%`;
+          conds.push(`(
+        s.sale_number LIKE ? OR
+        l.name LIKE ? OR
+        s.customer_name LIKE ? OR
+        s.customer_mobile LIKE ? OR
+        EXISTS (SELECT 1 FROM sale_items si WHERE si.sale_id = s.id AND si.item_name LIKE ?) OR
+        EXISTS (SELECT 1 FROM item_imeis iu WHERE iu.sale_id = s.id AND iu.imei LIKE ?)
+      )`);
+          params.push(like, like, like, like, like, like);
+        }
+        const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+        const limitClause = limit ? `LIMIT ${parseInt(limit, 10)}` : "";
+        return db.prepare(`
+      SELECT s.*, l.name AS ledger_name
+      FROM sales s
+      JOIN ledgers l ON l.id = s.ledger_id
+      ${where}
+      ORDER BY s.date DESC, s.id DESC
+      ${limitClause}
+    `).all(...params);
+      }
+      getByLedger(ledgerId) {
+        const db = getDb();
+        const sales = db.prepare(`
+      SELECT s.*, l.name AS ledger_name
+      FROM sales s
+      JOIN ledgers l ON l.id = s.ledger_id
+      WHERE s.ledger_id = ?
+      ORDER BY s.date DESC, s.id DESC
+    `).all(ledgerId);
+        const itemStmt = db.prepare(`
+      SELECT * FROM sale_items WHERE sale_id = ? ORDER BY sort_order ASC, id ASC
+    `);
+        return sales.map((s) => ({ ...s, items: itemStmt.all(s.id) }));
+      }
+      delete(id) {
+        const db = getDb();
+        return db.prepare("DELETE FROM sales WHERE id = ?").run(id);
+      }
+      update(id, { date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, items }) {
+        const db = getDb();
+        db.prepare(`
+      UPDATE sales
+      SET date = ?, time = ?, total_amount = ?, total_discount = ?, bill_discount = ?, total_gst = ?, item_count = ?, notes = ?, customer_name = ?, customer_mobile = ?, customer_place = ?, customer_id = ?
+      WHERE id = ?
+    `).run(
+          date,
+          time || "",
+          total_amount,
+          total_discount || 0,
+          bill_discount || 0,
+          total_gst || 0,
+          item_count || (items ? items.length : 0),
+          notes || "",
+          customer_name || "",
+          customer_mobile || "",
+          customer_place || "",
+          customer_id || null,
+          id
+        );
+        if (Array.isArray(items)) {
+          db.prepare("DELETE FROM sale_items WHERE sale_id = ?").run(id);
+          const stmt = db.prepare(`
+        INSERT INTO sale_items (sale_id, item_id, item_name, unit, mrp, rate, quantity, discount_percent, gst_percent, gst_amount, amount, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+          items.forEach((line, idx) => {
+            stmt.run(
+              id,
+              line.item_id || null,
+              line.item_name,
+              line.unit || "Nos",
+              parseFloat(line.mrp) || 0,
+              parseFloat(line.rate) || 0,
+              parseFloat(line.quantity) || 1,
+              parseFloat(line.discount_percent) || 0,
+              parseFloat(line.gst_percent) || 0,
+              parseFloat(line.gst_amount) || 0,
+              parseFloat(line.amount) || 0,
+              idx
+            );
+          });
+        }
+        return this.getById(id);
+      }
+    };
+    module2.exports = new SaleRepository();
+  }
+});
+
+// src/repositories/customerRepository.js
+var require_customerRepository = __commonJS({
+  "src/repositories/customerRepository.js"(exports2, module2) {
+    var { getDb } = require_database();
+    var CustomerRepository = class {
+      getAll({ search, status } = {}) {
+        const db = getDb();
+        const conds = [];
+        const params = [];
+        if (status) {
+          conds.push("status = ?");
+          params.push(status);
+        }
+        if (search) {
+          const like = `%${String(search).toLowerCase()}%`;
+          conds.push("(LOWER(name) LIKE ? OR mobile LIKE ? OR LOWER(place) LIKE ?)");
+          params.push(like, `%${String(search)}%`, like);
+        }
+        const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+        return db.prepare(`
+      SELECT * FROM customers
+      ${where}
+      ORDER BY name ASC
+    `).all(...params);
+      }
+      getById(id) {
+        const db = getDb();
+        return db.prepare("SELECT * FROM customers WHERE id = ?").get(id);
+      }
+      findByMobile(mobile) {
+        const db = getDb();
+        const m = String(mobile || "").trim();
+        if (!m) return null;
+        return db.prepare("SELECT * FROM customers WHERE mobile = ?").get(m);
+      }
+      create({ name, mobile, place, address, email, notes }) {
+        const db = getDb();
+        const info = db.prepare(`
+      INSERT INTO customers (name, mobile, place, address, email, notes)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+          name,
+          mobile || "",
+          place || "",
+          address || "",
+          email || "",
+          notes || ""
+        );
+        return this.getById(info.lastInsertRowid);
+      }
+      update(id, { name, mobile, place, address, email, notes, status }) {
+        const db = getDb();
+        db.prepare(`
+      UPDATE customers
+      SET name = ?, mobile = ?, place = ?, address = ?, email = ?, notes = ?, status = ?,
+          updated_at = datetime('now', 'localtime')
+      WHERE id = ?
+    `).run(
+          name,
+          mobile || "",
+          place || "",
+          address || "",
+          email || "",
+          notes || "",
+          status || "active",
+          id
+        );
+        return this.getById(id);
+      }
+      delete(id) {
+        const db = getDb();
+        return db.prepare("DELETE FROM customers WHERE id = ?").run(id);
+      }
+      countSales(id) {
+        const db = getDb();
+        const row = db.prepare("SELECT COUNT(*) AS n FROM sales WHERE customer_id = ?").get(id);
+        return row.n;
+      }
+    };
+    module2.exports = new CustomerRepository();
+  }
+});
+
+// src/services/customerService.js
+var require_customerService = __commonJS({
+  "src/services/customerService.js"(exports2, module2) {
+    var customerRepository = require_customerRepository();
+    var { AppError } = require_errorHandler();
+    function cleanMobile(mobile) {
+      return String(mobile || "").replace(/\D/g, "").slice(0, 10);
+    }
+    var CustomerService = class {
+      getAll(filters) {
+        return customerRepository.getAll(filters);
+      }
+      getById(id) {
+        const customer = customerRepository.getById(id);
+        if (!customer) throw new AppError("Customer not found", 404);
+        return customer;
+      }
+      normalise(data) {
+        const name = (data && data.name ? String(data.name) : "").trim();
+        const mobile = cleanMobile(data && data.mobile);
+        if (!name) throw new AppError("Customer name is required", 400);
+        if (mobile && mobile.length !== 10) {
+          throw new AppError("Mobile number must be exactly 10 digits", 400);
+        }
+        return {
+          name,
+          mobile,
+          place: (data.place ? String(data.place) : "").trim(),
+          address: (data.address ? String(data.address) : "").trim(),
+          email: (data.email ? String(data.email) : "").trim(),
+          notes: (data.notes ? String(data.notes) : "").trim()
+        };
+      }
+      create(data) {
+        const payload = this.normalise(data);
+        if (payload.mobile) {
+          const existing = customerRepository.findByMobile(payload.mobile);
+          if (existing) throw new AppError("A customer with this mobile already exists", 409);
+        }
+        return customerRepository.create(payload);
+      }
+      update(id, data) {
+        this.getById(id);
+        const payload = this.normalise(data);
+        if (payload.mobile) {
+          const existing = customerRepository.findByMobile(payload.mobile);
+          if (existing && existing.id !== id) {
+            throw new AppError("A customer with this mobile already exists", 409);
+          }
+        }
+        const status = data.status === "inactive" ? "inactive" : "active";
+        return customerRepository.update(id, { ...payload, status });
+      }
+      delete(id) {
+        this.getById(id);
+        if (customerRepository.countSales(id) > 0) {
+          throw new AppError("Cannot delete a customer linked to sales", 400);
+        }
+        return customerRepository.delete(id);
+      }
+      /**
+       * Resolve a customer for a sale without the user explicitly choosing
+       * "new" vs "existing". The 10-digit mobile is the natural key:
+       *   • valid mobile that matches → reuse it (refresh name/place if provided)
+       *   • valid mobile with no match → create a new customer
+       *   • no/invalid mobile         → return null (nothing retained)
+       *
+       * Returns the customer id, or null.
+       */
+      resolveForSale({ customer_id, customer_name, customer_mobile, customer_place }) {
+        if (customer_id) {
+          const byId = customerRepository.getById(customer_id);
+          if (byId) return byId.id;
+        }
+        const mobile = cleanMobile(customer_mobile);
+        if (mobile.length !== 10) return null;
+        const name = (customer_name ? String(customer_name) : "").trim() || "Customer";
+        const place = (customer_place ? String(customer_place) : "").trim();
+        const existing = customerRepository.findByMobile(mobile);
+        if (existing) {
+          const nextName = name && name !== "Customer" ? name : existing.name;
+          const nextPlace = place || existing.place;
+          if (nextName !== existing.name || nextPlace !== existing.place) {
+            customerRepository.update(existing.id, {
+              name: nextName,
+              mobile,
+              place: nextPlace,
+              address: existing.address,
+              email: existing.email,
+              notes: existing.notes,
+              status: existing.status
+            });
+          }
+          return existing.id;
+        }
+        const created = customerRepository.create({ name, mobile, place });
+        return created.id;
+      }
+    };
+    module2.exports = new CustomerService();
+  }
+});
+
+// src/services/saleService.js
+var require_saleService = __commonJS({
+  "src/services/saleService.js"(exports2, module2) {
+    var saleRepository = require_saleRepository();
+    var ledgerRepository = require_ledgerRepository();
+    var itemRepository = require_itemRepository();
+    var imeiRepository = require_imeiRepository();
+    var customerService = require_customerService();
+    var { AppError } = require_errorHandler();
+    var { getDb } = require_database();
+    function applyStockDelta(items, sign) {
+      for (const line of items || []) {
+        if (!line.item_id) continue;
+        const qty = parseFloat(line.quantity) || 0;
+        if (!qty) continue;
+        itemRepository.adjustStock(line.item_id, sign * qty);
+      }
+    }
+    function consumeImeis(items, saleId) {
+      for (const line of items || []) {
+        if (!line.item_id || !Array.isArray(line.imeis)) continue;
+        const clean = line.imeis.map((s) => String(s || "").trim()).filter(Boolean);
+        if (clean.length === 0) continue;
+        imeiRepository.markSold(line.item_id, saleId, clean);
+      }
+    }
+    function computeLineAmounts(line) {
+      const rate = parseFloat(line.rate) || 0;
+      const qty = parseFloat(line.quantity) || 1;
+      const disc = parseFloat(line.discount_percent) || 0;
+      const gst = parseFloat(line.gst_percent) || 0;
+      const gross = rate * qty * (1 - disc / 100);
+      if (line.rate_tax_mode === "taxable") {
+        const gst_amount2 = Math.round(gross * gst / 100 * 100) / 100;
+        const amount2 = Math.round((gross + gst_amount2) * 100) / 100;
+        return { gst_amount: gst_amount2, amount: amount2 };
+      }
+      const gst_amount = Math.round((gross - gross / (1 + gst / 100)) * 100) / 100;
+      const amount = Math.round(gross * 100) / 100;
+      return { gst_amount, amount };
+    }
+    function applyLedgerDelta(behaviour, delta) {
+      return behaviour === "customer" ? delta : -delta;
+    }
+    var SaleService = class {
+      validate(data) {
+        if (!data) throw new AppError("Invalid payload", 400);
+        if (!data.ledger_id) throw new AppError("Customer ledger is required", 400);
+        if (!Array.isArray(data.items) || data.items.length === 0) {
+          throw new AppError("At least one item line is required", 400);
+        }
+        data.items.forEach((line, idx) => {
+          if (!line.item_name || !String(line.item_name).trim()) {
+            throw new AppError(`Row ${idx + 1}: item name is required`, 400);
+          }
+          const rate = parseFloat(line.rate);
+          if (isNaN(rate) || rate < 0) {
+            throw new AppError(`Row ${idx + 1}: rate must be a non-negative number`, 400);
+          }
+        });
+      }
+      create(data) {
+        this.validate(data);
+        const db = getDb();
+        const ledger = ledgerRepository.findById(data.ledger_id);
+        if (!ledger) throw new AppError("Ledger not found", 404);
+        if (ledger.status === "closed") throw new AppError("Cannot record sale on a closed ledger", 400);
+        const normalisedItems = data.items.map((line) => {
+          const { gst_amount, amount } = computeLineAmounts(line);
+          return {
+            ...line,
+            quantity: parseFloat(line.quantity) || 1,
+            rate: parseFloat(line.rate) || 0,
+            mrp: parseFloat(line.mrp) || 0,
+            discount_percent: parseFloat(line.discount_percent) || 0,
+            gst_percent: parseFloat(line.gst_percent) || 0,
+            gst_amount,
+            amount
+          };
+        });
+        const total_amount = normalisedItems.reduce((s, l) => s + l.amount, 0);
+        const total_gst = normalisedItems.reduce((s, l) => s + l.gst_amount, 0);
+        const total_discount = normalisedItems.reduce((s, l) => {
+          const gross = (parseFloat(l.rate) || 0) * (parseFloat(l.quantity) || 1);
+          const taxable = gross * (1 - (parseFloat(l.discount_percent) || 0) / 100);
+          return s + (gross - taxable);
+        }, 0);
+        const run = db.transaction(() => {
+          const sale_number = saleRepository.getNextSaleNumber();
+          const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
+          const customer_id = customerService.resolveForSale({
+            customer_id: data.customer_id,
+            customer_name: data.customer_name,
+            customer_mobile: data.customer_mobile,
+            customer_place: data.customer_place
+          });
+          const sale = saleRepository.create({
+            sale_number,
+            ledger_id: parseInt(data.ledger_id),
+            date: data.date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+            time: data.time || "",
+            total_amount: Math.round((total_amount - bill_discount_val) * 100) / 100,
+            total_discount: Math.round(total_discount * 100) / 100,
+            bill_discount: bill_discount_val,
+            total_gst: Math.round(total_gst * 100) / 100,
+            item_count: normalisedItems.length,
+            notes: data.notes || "",
+            customer_name: data.customer_name || "",
+            customer_mobile: data.customer_mobile || "",
+            customer_place: data.customer_place || "",
+            customer_id,
+            items: normalisedItems
+          });
+          const delta = applyLedgerDelta(ledger.behaviour, total_amount - bill_discount_val);
+          ledgerRepository.updateBalance(ledger.id, ledger.current_balance + delta);
+          applyStockDelta(normalisedItems, -1);
+          consumeImeis(normalisedItems, sale.id);
+          return sale;
+        });
+        return run();
+      }
+      update(id, data) {
+        this.validate(data);
+        const db = getDb();
+        const existing = saleRepository.getById(id);
+        if (!existing) throw new AppError("Sale not found", 404);
+        const ledger = ledgerRepository.findById(existing.ledger_id);
+        if (!ledger) throw new AppError("Ledger not found", 404);
+        const normalisedItems = data.items.map((line) => {
+          const { gst_amount, amount } = computeLineAmounts(line);
+          return {
+            ...line,
+            quantity: parseFloat(line.quantity) || 1,
+            rate: parseFloat(line.rate) || 0,
+            mrp: parseFloat(line.mrp) || 0,
+            discount_percent: parseFloat(line.discount_percent) || 0,
+            gst_percent: parseFloat(line.gst_percent) || 0,
+            gst_amount,
+            amount
+          };
+        });
+        const total_amount = normalisedItems.reduce((s, l) => s + l.amount, 0);
+        const total_gst = normalisedItems.reduce((s, l) => s + l.gst_amount, 0);
+        const total_discount = normalisedItems.reduce((s, l) => {
+          const gross = (parseFloat(l.rate) || 0) * (parseFloat(l.quantity) || 1);
+          const taxable = gross * (1 - (parseFloat(l.discount_percent) || 0) / 100);
+          return s + (gross - taxable);
+        }, 0);
+        const run = db.transaction(() => {
+          const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
+          const net_total = Math.round((total_amount - bill_discount_val) * 100) / 100;
+          const oldDelta = applyLedgerDelta(ledger.behaviour, existing.total_amount);
+          const newDelta = applyLedgerDelta(ledger.behaviour, net_total);
+          ledgerRepository.updateBalance(ledger.id, ledger.current_balance - oldDelta + newDelta);
+          applyStockDelta(existing.items, 1);
+          applyStockDelta(normalisedItems, -1);
+          imeiRepository.restoreBySale(id);
+          const customer_id = customerService.resolveForSale({
+            customer_id: data.customer_id,
+            customer_name: data.customer_name,
+            customer_mobile: data.customer_mobile,
+            customer_place: data.customer_place
+          });
+          const updated = saleRepository.update(id, {
+            date: data.date || existing.date,
+            time: data.time != null ? data.time : existing.time,
+            total_amount: Math.round((total_amount - bill_discount_val) * 100) / 100,
+            total_discount: Math.round(total_discount * 100) / 100,
+            bill_discount: bill_discount_val,
+            total_gst: Math.round(total_gst * 100) / 100,
+            item_count: normalisedItems.length,
+            notes: data.notes || "",
+            customer_name: data.customer_name || "",
+            customer_mobile: data.customer_mobile || "",
+            customer_place: data.customer_place || "",
+            customer_id,
+            items: normalisedItems
+          });
+          consumeImeis(normalisedItems, id);
+          return updated;
+        });
+        return run();
+      }
+      delete(id) {
+        const db = getDb();
+        const existing = saleRepository.getById(id);
+        if (!existing) throw new AppError("Sale not found", 404);
+        const ledger = ledgerRepository.findById(existing.ledger_id);
+        const run = db.transaction(() => {
+          if (ledger) {
+            const oldDelta = applyLedgerDelta(ledger.behaviour, existing.total_amount);
+            ledgerRepository.updateBalance(ledger.id, ledger.current_balance - oldDelta);
+          }
+          applyStockDelta(existing.items, 1);
+          imeiRepository.restoreBySale(id);
+          saleRepository.delete(id);
+        });
+        run();
+      }
+      getById(id) {
+        const sale = saleRepository.getById(id);
+        if (!sale) throw new AppError("Sale not found", 404);
+        return sale;
+      }
+      getAll(filters) {
+        return saleRepository.getAll(filters);
+      }
+      getByLedger(ledgerId) {
+        return saleRepository.getByLedger(ledgerId);
+      }
+      getNextSaleNumber() {
+        return saleRepository.getNextSaleNumber();
+      }
+    };
+    module2.exports = new SaleService();
+  }
+});
+
+// src/controllers/saleController.js
+var require_saleController = __commonJS({
+  "src/controllers/saleController.js"(exports2, module2) {
+    var saleService = require_saleService();
+    var SaleController = class {
+      getAll(req, res, next) {
+        try {
+          const { ledgerId, fromDate, toDate, search, limit } = req.query;
+          const sales = saleService.getAll({
+            ledgerId: ledgerId ? parseInt(ledgerId) : void 0,
+            fromDate,
+            toDate,
+            search,
+            limit: limit ? parseInt(limit) : void 0
+          });
+          res.json({ success: true, data: sales });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getNextNumber(req, res, next) {
+        try {
+          res.json({ success: true, data: { sale_number: saleService.getNextSaleNumber() } });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getById(req, res, next) {
+        try {
+          const sale = saleService.getById(parseInt(req.params.id));
+          res.json({ success: true, data: sale });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getByLedger(req, res, next) {
+        try {
+          const sales = saleService.getByLedger(parseInt(req.params.ledgerId));
+          res.json({ success: true, data: sales });
+        } catch (err) {
+          next(err);
+        }
+      }
+      create(req, res, next) {
+        try {
+          const sale = saleService.create(req.body);
+          res.status(201).json({ success: true, data: sale });
+        } catch (err) {
+          next(err);
+        }
+      }
+      update(req, res, next) {
+        try {
+          const sale = saleService.update(parseInt(req.params.id), req.body);
+          res.json({ success: true, data: sale });
+        } catch (err) {
+          next(err);
+        }
+      }
+      delete(req, res, next) {
+        try {
+          saleService.delete(parseInt(req.params.id));
+          res.json({ success: true });
+        } catch (err) {
+          next(err);
+        }
+      }
+    };
+    module2.exports = new SaleController();
+  }
+});
+
+// src/routes/saleRoutes.js
+var require_saleRoutes = __commonJS({
+  "src/routes/saleRoutes.js"(exports2, module2) {
+    var express2 = require_express2();
+    var router = express2.Router();
+    var saleController = require_saleController();
+    router.get("/next-number", (req, res, next) => saleController.getNextNumber(req, res, next));
+    router.get("/ledger/:ledgerId", (req, res, next) => saleController.getByLedger(req, res, next));
+    router.get("/", (req, res, next) => saleController.getAll(req, res, next));
+    router.get("/:id", (req, res, next) => saleController.getById(req, res, next));
+    router.post("/", (req, res, next) => saleController.create(req, res, next));
+    router.put("/:id", (req, res, next) => saleController.update(req, res, next));
+    router.delete("/:id", (req, res, next) => saleController.delete(req, res, next));
+    module2.exports = router;
+  }
+});
+
+// src/repositories/purchaseRepository.js
+var require_purchaseRepository = __commonJS({
+  "src/repositories/purchaseRepository.js"(exports2, module2) {
+    var { getDb } = require_database();
+    var imeiRepository = require_imeiRepository();
+    var PurchaseRepository = class {
+      getNextPurchaseNumber() {
+        const db = getDb();
+        const row = db.prepare(`
+      SELECT COALESCE(MAX(CAST(purchase_number AS INTEGER)), 0) + 1 AS next
+      FROM purchases
+    `).get();
+        return String(row.next);
+      }
+      create({ purchase_number, ledger_id, bill_number, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, items }) {
+        const db = getDb();
+        const info = db.prepare(`
+      INSERT INTO purchases (purchase_number, ledger_id, bill_number, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+          purchase_number,
+          ledger_id,
+          (bill_number || "").toString().trim(),
+          date,
+          time || "",
+          total_amount,
+          total_discount || 0,
+          bill_discount || 0,
+          total_gst || 0,
+          item_count || (items ? items.length : 0),
+          notes || ""
+        );
+        const purchaseId = info.lastInsertRowid;
+        if (Array.isArray(items)) {
+          const stmt = db.prepare(`
+        INSERT INTO purchase_items (purchase_id, item_id, item_name, unit, mrp, rate, quantity, discount_percent, gst_percent, gst_amount, amount, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+          items.forEach((line, idx) => {
+            stmt.run(
+              purchaseId,
+              line.item_id || null,
+              line.item_name,
+              line.unit || "Nos",
+              parseFloat(line.mrp) || 0,
+              parseFloat(line.rate) || 0,
+              parseFloat(line.quantity) || 1,
+              parseFloat(line.discount_percent) || 0,
+              parseFloat(line.gst_percent) || 0,
+              parseFloat(line.gst_amount) || 0,
+              parseFloat(line.amount) || 0,
+              idx
+            );
+          });
+        }
+        return this.getById(purchaseId);
+      }
+      getById(id) {
+        const db = getDb();
+        const purchase = db.prepare(`
+      SELECT p.*, l.name AS ledger_name
+      FROM purchases p
+      JOIN ledgers l ON l.id = p.ledger_id
+      WHERE p.id = ?
+    `).get(id);
+        if (!purchase) return null;
+        purchase.items = db.prepare(`
+      SELECT * FROM purchase_items WHERE purchase_id = ? ORDER BY sort_order ASC, id ASC
+    `).all(id);
+        const imeiRows = imeiRepository.getByPurchase(id);
+        const byItem = /* @__PURE__ */ new Map();
+        for (const row of imeiRows) {
+          if (!byItem.has(row.item_id)) byItem.set(row.item_id, []);
+          byItem.get(row.item_id).push(row.imei);
+        }
+        purchase.items = purchase.items.map((line) => ({
+          ...line,
+          imeis: line.item_id ? byItem.get(line.item_id) || [] : []
+        }));
+        return purchase;
+      }
+      getAll({ ledgerId, fromDate, toDate, search, limit } = {}) {
+        const db = getDb();
+        const conds = [];
+        const params = [];
+        if (ledgerId) {
+          conds.push("p.ledger_id = ?");
+          params.push(ledgerId);
+        }
+        if (fromDate) {
+          conds.push("p.date >= ?");
+          params.push(fromDate);
+        }
+        if (toDate) {
+          conds.push("p.date <= ?");
+          params.push(toDate);
+        }
+        if (search && String(search).trim()) {
+          const like = `%${String(search).trim()}%`;
+          conds.push(`(
+        p.purchase_number LIKE ? OR
+        p.bill_number LIKE ? OR
+        l.name LIKE ? OR
+        EXISTS (SELECT 1 FROM purchase_items pi WHERE pi.purchase_id = p.id AND pi.item_name LIKE ?) OR
+        EXISTS (SELECT 1 FROM item_imeis iu WHERE iu.purchase_id = p.id AND iu.imei LIKE ?)
+      )`);
+          params.push(like, like, like, like, like);
+        }
+        const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+        const limitClause = limit ? `LIMIT ${parseInt(limit, 10)}` : "";
+        return db.prepare(`
+      SELECT p.*, l.name AS ledger_name
+      FROM purchases p
+      JOIN ledgers l ON l.id = p.ledger_id
+      ${where}
+      ORDER BY p.date DESC, p.id DESC
+      ${limitClause}
+    `).all(...params);
+      }
+      getByLedger(ledgerId) {
+        const db = getDb();
+        const purchases = db.prepare(`
+      SELECT p.*, l.name AS ledger_name
+      FROM purchases p
+      JOIN ledgers l ON l.id = p.ledger_id
+      WHERE p.ledger_id = ?
+      ORDER BY p.date DESC, p.id DESC
+    `).all(ledgerId);
+        const itemStmt = db.prepare(`
+      SELECT * FROM purchase_items WHERE purchase_id = ? ORDER BY sort_order ASC, id ASC
+    `);
+        return purchases.map((p) => ({ ...p, items: itemStmt.all(p.id) }));
+      }
+      delete(id) {
+        const db = getDb();
+        return db.prepare("DELETE FROM purchases WHERE id = ?").run(id);
+      }
+      update(id, { ledger_id, bill_number, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, items }) {
+        const db = getDb();
+        db.prepare(`
+      UPDATE purchases
+      SET ledger_id = ?, bill_number = ?, date = ?, time = ?, total_amount = ?,
+          total_discount = ?, bill_discount = ?, total_gst = ?, item_count = ?, notes = ?
+      WHERE id = ?
+    `).run(
+          ledger_id,
+          (bill_number || "").toString().trim(),
+          date,
+          time || "",
+          total_amount,
+          total_discount || 0,
+          bill_discount || 0,
+          total_gst || 0,
+          item_count || (items ? items.length : 0),
+          notes || "",
+          id
+        );
+        if (Array.isArray(items)) {
+          db.prepare("DELETE FROM purchase_items WHERE purchase_id = ?").run(id);
+          const stmt = db.prepare(`
+        INSERT INTO purchase_items (purchase_id, item_id, item_name, unit, mrp, rate, quantity, discount_percent, gst_percent, gst_amount, amount, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+          items.forEach((line, idx) => {
+            stmt.run(
+              id,
+              line.item_id || null,
+              line.item_name,
+              line.unit || "Nos",
+              parseFloat(line.mrp) || 0,
+              parseFloat(line.rate) || 0,
+              parseFloat(line.quantity) || 1,
+              parseFloat(line.discount_percent) || 0,
+              parseFloat(line.gst_percent) || 0,
+              parseFloat(line.gst_amount) || 0,
+              parseFloat(line.amount) || 0,
+              idx
+            );
+          });
+        }
+        return this.getById(id);
+      }
+    };
+    module2.exports = new PurchaseRepository();
+  }
+});
+
+// src/services/purchaseService.js
+var require_purchaseService = __commonJS({
+  "src/services/purchaseService.js"(exports2, module2) {
+    var purchaseRepository = require_purchaseRepository();
+    var ledgerRepository = require_ledgerRepository();
+    var itemRepository = require_itemRepository();
+    var imeiRepository = require_imeiRepository();
+    var { AppError } = require_errorHandler();
+    var { getDb } = require_database();
+    function computeLineAmounts(line) {
+      const rate = parseFloat(line.rate) || 0;
+      const qty = parseFloat(line.quantity) || 1;
+      const disc = parseFloat(line.discount_percent) || 0;
+      const gst = parseFloat(line.gst_percent) || 0;
+      const gross = rate * qty * (1 - disc / 100);
+      const gst_amount = Math.round((gross - gross / (1 + gst / 100)) * 100) / 100;
+      const amount = Math.round(gross * 100) / 100;
+      return { gst_amount, amount };
+    }
+    function applyStockDelta(items, sign) {
+      for (const line of items || []) {
+        if (!line.item_id) continue;
+        const qty = parseFloat(line.quantity) || 0;
+        if (!qty) continue;
+        itemRepository.adjustStock(line.item_id, sign * qty);
+      }
+    }
+    function registerImeis(items, purchaseId) {
+      for (const line of items || []) {
+        if (!line.item_id || !Array.isArray(line.imeis)) continue;
+        const clean = line.imeis.map((s) => String(s || "").trim()).filter(Boolean);
+        if (clean.length === 0) continue;
+        imeiRepository.addForPurchase(line.item_id, purchaseId, clean);
+      }
+    }
+    function isCashLedger(ledger) {
+      return ledger && ledger.name === "CASH";
+    }
+    function applyLedgerDelta(behaviour, delta) {
+      return behaviour === "customer" ? -delta : delta;
+    }
+    var PurchaseService = class {
+      validate(data) {
+        if (!data) throw new AppError("Invalid payload", 400);
+        if (!data.ledger_id) throw new AppError("Ledger is required", 400);
+        if (!Array.isArray(data.items) || data.items.length === 0) {
+          throw new AppError("At least one item line is required", 400);
+        }
+        data.items.forEach((line, idx) => {
+          if (!line.item_name || !String(line.item_name).trim()) {
+            throw new AppError(`Row ${idx + 1}: item name is required`, 400);
+          }
+          const rate = parseFloat(line.rate);
+          if (isNaN(rate) || rate < 0) {
+            throw new AppError(`Row ${idx + 1}: rate must be a non-negative number`, 400);
+          }
+          const qty = parseFloat(line.quantity);
+          if (isNaN(qty) || qty <= 0) {
+            throw new AppError(`Row ${idx + 1}: quantity must be greater than zero`, 400);
+          }
+        });
+      }
+      _normalise(items) {
+        return items.map((line) => {
+          const { gst_amount, amount } = computeLineAmounts(line);
+          return {
+            ...line,
+            quantity: parseFloat(line.quantity) || 1,
+            rate: parseFloat(line.rate) || 0,
+            mrp: parseFloat(line.mrp) || 0,
+            discount_percent: parseFloat(line.discount_percent) || 0,
+            gst_percent: parseFloat(line.gst_percent) || 0,
+            gst_amount,
+            amount
+          };
+        });
+      }
+      _totals(items) {
+        const total_amount = items.reduce((s, l) => s + l.amount, 0);
+        const total_gst = items.reduce((s, l) => s + l.gst_amount, 0);
+        const total_discount = items.reduce((s, l) => {
+          const gross = (parseFloat(l.rate) || 0) * (parseFloat(l.quantity) || 1);
+          const taxable = gross * (1 - (parseFloat(l.discount_percent) || 0) / 100);
+          return s + (gross - taxable);
+        }, 0);
+        return {
+          total_amount: Math.round(total_amount * 100) / 100,
+          total_gst: Math.round(total_gst * 100) / 100,
+          total_discount: Math.round(total_discount * 100) / 100
+        };
+      }
+      create(data) {
+        this.validate(data);
+        const db = getDb();
+        const ledger = ledgerRepository.findById(data.ledger_id);
+        if (!ledger) throw new AppError("Ledger not found", 404);
+        if (ledger.status === "closed") throw new AppError("Cannot record purchase on a closed ledger", 400);
+        const normalisedItems = this._normalise(data.items);
+        const totals = this._totals(normalisedItems);
+        const run = db.transaction(() => {
+          const purchase_number = purchaseRepository.getNextPurchaseNumber();
+          const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
+          const purchase = purchaseRepository.create({
+            purchase_number,
+            ledger_id: parseInt(data.ledger_id),
+            bill_number: data.bill_number || "",
+            date: data.date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+            time: data.time || "",
+            ...totals,
+            total_amount: Math.round((totals.total_amount - bill_discount_val) * 100) / 100,
+            bill_discount: bill_discount_val,
+            item_count: normalisedItems.length,
+            notes: data.notes || "",
+            items: normalisedItems
+          });
+          if (!isCashLedger(ledger)) {
+            const delta = applyLedgerDelta(ledger.behaviour, purchase.total_amount);
+            ledgerRepository.updateBalance(ledger.id, ledger.current_balance + delta);
+          }
+          applyStockDelta(normalisedItems, 1);
+          registerImeis(normalisedItems, purchase.id);
+          return purchase;
+        });
+        return run();
+      }
+      update(id, data) {
+        this.validate(data);
+        const db = getDb();
+        const existing = purchaseRepository.getById(id);
+        if (!existing) throw new AppError("Purchase not found", 404);
+        const ledger = ledgerRepository.findById(data.ledger_id || existing.ledger_id);
+        if (!ledger) throw new AppError("Ledger not found", 404);
+        const normalisedItems = this._normalise(data.items);
+        const totals = this._totals(normalisedItems);
+        const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
+        const net_total = Math.round((totals.total_amount - bill_discount_val) * 100) / 100;
+        const run = db.transaction(() => {
+          applyStockDelta(existing.items, -1);
+          applyStockDelta(normalisedItems, 1);
+          imeiRepository.removeInStockByPurchase(id);
+          const oldLedger = ledgerRepository.findById(existing.ledger_id);
+          if (oldLedger && !isCashLedger(oldLedger)) {
+            const oldDelta = applyLedgerDelta(oldLedger.behaviour, existing.total_amount);
+            ledgerRepository.updateBalance(oldLedger.id, oldLedger.current_balance - oldDelta);
+          }
+          if (!isCashLedger(ledger)) {
+            const fresh = ledgerRepository.findById(ledger.id);
+            const newDelta = applyLedgerDelta(fresh.behaviour, net_total);
+            ledgerRepository.updateBalance(fresh.id, fresh.current_balance + newDelta);
+          }
+          const updated = purchaseRepository.update(id, {
+            ledger_id: ledger.id,
+            bill_number: data.bill_number || "",
+            date: data.date || existing.date,
+            time: data.time != null ? data.time : existing.time,
+            ...totals,
+            total_amount: net_total,
+            bill_discount: bill_discount_val,
+            item_count: normalisedItems.length,
+            notes: data.notes || "",
+            items: normalisedItems
+          });
+          registerImeis(normalisedItems, id);
+          return updated;
+        });
+        return run();
+      }
+      delete(id) {
+        const db = getDb();
+        const existing = purchaseRepository.getById(id);
+        if (!existing) throw new AppError("Purchase not found", 404);
+        const ledger = ledgerRepository.findById(existing.ledger_id);
+        const run = db.transaction(() => {
+          if (ledger && !isCashLedger(ledger)) {
+            const oldDelta = applyLedgerDelta(ledger.behaviour, existing.total_amount);
+            ledgerRepository.updateBalance(ledger.id, ledger.current_balance - oldDelta);
+          }
+          applyStockDelta(existing.items, -1);
+          imeiRepository.removeInStockByPurchase(id);
+          purchaseRepository.delete(id);
+        });
+        run();
+      }
+      getById(id) {
+        const purchase = purchaseRepository.getById(id);
+        if (!purchase) throw new AppError("Purchase not found", 404);
+        return purchase;
+      }
+      getAll(filters) {
+        return purchaseRepository.getAll(filters);
+      }
+      getByLedger(ledgerId) {
+        return purchaseRepository.getByLedger(ledgerId);
+      }
+      getNextPurchaseNumber() {
+        return purchaseRepository.getNextPurchaseNumber();
+      }
+    };
+    module2.exports = new PurchaseService();
+  }
+});
+
+// src/controllers/purchaseController.js
+var require_purchaseController = __commonJS({
+  "src/controllers/purchaseController.js"(exports2, module2) {
+    var purchaseService = require_purchaseService();
+    var PurchaseController = class {
+      getAll(req, res, next) {
+        try {
+          const { ledgerId, fromDate, toDate, search, limit } = req.query;
+          const purchases = purchaseService.getAll({
+            ledgerId: ledgerId ? parseInt(ledgerId) : void 0,
+            fromDate,
+            toDate,
+            search,
+            limit: limit ? parseInt(limit) : void 0
+          });
+          res.json({ success: true, data: purchases });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getNextNumber(req, res, next) {
+        try {
+          res.json({ success: true, data: { purchase_number: purchaseService.getNextPurchaseNumber() } });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getById(req, res, next) {
+        try {
+          const purchase = purchaseService.getById(parseInt(req.params.id));
+          res.json({ success: true, data: purchase });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getByLedger(req, res, next) {
+        try {
+          const purchases = purchaseService.getByLedger(parseInt(req.params.ledgerId));
+          res.json({ success: true, data: purchases });
+        } catch (err) {
+          next(err);
+        }
+      }
+      create(req, res, next) {
+        try {
+          const purchase = purchaseService.create(req.body);
+          res.status(201).json({ success: true, data: purchase });
+        } catch (err) {
+          next(err);
+        }
+      }
+      update(req, res, next) {
+        try {
+          const purchase = purchaseService.update(parseInt(req.params.id), req.body);
+          res.json({ success: true, data: purchase });
+        } catch (err) {
+          next(err);
+        }
+      }
+      delete(req, res, next) {
+        try {
+          purchaseService.delete(parseInt(req.params.id));
+          res.json({ success: true });
+        } catch (err) {
+          next(err);
+        }
+      }
+    };
+    module2.exports = new PurchaseController();
+  }
+});
+
+// src/routes/purchaseRoutes.js
+var require_purchaseRoutes = __commonJS({
+  "src/routes/purchaseRoutes.js"(exports2, module2) {
+    var express2 = require_express2();
+    var router = express2.Router();
+    var purchaseController = require_purchaseController();
+    router.get("/next-number", (req, res, next) => purchaseController.getNextNumber(req, res, next));
+    router.get("/ledger/:ledgerId", (req, res, next) => purchaseController.getByLedger(req, res, next));
+    router.get("/", (req, res, next) => purchaseController.getAll(req, res, next));
+    router.get("/:id", (req, res, next) => purchaseController.getById(req, res, next));
+    router.post("/", (req, res, next) => purchaseController.create(req, res, next));
+    router.put("/:id", (req, res, next) => purchaseController.update(req, res, next));
+    router.delete("/:id", (req, res, next) => purchaseController.delete(req, res, next));
+    module2.exports = router;
+  }
+});
+
+// src/repositories/estimationRepository.js
+var require_estimationRepository = __commonJS({
+  "src/repositories/estimationRepository.js"(exports2, module2) {
+    var { getDb } = require_database();
+    var EstimationRepository = class {
+      getNextNumber() {
+        const db = getDb();
+        const row = db.prepare(`
+      SELECT COALESCE(MAX(CAST(estimation_number AS INTEGER)), 0) + 1 AS next
+      FROM estimations
+    `).get();
+        return String(row.next);
+      }
+      create({
+        estimation_number,
+        ledger_id,
+        customer_name,
+        date,
+        time,
+        valid_until,
+        total_amount,
+        total_discount,
+        total_gst,
+        item_count,
+        notes,
+        items
+      }) {
+        const db = getDb();
+        const info = db.prepare(`
+      INSERT INTO estimations (
+        estimation_number, ledger_id, customer_name, date, time, valid_until,
+        total_amount, total_discount, total_gst, item_count, notes
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+          estimation_number,
+          ledger_id || null,
+          (customer_name || "").toString().trim(),
+          date,
+          time || "",
+          valid_until || "",
+          total_amount,
+          total_discount || 0,
+          total_gst || 0,
+          item_count || (items ? items.length : 0),
+          notes || ""
+        );
+        const estimationId = info.lastInsertRowid;
+        if (Array.isArray(items)) this._insertItems(db, estimationId, items);
+        return this.getById(estimationId);
+      }
+      _insertItems(db, estimationId, items) {
+        const stmt = db.prepare(`
+      INSERT INTO estimation_items (
+        estimation_id, item_id, item_name, unit, mrp, rate, quantity,
+        discount_percent, gst_percent, gst_amount, amount, sort_order
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+        items.forEach((line, idx) => {
+          stmt.run(
+            estimationId,
+            line.item_id || null,
+            line.item_name,
+            line.unit || "Nos",
+            parseFloat(line.mrp) || 0,
+            parseFloat(line.rate) || 0,
+            parseFloat(line.quantity) || 1,
+            parseFloat(line.discount_percent) || 0,
+            parseFloat(line.gst_percent) || 0,
+            parseFloat(line.gst_amount) || 0,
+            parseFloat(line.amount) || 0,
+            idx
+          );
+        });
+      }
+      getById(id) {
+        const db = getDb();
+        const est = db.prepare(`
+      SELECT e.*, l.name AS ledger_name
+      FROM estimations e
+      LEFT JOIN ledgers l ON l.id = e.ledger_id
+      WHERE e.id = ?
+    `).get(id);
+        if (!est) return null;
+        est.items = db.prepare(`
+      SELECT * FROM estimation_items WHERE estimation_id = ?
+      ORDER BY sort_order ASC, id ASC
+    `).all(id);
+        return est;
+      }
+      getAll({ ledgerId, fromDate, toDate, status } = {}) {
+        const db = getDb();
+        const conds = [];
+        const params = [];
+        if (ledgerId) {
+          conds.push("e.ledger_id = ?");
+          params.push(ledgerId);
+        }
+        if (fromDate) {
+          conds.push("e.date >= ?");
+          params.push(fromDate);
+        }
+        if (toDate) {
+          conds.push("e.date <= ?");
+          params.push(toDate);
+        }
+        if (status) {
+          conds.push("e.status = ?");
+          params.push(status);
+        }
+        const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+        return db.prepare(`
+      SELECT e.*, l.name AS ledger_name
+      FROM estimations e
+      LEFT JOIN ledgers l ON l.id = e.ledger_id
+      ${where}
+      ORDER BY e.date DESC, e.id DESC
+    `).all(...params);
+      }
+      delete(id) {
+        const db = getDb();
+        return db.prepare("DELETE FROM estimations WHERE id = ?").run(id);
+      }
+      update(id, {
+        ledger_id,
+        customer_name,
+        date,
+        time,
+        valid_until,
+        total_amount,
+        total_discount,
+        total_gst,
+        item_count,
+        notes,
+        items,
+        status
+      }) {
+        const db = getDb();
+        db.prepare(`
+      UPDATE estimations
+      SET ledger_id = ?, customer_name = ?, date = ?, time = ?, valid_until = ?,
+          total_amount = ?, total_discount = ?, total_gst = ?,
+          item_count = ?, notes = ?, status = COALESCE(?, status)
+      WHERE id = ?
+    `).run(
+          ledger_id || null,
+          (customer_name || "").toString().trim(),
+          date,
+          time || "",
+          valid_until || "",
+          total_amount,
+          total_discount || 0,
+          total_gst || 0,
+          item_count || (items ? items.length : 0),
+          notes || "",
+          status || null,
+          id
+        );
+        if (Array.isArray(items)) {
+          db.prepare("DELETE FROM estimation_items WHERE estimation_id = ?").run(id);
+          this._insertItems(db, id, items);
+        }
+        return this.getById(id);
+      }
+      markConverted(id, saleId) {
+        const db = getDb();
+        db.prepare(`
+      UPDATE estimations
+      SET status = 'converted', converted_sale_id = ?
+      WHERE id = ?
+    `).run(saleId, id);
+      }
+    };
+    module2.exports = new EstimationRepository();
+  }
+});
+
+// src/services/estimationService.js
+var require_estimationService = __commonJS({
+  "src/services/estimationService.js"(exports2, module2) {
+    var estimationRepository = require_estimationRepository();
+    var ledgerRepository = require_ledgerRepository();
+    var saleService = require_saleService();
+    var { AppError } = require_errorHandler();
+    var { getDb } = require_database();
+    function computeLineAmounts(line) {
+      const rate = parseFloat(line.rate) || 0;
+      const qty = parseFloat(line.quantity) || 1;
+      const disc = parseFloat(line.discount_percent) || 0;
+      const gst = parseFloat(line.gst_percent) || 0;
+      const taxable = rate * qty * (1 - disc / 100);
+      const gst_amount = Math.round(taxable * gst / 100 * 100) / 100;
+      const amount = Math.round((taxable + gst_amount) * 100) / 100;
+      return { gst_amount, amount };
+    }
+    var EstimationService = class {
+      validate(data) {
+        if (!data) throw new AppError("Invalid payload", 400);
+        const hasLedger = !!data.ledger_id;
+        const hasName = data.customer_name && String(data.customer_name).trim();
+        if (!hasLedger && !hasName) {
+          throw new AppError("Select a ledger or enter a customer name", 400);
+        }
+        if (!Array.isArray(data.items) || data.items.length === 0) {
+          throw new AppError("At least one item line is required", 400);
+        }
+        data.items.forEach((line, idx) => {
+          if (!line.item_name || !String(line.item_name).trim()) {
+            throw new AppError(`Row ${idx + 1}: item name is required`, 400);
+          }
+          const rate = parseFloat(line.rate);
+          if (isNaN(rate) || rate < 0) {
+            throw new AppError(`Row ${idx + 1}: rate must be a non-negative number`, 400);
+          }
+          const qty = parseFloat(line.quantity);
+          if (isNaN(qty) || qty <= 0) {
+            throw new AppError(`Row ${idx + 1}: quantity must be greater than zero`, 400);
+          }
+        });
+      }
+      _normalise(items) {
+        return items.map((line) => {
+          const { gst_amount, amount } = computeLineAmounts(line);
+          return {
+            ...line,
+            quantity: parseFloat(line.quantity) || 1,
+            rate: parseFloat(line.rate) || 0,
+            mrp: parseFloat(line.mrp) || 0,
+            discount_percent: parseFloat(line.discount_percent) || 0,
+            gst_percent: parseFloat(line.gst_percent) || 0,
+            gst_amount,
+            amount
+          };
+        });
+      }
+      _totals(items) {
+        const total_amount = items.reduce((s, l) => s + l.amount, 0);
+        const total_gst = items.reduce((s, l) => s + l.gst_amount, 0);
+        const total_discount = items.reduce((s, l) => {
+          const gross = (parseFloat(l.rate) || 0) * (parseFloat(l.quantity) || 1);
+          const taxable = gross * (1 - (parseFloat(l.discount_percent) || 0) / 100);
+          return s + (gross - taxable);
+        }, 0);
+        return {
+          total_amount: Math.round(total_amount * 100) / 100,
+          total_gst: Math.round(total_gst * 100) / 100,
+          total_discount: Math.round(total_discount * 100) / 100
+        };
+      }
+      create(data) {
+        this.validate(data);
+        if (data.ledger_id) {
+          const ledger = ledgerRepository.findById(data.ledger_id);
+          if (!ledger) throw new AppError("Ledger not found", 404);
+        }
+        const normalisedItems = this._normalise(data.items);
+        const totals = this._totals(normalisedItems);
+        return estimationRepository.create({
+          estimation_number: estimationRepository.getNextNumber(),
+          ledger_id: data.ledger_id ? parseInt(data.ledger_id) : null,
+          customer_name: data.customer_name || "",
+          date: data.date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+          time: data.time || "",
+          valid_until: data.valid_until || "",
+          ...totals,
+          item_count: normalisedItems.length,
+          notes: data.notes || "",
+          items: normalisedItems
+        });
+      }
+      update(id, data) {
+        this.validate(data);
+        const existing = estimationRepository.getById(id);
+        if (!existing) throw new AppError("Estimation not found", 404);
+        if (existing.status === "converted") {
+          throw new AppError("Cannot edit a converted estimation", 400);
+        }
+        if (data.ledger_id) {
+          const ledger = ledgerRepository.findById(data.ledger_id);
+          if (!ledger) throw new AppError("Ledger not found", 404);
+        }
+        const normalisedItems = this._normalise(data.items);
+        const totals = this._totals(normalisedItems);
+        return estimationRepository.update(id, {
+          ledger_id: data.ledger_id ? parseInt(data.ledger_id) : null,
+          customer_name: data.customer_name || "",
+          date: data.date || existing.date,
+          time: data.time != null ? data.time : existing.time,
+          valid_until: data.valid_until || "",
+          ...totals,
+          item_count: normalisedItems.length,
+          notes: data.notes || "",
+          items: normalisedItems
+        });
+      }
+      delete(id) {
+        const existing = estimationRepository.getById(id);
+        if (!existing) throw new AppError("Estimation not found", 404);
+        estimationRepository.delete(id);
+      }
+      getById(id) {
+        const est = estimationRepository.getById(id);
+        if (!est) throw new AppError("Estimation not found", 404);
+        return est;
+      }
+      getAll(filters) {
+        return estimationRepository.getAll(filters);
+      }
+      getNextNumber() {
+        return estimationRepository.getNextNumber();
+      }
+      /**
+       * Convert an open estimation into a real sale. Requires the estimation
+       * to have a linked ledger (we don't auto-create ledgers).
+       */
+      convertToSale(id) {
+        const db = getDb();
+        const estimation = estimationRepository.getById(id);
+        if (!estimation) throw new AppError("Estimation not found", 404);
+        if (estimation.status === "converted") {
+          throw new AppError("Estimation has already been converted", 400);
+        }
+        if (!estimation.ledger_id) {
+          throw new AppError("Link a ledger before converting to a sale", 400);
+        }
+        const run = db.transaction(() => {
+          const sale = saleService.create({
+            ledger_id: estimation.ledger_id,
+            date: (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+            notes: `Converted from Estimation #${estimation.estimation_number}`,
+            items: estimation.items.map((l) => ({
+              item_id: l.item_id,
+              item_name: l.item_name,
+              unit: l.unit,
+              mrp: l.mrp,
+              rate: l.rate,
+              quantity: l.quantity,
+              discount_percent: l.discount_percent,
+              gst_percent: l.gst_percent
+            }))
+          });
+          estimationRepository.markConverted(id, sale.id);
+          return sale;
+        });
+        return run();
+      }
+    };
+    module2.exports = new EstimationService();
+  }
+});
+
+// src/controllers/estimationController.js
+var require_estimationController = __commonJS({
+  "src/controllers/estimationController.js"(exports2, module2) {
+    var estimationService = require_estimationService();
+    var EstimationController = class {
+      getAll(req, res, next) {
+        try {
+          const { ledgerId, fromDate, toDate, status } = req.query;
+          const data = estimationService.getAll({
+            ledgerId: ledgerId ? parseInt(ledgerId) : void 0,
+            fromDate,
+            toDate,
+            status
+          });
+          res.json({ success: true, data });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getNextNumber(req, res, next) {
+        try {
+          res.json({ success: true, data: { estimation_number: estimationService.getNextNumber() } });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getById(req, res, next) {
+        try {
+          res.json({ success: true, data: estimationService.getById(parseInt(req.params.id)) });
+        } catch (err) {
+          next(err);
+        }
+      }
+      create(req, res, next) {
+        try {
+          const est = estimationService.create(req.body);
+          res.status(201).json({ success: true, data: est });
+        } catch (err) {
+          next(err);
+        }
+      }
+      update(req, res, next) {
+        try {
+          const est = estimationService.update(parseInt(req.params.id), req.body);
+          res.json({ success: true, data: est });
+        } catch (err) {
+          next(err);
+        }
+      }
+      delete(req, res, next) {
+        try {
+          estimationService.delete(parseInt(req.params.id));
+          res.json({ success: true });
+        } catch (err) {
+          next(err);
+        }
+      }
+      convert(req, res, next) {
+        try {
+          const sale = estimationService.convertToSale(parseInt(req.params.id));
+          res.json({ success: true, data: sale });
+        } catch (err) {
+          next(err);
+        }
+      }
+    };
+    module2.exports = new EstimationController();
+  }
+});
+
+// src/routes/estimationRoutes.js
+var require_estimationRoutes = __commonJS({
+  "src/routes/estimationRoutes.js"(exports2, module2) {
+    var express2 = require_express2();
+    var router = express2.Router();
+    var estimationController = require_estimationController();
+    router.get("/next-number", (req, res, next) => estimationController.getNextNumber(req, res, next));
+    router.get("/", (req, res, next) => estimationController.getAll(req, res, next));
+    router.get("/:id", (req, res, next) => estimationController.getById(req, res, next));
+    router.post("/", (req, res, next) => estimationController.create(req, res, next));
+    router.post("/:id/convert", (req, res, next) => estimationController.convert(req, res, next));
+    router.put("/:id", (req, res, next) => estimationController.update(req, res, next));
+    router.delete("/:id", (req, res, next) => estimationController.delete(req, res, next));
+    module2.exports = router;
+  }
+});
+
+// src/repositories/salesReturnRepository.js
+var require_salesReturnRepository = __commonJS({
+  "src/repositories/salesReturnRepository.js"(exports2, module2) {
+    var { getDb } = require_database();
+    var SalesReturnRepository = class {
+      getNextNumber() {
+        const db = getDb();
+        const row = db.prepare(`
+      SELECT COALESCE(MAX(CAST(return_number AS INTEGER)), 0) + 1 AS next
+      FROM sales_returns
+    `).get();
+        return String(row.next);
+      }
+      create({
+        return_number,
+        ledger_id,
+        sale_id,
+        date,
+        time,
+        reason,
+        total_amount,
+        total_discount,
+        total_gst,
+        item_count,
+        notes,
+        items
+      }) {
+        const db = getDb();
+        const info = db.prepare(`
+      INSERT INTO sales_returns (
+        return_number, ledger_id, sale_id, date, time, reason,
+        total_amount, total_discount, total_gst, item_count, notes
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+          return_number,
+          ledger_id,
+          sale_id || null,
+          date,
+          time || "",
+          (reason || "").toString().trim(),
+          total_amount,
+          total_discount || 0,
+          total_gst || 0,
+          item_count || (items ? items.length : 0),
+          notes || ""
+        );
+        const returnId = info.lastInsertRowid;
+        if (Array.isArray(items)) this._insertItems(db, returnId, items);
+        return this.getById(returnId);
+      }
+      _insertItems(db, returnId, items) {
+        const stmt = db.prepare(`
+      INSERT INTO sales_return_items (
+        sales_return_id, item_id, item_name, unit, mrp, rate, quantity,
+        discount_percent, gst_percent, gst_amount, amount, sort_order
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+        items.forEach((line, idx) => {
+          stmt.run(
+            returnId,
+            line.item_id || null,
+            line.item_name,
+            line.unit || "Nos",
+            parseFloat(line.mrp) || 0,
+            parseFloat(line.rate) || 0,
+            parseFloat(line.quantity) || 1,
+            parseFloat(line.discount_percent) || 0,
+            parseFloat(line.gst_percent) || 0,
+            parseFloat(line.gst_amount) || 0,
+            parseFloat(line.amount) || 0,
+            idx
+          );
+        });
+      }
+      getById(id) {
+        const db = getDb();
+        const ret2 = db.prepare(`
+      SELECT r.*, l.name AS ledger_name, s.sale_number
+      FROM sales_returns r
+      JOIN ledgers l ON l.id = r.ledger_id
+      LEFT JOIN sales s ON s.id = r.sale_id
+      WHERE r.id = ?
+    `).get(id);
+        if (!ret2) return null;
+        ret2.items = db.prepare(`
+      SELECT * FROM sales_return_items WHERE sales_return_id = ?
+      ORDER BY sort_order ASC, id ASC
+    `).all(id);
+        return ret2;
+      }
+      getAll({ ledgerId, fromDate, toDate } = {}) {
+        const db = getDb();
+        const conds = [];
+        const params = [];
+        if (ledgerId) {
+          conds.push("r.ledger_id = ?");
+          params.push(ledgerId);
+        }
+        if (fromDate) {
+          conds.push("r.date >= ?");
+          params.push(fromDate);
+        }
+        if (toDate) {
+          conds.push("r.date <= ?");
+          params.push(toDate);
+        }
+        const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+        return db.prepare(`
+      SELECT r.*, l.name AS ledger_name, s.sale_number
+      FROM sales_returns r
+      JOIN ledgers l ON l.id = r.ledger_id
+      LEFT JOIN sales s ON s.id = r.sale_id
+      ${where}
+      ORDER BY r.date DESC, r.id DESC
+    `).all(...params);
+      }
+      getByLedger(ledgerId) {
+        const db = getDb();
+        const rows = db.prepare(`
+      SELECT r.*, l.name AS ledger_name, s.sale_number
+      FROM sales_returns r
+      JOIN ledgers l ON l.id = r.ledger_id
+      LEFT JOIN sales s ON s.id = r.sale_id
+      WHERE r.ledger_id = ?
+      ORDER BY r.date DESC, r.id DESC
+    `).all(ledgerId);
+        const itemStmt = db.prepare(`
+      SELECT * FROM sales_return_items WHERE sales_return_id = ?
+      ORDER BY sort_order ASC, id ASC
+    `);
+        return rows.map((r) => ({ ...r, items: itemStmt.all(r.id) }));
+      }
+      delete(id) {
+        const db = getDb();
+        return db.prepare("DELETE FROM sales_returns WHERE id = ?").run(id);
+      }
+      update(id, {
+        ledger_id,
+        sale_id,
+        date,
+        time,
+        reason,
+        total_amount,
+        total_discount,
+        total_gst,
+        item_count,
+        notes,
+        items
+      }) {
+        const db = getDb();
+        db.prepare(`
+      UPDATE sales_returns
+      SET ledger_id = ?, sale_id = ?, date = ?, time = ?, reason = ?,
+          total_amount = ?, total_discount = ?, total_gst = ?,
+          item_count = ?, notes = ?
+      WHERE id = ?
+    `).run(
+          ledger_id,
+          sale_id || null,
+          date,
+          time || "",
+          (reason || "").toString().trim(),
+          total_amount,
+          total_discount || 0,
+          total_gst || 0,
+          item_count || (items ? items.length : 0),
+          notes || "",
+          id
+        );
+        if (Array.isArray(items)) {
+          db.prepare("DELETE FROM sales_return_items WHERE sales_return_id = ?").run(id);
+          this._insertItems(db, id, items);
+        }
+        return this.getById(id);
+      }
+    };
+    module2.exports = new SalesReturnRepository();
+  }
+});
+
+// src/services/salesReturnService.js
+var require_salesReturnService = __commonJS({
+  "src/services/salesReturnService.js"(exports2, module2) {
+    var salesReturnRepository = require_salesReturnRepository();
+    var ledgerRepository = require_ledgerRepository();
+    var itemRepository = require_itemRepository();
+    var saleRepository = require_saleRepository();
+    var { AppError } = require_errorHandler();
+    var { getDb } = require_database();
+    function computeLineAmounts(line) {
+      const rate = parseFloat(line.rate) || 0;
+      const qty = parseFloat(line.quantity) || 1;
+      const disc = parseFloat(line.discount_percent) || 0;
+      const gst = parseFloat(line.gst_percent) || 0;
+      const taxable = rate * qty * (1 - disc / 100);
+      const gst_amount = Math.round(taxable * gst / 100 * 100) / 100;
+      const amount = Math.round((taxable + gst_amount) * 100) / 100;
+      return { gst_amount, amount };
+    }
+    function applyStockDelta(items, sign) {
+      for (const line of items || []) {
+        if (!line.item_id) continue;
+        const qty = parseFloat(line.quantity) || 0;
+        if (!qty) continue;
+        itemRepository.adjustStock(line.item_id, sign * qty);
+      }
+    }
+    function applyLedgerDelta(behaviour, delta) {
+      return behaviour === "customer" ? delta : -delta;
+    }
+    var SalesReturnService = class {
+      validate(data) {
+        if (!data) throw new AppError("Invalid payload", 400);
+        if (!data.ledger_id) throw new AppError("Customer ledger is required", 400);
+        if (!Array.isArray(data.items) || data.items.length === 0) {
+          throw new AppError("At least one item line is required", 400);
+        }
+        data.items.forEach((line, idx) => {
+          if (!line.item_name || !String(line.item_name).trim()) {
+            throw new AppError(`Row ${idx + 1}: item name is required`, 400);
+          }
+          const rate = parseFloat(line.rate);
+          if (isNaN(rate) || rate < 0) {
+            throw new AppError(`Row ${idx + 1}: rate must be a non-negative number`, 400);
+          }
+          const qty = parseFloat(line.quantity);
+          if (isNaN(qty) || qty <= 0) {
+            throw new AppError(`Row ${idx + 1}: quantity must be greater than zero`, 400);
+          }
+        });
+      }
+      _normalise(items) {
+        return items.map((line) => {
+          const { gst_amount, amount } = computeLineAmounts(line);
+          return {
+            ...line,
+            quantity: parseFloat(line.quantity) || 1,
+            rate: parseFloat(line.rate) || 0,
+            mrp: parseFloat(line.mrp) || 0,
+            discount_percent: parseFloat(line.discount_percent) || 0,
+            gst_percent: parseFloat(line.gst_percent) || 0,
+            gst_amount,
+            amount
+          };
+        });
+      }
+      _totals(items) {
+        const total_amount = items.reduce((s, l) => s + l.amount, 0);
+        const total_gst = items.reduce((s, l) => s + l.gst_amount, 0);
+        const total_discount = items.reduce((s, l) => {
+          const gross = (parseFloat(l.rate) || 0) * (parseFloat(l.quantity) || 1);
+          const taxable = gross * (1 - (parseFloat(l.discount_percent) || 0) / 100);
+          return s + (gross - taxable);
+        }, 0);
+        return {
+          total_amount: Math.round(total_amount * 100) / 100,
+          total_gst: Math.round(total_gst * 100) / 100,
+          total_discount: Math.round(total_discount * 100) / 100
+        };
+      }
+      create(data) {
+        this.validate(data);
+        const db = getDb();
+        const ledger = ledgerRepository.findById(data.ledger_id);
+        if (!ledger) throw new AppError("Ledger not found", 404);
+        if (ledger.status === "closed") throw new AppError("Cannot record return on a closed ledger", 400);
+        if (data.sale_id) {
+          const sale = saleRepository.getById(data.sale_id);
+          if (!sale) throw new AppError("Linked sale not found", 404);
+        }
+        const normalisedItems = this._normalise(data.items);
+        const totals = this._totals(normalisedItems);
+        const run = db.transaction(() => {
+          const ret2 = salesReturnRepository.create({
+            return_number: salesReturnRepository.getNextNumber(),
+            ledger_id: parseInt(data.ledger_id),
+            sale_id: data.sale_id ? parseInt(data.sale_id) : null,
+            date: data.date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+            time: data.time || "",
+            reason: data.reason || "",
+            ...totals,
+            item_count: normalisedItems.length,
+            notes: data.notes || "",
+            items: normalisedItems
+          });
+          const delta = applyLedgerDelta(ledger.behaviour, totals.total_amount);
+          ledgerRepository.updateBalance(ledger.id, ledger.current_balance - delta);
+          applyStockDelta(normalisedItems, 1);
+          return ret2;
+        });
+        return run();
+      }
+      update(id, data) {
+        this.validate(data);
+        const db = getDb();
+        const existing = salesReturnRepository.getById(id);
+        if (!existing) throw new AppError("Sales return not found", 404);
+        const ledger = ledgerRepository.findById(existing.ledger_id);
+        if (!ledger) throw new AppError("Ledger not found", 404);
+        const normalisedItems = this._normalise(data.items);
+        const totals = this._totals(normalisedItems);
+        const run = db.transaction(() => {
+          const oldDelta = applyLedgerDelta(ledger.behaviour, existing.total_amount);
+          const newDelta = applyLedgerDelta(ledger.behaviour, totals.total_amount);
+          ledgerRepository.updateBalance(ledger.id, ledger.current_balance + oldDelta - newDelta);
+          applyStockDelta(existing.items, -1);
+          applyStockDelta(normalisedItems, 1);
+          return salesReturnRepository.update(id, {
+            ledger_id: ledger.id,
+            sale_id: data.sale_id ? parseInt(data.sale_id) : existing.sale_id,
+            date: data.date || existing.date,
+            time: data.time != null ? data.time : existing.time,
+            reason: data.reason || "",
+            ...totals,
+            item_count: normalisedItems.length,
+            notes: data.notes || "",
+            items: normalisedItems
+          });
+        });
+        return run();
+      }
+      delete(id) {
+        const db = getDb();
+        const existing = salesReturnRepository.getById(id);
+        if (!existing) throw new AppError("Sales return not found", 404);
+        const ledger = ledgerRepository.findById(existing.ledger_id);
+        const run = db.transaction(() => {
+          if (ledger) {
+            const oldDelta = applyLedgerDelta(ledger.behaviour, existing.total_amount);
+            ledgerRepository.updateBalance(ledger.id, ledger.current_balance + oldDelta);
+          }
+          applyStockDelta(existing.items, -1);
+          salesReturnRepository.delete(id);
+        });
+        run();
+      }
+      getById(id) {
+        const ret2 = salesReturnRepository.getById(id);
+        if (!ret2) throw new AppError("Sales return not found", 404);
+        return ret2;
+      }
+      getAll(filters) {
+        return salesReturnRepository.getAll(filters);
+      }
+      getByLedger(ledgerId) {
+        return salesReturnRepository.getByLedger(ledgerId);
+      }
+      getNextNumber() {
+        return salesReturnRepository.getNextNumber();
+      }
+    };
+    module2.exports = new SalesReturnService();
+  }
+});
+
+// src/controllers/salesReturnController.js
+var require_salesReturnController = __commonJS({
+  "src/controllers/salesReturnController.js"(exports2, module2) {
+    var salesReturnService = require_salesReturnService();
+    var SalesReturnController = class {
+      getAll(req, res, next) {
+        try {
+          const { ledgerId, fromDate, toDate } = req.query;
+          const data = salesReturnService.getAll({
+            ledgerId: ledgerId ? parseInt(ledgerId) : void 0,
+            fromDate,
+            toDate
+          });
+          res.json({ success: true, data });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getNextNumber(req, res, next) {
+        try {
+          res.json({ success: true, data: { return_number: salesReturnService.getNextNumber() } });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getById(req, res, next) {
+        try {
+          res.json({ success: true, data: salesReturnService.getById(parseInt(req.params.id)) });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getByLedger(req, res, next) {
+        try {
+          res.json({ success: true, data: salesReturnService.getByLedger(parseInt(req.params.ledgerId)) });
+        } catch (err) {
+          next(err);
+        }
+      }
+      create(req, res, next) {
+        try {
+          const ret2 = salesReturnService.create(req.body);
+          res.status(201).json({ success: true, data: ret2 });
+        } catch (err) {
+          next(err);
+        }
+      }
+      update(req, res, next) {
+        try {
+          const ret2 = salesReturnService.update(parseInt(req.params.id), req.body);
+          res.json({ success: true, data: ret2 });
+        } catch (err) {
+          next(err);
+        }
+      }
+      delete(req, res, next) {
+        try {
+          salesReturnService.delete(parseInt(req.params.id));
+          res.json({ success: true });
+        } catch (err) {
+          next(err);
+        }
+      }
+    };
+    module2.exports = new SalesReturnController();
+  }
+});
+
+// src/routes/salesReturnRoutes.js
+var require_salesReturnRoutes = __commonJS({
+  "src/routes/salesReturnRoutes.js"(exports2, module2) {
+    var express2 = require_express2();
+    var router = express2.Router();
+    var salesReturnController = require_salesReturnController();
+    router.get("/next-number", (req, res, next) => salesReturnController.getNextNumber(req, res, next));
+    router.get("/ledger/:ledgerId", (req, res, next) => salesReturnController.getByLedger(req, res, next));
+    router.get("/", (req, res, next) => salesReturnController.getAll(req, res, next));
+    router.get("/:id", (req, res, next) => salesReturnController.getById(req, res, next));
+    router.post("/", (req, res, next) => salesReturnController.create(req, res, next));
+    router.put("/:id", (req, res, next) => salesReturnController.update(req, res, next));
+    router.delete("/:id", (req, res, next) => salesReturnController.delete(req, res, next));
+    module2.exports = router;
+  }
+});
+
+// src/repositories/purchaseReturnRepository.js
+var require_purchaseReturnRepository = __commonJS({
+  "src/repositories/purchaseReturnRepository.js"(exports2, module2) {
+    var { getDb } = require_database();
+    var PurchaseReturnRepository = class {
+      getNextNumber() {
+        const db = getDb();
+        const row = db.prepare(`
+      SELECT COALESCE(MAX(CAST(return_number AS INTEGER)), 0) + 1 AS next
+      FROM purchase_returns
+    `).get();
+        return String(row.next);
+      }
+      create({
+        return_number,
+        ledger_id,
+        purchase_id,
+        bill_number,
+        date,
+        time,
+        reason,
+        total_amount,
+        total_discount,
+        total_gst,
+        item_count,
+        notes,
+        items
+      }) {
+        const db = getDb();
+        const info = db.prepare(`
+      INSERT INTO purchase_returns (
+        return_number, ledger_id, purchase_id, bill_number, date, time, reason,
+        total_amount, total_discount, total_gst, item_count, notes
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+          return_number,
+          ledger_id,
+          purchase_id || null,
+          (bill_number || "").toString().trim(),
+          date,
+          time || "",
+          (reason || "").toString().trim(),
+          total_amount,
+          total_discount || 0,
+          total_gst || 0,
+          item_count || (items ? items.length : 0),
+          notes || ""
+        );
+        const returnId = info.lastInsertRowid;
+        if (Array.isArray(items)) this._insertItems(db, returnId, items);
+        return this.getById(returnId);
+      }
+      _insertItems(db, returnId, items) {
+        const stmt = db.prepare(`
+      INSERT INTO purchase_return_items (
+        purchase_return_id, item_id, item_name, unit, mrp, rate, quantity,
+        discount_percent, gst_percent, gst_amount, amount, sort_order
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+        items.forEach((line, idx) => {
+          stmt.run(
+            returnId,
+            line.item_id || null,
+            line.item_name,
+            line.unit || "Nos",
+            parseFloat(line.mrp) || 0,
+            parseFloat(line.rate) || 0,
+            parseFloat(line.quantity) || 1,
+            parseFloat(line.discount_percent) || 0,
+            parseFloat(line.gst_percent) || 0,
+            parseFloat(line.gst_amount) || 0,
+            parseFloat(line.amount) || 0,
+            idx
+          );
+        });
+      }
+      getById(id) {
+        const db = getDb();
+        const ret2 = db.prepare(`
+      SELECT r.*, l.name AS ledger_name, p.purchase_number
+      FROM purchase_returns r
+      JOIN ledgers l ON l.id = r.ledger_id
+      LEFT JOIN purchases p ON p.id = r.purchase_id
+      WHERE r.id = ?
+    `).get(id);
+        if (!ret2) return null;
+        ret2.items = db.prepare(`
+      SELECT * FROM purchase_return_items WHERE purchase_return_id = ?
+      ORDER BY sort_order ASC, id ASC
+    `).all(id);
+        return ret2;
+      }
+      getAll({ ledgerId, fromDate, toDate } = {}) {
+        const db = getDb();
+        const conds = [];
+        const params = [];
+        if (ledgerId) {
+          conds.push("r.ledger_id = ?");
+          params.push(ledgerId);
+        }
+        if (fromDate) {
+          conds.push("r.date >= ?");
+          params.push(fromDate);
+        }
+        if (toDate) {
+          conds.push("r.date <= ?");
+          params.push(toDate);
+        }
+        const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+        return db.prepare(`
+      SELECT r.*, l.name AS ledger_name, p.purchase_number
+      FROM purchase_returns r
+      JOIN ledgers l ON l.id = r.ledger_id
+      LEFT JOIN purchases p ON p.id = r.purchase_id
+      ${where}
+      ORDER BY r.date DESC, r.id DESC
+    `).all(...params);
+      }
+      getByLedger(ledgerId) {
+        const db = getDb();
+        const rows = db.prepare(`
+      SELECT r.*, l.name AS ledger_name, p.purchase_number
+      FROM purchase_returns r
+      JOIN ledgers l ON l.id = r.ledger_id
+      LEFT JOIN purchases p ON p.id = r.purchase_id
+      WHERE r.ledger_id = ?
+      ORDER BY r.date DESC, r.id DESC
+    `).all(ledgerId);
+        const itemStmt = db.prepare(`
+      SELECT * FROM purchase_return_items WHERE purchase_return_id = ?
+      ORDER BY sort_order ASC, id ASC
+    `);
+        return rows.map((r) => ({ ...r, items: itemStmt.all(r.id) }));
+      }
+      delete(id) {
+        const db = getDb();
+        return db.prepare("DELETE FROM purchase_returns WHERE id = ?").run(id);
+      }
+      update(id, {
+        ledger_id,
+        purchase_id,
+        bill_number,
+        date,
+        time,
+        reason,
+        total_amount,
+        total_discount,
+        total_gst,
+        item_count,
+        notes,
+        items
+      }) {
+        const db = getDb();
+        db.prepare(`
+      UPDATE purchase_returns
+      SET ledger_id = ?, purchase_id = ?, bill_number = ?, date = ?, time = ?,
+          reason = ?, total_amount = ?, total_discount = ?, total_gst = ?,
+          item_count = ?, notes = ?
+      WHERE id = ?
+    `).run(
+          ledger_id,
+          purchase_id || null,
+          (bill_number || "").toString().trim(),
+          date,
+          time || "",
+          (reason || "").toString().trim(),
+          total_amount,
+          total_discount || 0,
+          total_gst || 0,
+          item_count || (items ? items.length : 0),
+          notes || "",
+          id
+        );
+        if (Array.isArray(items)) {
+          db.prepare("DELETE FROM purchase_return_items WHERE purchase_return_id = ?").run(id);
+          this._insertItems(db, id, items);
+        }
+        return this.getById(id);
+      }
+    };
+    module2.exports = new PurchaseReturnRepository();
+  }
+});
+
+// src/services/purchaseReturnService.js
+var require_purchaseReturnService = __commonJS({
+  "src/services/purchaseReturnService.js"(exports2, module2) {
+    var purchaseReturnRepository = require_purchaseReturnRepository();
+    var ledgerRepository = require_ledgerRepository();
+    var itemRepository = require_itemRepository();
+    var purchaseRepository = require_purchaseRepository();
+    var { AppError } = require_errorHandler();
+    var { getDb } = require_database();
+    function computeLineAmounts(line) {
+      const rate = parseFloat(line.rate) || 0;
+      const qty = parseFloat(line.quantity) || 1;
+      const disc = parseFloat(line.discount_percent) || 0;
+      const gst = parseFloat(line.gst_percent) || 0;
+      const taxable = rate * qty * (1 - disc / 100);
+      const gst_amount = Math.round(taxable * gst / 100 * 100) / 100;
+      const amount = Math.round((taxable + gst_amount) * 100) / 100;
+      return { gst_amount, amount };
+    }
+    function applyStockDelta(items, sign) {
+      for (const line of items || []) {
+        if (!line.item_id) continue;
+        const qty = parseFloat(line.quantity) || 0;
+        if (!qty) continue;
+        itemRepository.adjustStock(line.item_id, sign * qty);
+      }
+    }
+    var PurchaseReturnService = class {
+      validate(data) {
+        if (!data) throw new AppError("Invalid payload", 400);
+        if (!data.ledger_id) throw new AppError("Supplier ledger is required", 400);
+        if (!Array.isArray(data.items) || data.items.length === 0) {
+          throw new AppError("At least one item line is required", 400);
+        }
+        data.items.forEach((line, idx) => {
+          if (!line.item_name || !String(line.item_name).trim()) {
+            throw new AppError(`Row ${idx + 1}: item name is required`, 400);
+          }
+          const rate = parseFloat(line.rate);
+          if (isNaN(rate) || rate < 0) {
+            throw new AppError(`Row ${idx + 1}: rate must be a non-negative number`, 400);
+          }
+          const qty = parseFloat(line.quantity);
+          if (isNaN(qty) || qty <= 0) {
+            throw new AppError(`Row ${idx + 1}: quantity must be greater than zero`, 400);
+          }
+        });
+      }
+      _normalise(items) {
+        return items.map((line) => {
+          const { gst_amount, amount } = computeLineAmounts(line);
+          return {
+            ...line,
+            quantity: parseFloat(line.quantity) || 1,
+            rate: parseFloat(line.rate) || 0,
+            mrp: parseFloat(line.mrp) || 0,
+            discount_percent: parseFloat(line.discount_percent) || 0,
+            gst_percent: parseFloat(line.gst_percent) || 0,
+            gst_amount,
+            amount
+          };
+        });
+      }
+      _totals(items) {
+        const total_amount = items.reduce((s, l) => s + l.amount, 0);
+        const total_gst = items.reduce((s, l) => s + l.gst_amount, 0);
+        const total_discount = items.reduce((s, l) => {
+          const gross = (parseFloat(l.rate) || 0) * (parseFloat(l.quantity) || 1);
+          const taxable = gross * (1 - (parseFloat(l.discount_percent) || 0) / 100);
+          return s + (gross - taxable);
+        }, 0);
+        return {
+          total_amount: Math.round(total_amount * 100) / 100,
+          total_gst: Math.round(total_gst * 100) / 100,
+          total_discount: Math.round(total_discount * 100) / 100
+        };
+      }
+      create(data) {
+        this.validate(data);
+        const db = getDb();
+        const ledger = ledgerRepository.findById(data.ledger_id);
+        if (!ledger) throw new AppError("Ledger not found", 404);
+        if (ledger.status === "closed") throw new AppError("Cannot record return on a closed ledger", 400);
+        if (data.purchase_id) {
+          const purchase = purchaseRepository.getById(data.purchase_id);
+          if (!purchase) throw new AppError("Linked purchase not found", 404);
+        }
+        const normalisedItems = this._normalise(data.items);
+        const totals = this._totals(normalisedItems);
+        const run = db.transaction(() => {
+          const ret2 = purchaseReturnRepository.create({
+            return_number: purchaseReturnRepository.getNextNumber(),
+            ledger_id: parseInt(data.ledger_id),
+            purchase_id: data.purchase_id ? parseInt(data.purchase_id) : null,
+            bill_number: data.bill_number || "",
+            date: data.date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+            time: data.time || "",
+            reason: data.reason || "",
+            ...totals,
+            item_count: normalisedItems.length,
+            notes: data.notes || "",
+            items: normalisedItems
+          });
+          applyStockDelta(normalisedItems, -1);
+          return ret2;
+        });
+        return run();
+      }
+      update(id, data) {
+        this.validate(data);
+        const db = getDb();
+        const existing = purchaseReturnRepository.getById(id);
+        if (!existing) throw new AppError("Purchase return not found", 404);
+        const ledger = ledgerRepository.findById(data.ledger_id || existing.ledger_id);
+        if (!ledger) throw new AppError("Ledger not found", 404);
+        const normalisedItems = this._normalise(data.items);
+        const totals = this._totals(normalisedItems);
+        const run = db.transaction(() => {
+          applyStockDelta(existing.items, 1);
+          applyStockDelta(normalisedItems, -1);
+          return purchaseReturnRepository.update(id, {
+            ledger_id: ledger.id,
+            purchase_id: data.purchase_id ? parseInt(data.purchase_id) : existing.purchase_id,
+            bill_number: data.bill_number || "",
+            date: data.date || existing.date,
+            time: data.time != null ? data.time : existing.time,
+            reason: data.reason || "",
+            ...totals,
+            item_count: normalisedItems.length,
+            notes: data.notes || "",
+            items: normalisedItems
+          });
+        });
+        return run();
+      }
+      delete(id) {
+        const db = getDb();
+        const existing = purchaseReturnRepository.getById(id);
+        if (!existing) throw new AppError("Purchase return not found", 404);
+        const run = db.transaction(() => {
+          applyStockDelta(existing.items, 1);
+          purchaseReturnRepository.delete(id);
+        });
+        run();
+      }
+      getById(id) {
+        const ret2 = purchaseReturnRepository.getById(id);
+        if (!ret2) throw new AppError("Purchase return not found", 404);
+        return ret2;
+      }
+      getAll(filters) {
+        return purchaseReturnRepository.getAll(filters);
+      }
+      getByLedger(ledgerId) {
+        return purchaseReturnRepository.getByLedger(ledgerId);
+      }
+      getNextNumber() {
+        return purchaseReturnRepository.getNextNumber();
+      }
+    };
+    module2.exports = new PurchaseReturnService();
+  }
+});
+
+// src/controllers/purchaseReturnController.js
+var require_purchaseReturnController = __commonJS({
+  "src/controllers/purchaseReturnController.js"(exports2, module2) {
+    var purchaseReturnService = require_purchaseReturnService();
+    var PurchaseReturnController = class {
+      getAll(req, res, next) {
+        try {
+          const { ledgerId, fromDate, toDate } = req.query;
+          const data = purchaseReturnService.getAll({
+            ledgerId: ledgerId ? parseInt(ledgerId) : void 0,
+            fromDate,
+            toDate
+          });
+          res.json({ success: true, data });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getNextNumber(req, res, next) {
+        try {
+          res.json({ success: true, data: { return_number: purchaseReturnService.getNextNumber() } });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getById(req, res, next) {
+        try {
+          res.json({ success: true, data: purchaseReturnService.getById(parseInt(req.params.id)) });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getByLedger(req, res, next) {
+        try {
+          res.json({ success: true, data: purchaseReturnService.getByLedger(parseInt(req.params.ledgerId)) });
+        } catch (err) {
+          next(err);
+        }
+      }
+      create(req, res, next) {
+        try {
+          const ret2 = purchaseReturnService.create(req.body);
+          res.status(201).json({ success: true, data: ret2 });
+        } catch (err) {
+          next(err);
+        }
+      }
+      update(req, res, next) {
+        try {
+          const ret2 = purchaseReturnService.update(parseInt(req.params.id), req.body);
+          res.json({ success: true, data: ret2 });
+        } catch (err) {
+          next(err);
+        }
+      }
+      delete(req, res, next) {
+        try {
+          purchaseReturnService.delete(parseInt(req.params.id));
+          res.json({ success: true });
+        } catch (err) {
+          next(err);
+        }
+      }
+    };
+    module2.exports = new PurchaseReturnController();
+  }
+});
+
+// src/routes/purchaseReturnRoutes.js
+var require_purchaseReturnRoutes = __commonJS({
+  "src/routes/purchaseReturnRoutes.js"(exports2, module2) {
+    var express2 = require_express2();
+    var router = express2.Router();
+    var purchaseReturnController = require_purchaseReturnController();
+    router.get("/next-number", (req, res, next) => purchaseReturnController.getNextNumber(req, res, next));
+    router.get("/ledger/:ledgerId", (req, res, next) => purchaseReturnController.getByLedger(req, res, next));
+    router.get("/", (req, res, next) => purchaseReturnController.getAll(req, res, next));
+    router.get("/:id", (req, res, next) => purchaseReturnController.getById(req, res, next));
+    router.post("/", (req, res, next) => purchaseReturnController.create(req, res, next));
+    router.put("/:id", (req, res, next) => purchaseReturnController.update(req, res, next));
+    router.delete("/:id", (req, res, next) => purchaseReturnController.delete(req, res, next));
+    module2.exports = router;
+  }
+});
+
+// src/repositories/userRepository.js
+var require_userRepository = __commonJS({
+  "src/repositories/userRepository.js"(exports2, module2) {
+    var { getDb } = require_database();
+    var PUBLIC_COLUMNS = `
+  id, username, can_create, can_modify, can_delete, can_manage_settings, status, created_at
+`;
+    function toBool(v) {
+      return v ? 1 : 0;
+    }
+    var UserRepository = class {
+      getAll() {
+        const db = getDb();
+        return db.prepare(`SELECT ${PUBLIC_COLUMNS} FROM users ORDER BY username ASC`).all();
+      }
+      // Lightweight list for the login screen (no password exposed)
+      getLoginList() {
+        const db = getDb();
+        return db.prepare(`SELECT id, username FROM users WHERE status = 'active' ORDER BY username ASC`).all();
+      }
+      getById(id) {
+        const db = getDb();
+        return db.prepare(`SELECT ${PUBLIC_COLUMNS} FROM users WHERE id = ?`).get(id);
+      }
+      getByUsername(username) {
+        const db = getDb();
+        return db.prepare("SELECT * FROM users WHERE username = ?").get(username);
+      }
+      create({ username, password, can_create, can_modify, can_delete, can_manage_settings }) {
+        const db = getDb();
+        const info = db.prepare(`
+      INSERT INTO users (username, password, can_create, can_modify, can_delete, can_manage_settings)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(
+          username.trim(),
+          password,
+          toBool(can_create),
+          toBool(can_modify),
+          toBool(can_delete),
+          toBool(can_manage_settings)
+        );
+        return this.getById(info.lastInsertRowid);
+      }
+      update(id, { username, password, can_create, can_modify, can_delete, can_manage_settings, status }) {
+        const db = getDb();
+        const existing = db.prepare("SELECT * FROM users WHERE id = ?").get(id);
+        if (!existing) return null;
+        db.prepare(`
+      UPDATE users
+      SET username = ?, password = ?, can_create = ?, can_modify = ?, can_delete = ?, can_manage_settings = ?, status = ?
+      WHERE id = ?
+    `).run(
+          (username ?? existing.username).trim(),
+          // Keep existing password when none supplied
+          password && password.length ? password : existing.password,
+          toBool(can_create),
+          toBool(can_modify),
+          toBool(can_delete),
+          toBool(can_manage_settings),
+          status || existing.status,
+          id
+        );
+        return this.getById(id);
+      }
+      delete(id) {
+        const db = getDb();
+        return db.prepare("DELETE FROM users WHERE id = ?").run(id);
+      }
+      // Validates credentials; returns the public user record on success, else null
+      authenticate(username, password) {
+        const db = getDb();
+        const row = db.prepare("SELECT * FROM users WHERE username = ? AND status = 'active'").get(username);
+        if (!row) return null;
+        if (row.password !== password) return null;
+        return this.getById(row.id);
+      }
+    };
+    module2.exports = new UserRepository();
+  }
+});
+
+// src/services/userService.js
+var require_userService = __commonJS({
+  "src/services/userService.js"(exports2, module2) {
+    var userRepository = require_userRepository();
+    var UserService = class {
+      getAll() {
+        return userRepository.getAll();
+      }
+      getLoginList() {
+        return userRepository.getLoginList();
+      }
+      getById(id) {
+        const user = userRepository.getById(id);
+        if (!user) throw new Error("User not found");
+        return user;
+      }
+      create(data) {
+        const { username, password } = data;
+        if (!username || !username.trim()) throw new Error("Username is required");
+        if (!password || !password.trim()) throw new Error("Password is required");
+        if (userRepository.getByUsername(username.trim())) {
+          throw new Error("A user with this name already exists");
+        }
+        return userRepository.create({ ...data, username: username.trim(), password: password.trim() });
+      }
+      update(id, data) {
+        const { username } = data;
+        if (!username || !username.trim()) throw new Error("Username is required");
+        const existing = userRepository.getByUsername(username.trim());
+        if (existing && existing.id !== id) {
+          throw new Error("A user with this name already exists");
+        }
+        const updated = userRepository.update(id, {
+          ...data,
+          username: username.trim(),
+          password: data.password ? data.password.trim() : ""
+        });
+        if (!updated) throw new Error("User not found");
+        return updated;
+      }
+      delete(id) {
+        return userRepository.delete(id);
+      }
+      authenticate(username, password) {
+        if (!username || !password) throw new Error("Username and password are required");
+        const user = userRepository.authenticate(username, password);
+        if (!user) throw new Error("Invalid username or password");
+        return user;
+      }
+    };
+    module2.exports = new UserService();
+  }
+});
+
+// src/controllers/userController.js
+var require_userController = __commonJS({
+  "src/controllers/userController.js"(exports2, module2) {
+    var userService = require_userService();
+    var UserController = class {
+      getAll(req, res, next) {
+        try {
+          res.json({ success: true, data: userService.getAll() });
+        } catch (err) {
+          next(err);
+        }
+      }
+      // Public list for the login screen (usernames only)
+      getLoginList(req, res, next) {
+        try {
+          res.json({ success: true, data: userService.getLoginList() });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getById(req, res, next) {
+        try {
+          res.json({ success: true, data: userService.getById(parseInt(req.params.id)) });
+        } catch (err) {
+          next(err);
+        }
+      }
+      create(req, res, next) {
+        try {
+          res.status(201).json({ success: true, data: userService.create(req.body) });
+        } catch (err) {
+          next(err);
+        }
+      }
+      update(req, res, next) {
+        try {
+          res.json({ success: true, data: userService.update(parseInt(req.params.id), req.body) });
+        } catch (err) {
+          next(err);
+        }
+      }
+      delete(req, res, next) {
+        try {
+          userService.delete(parseInt(req.params.id));
+          res.json({ success: true });
+        } catch (err) {
+          next(err);
+        }
+      }
+      login(req, res, next) {
+        try {
+          const { username, password } = req.body;
+          const user = userService.authenticate(username, password);
+          res.json({ success: true, data: user });
+        } catch (err) {
+          res.status(401).json({ success: false, message: err.message });
+        }
+      }
+    };
+    module2.exports = new UserController();
+  }
+});
+
+// src/routes/userRoutes.js
+var require_userRoutes = __commonJS({
+  "src/routes/userRoutes.js"(exports2, module2) {
+    var express2 = require_express2();
+    var router = express2.Router();
+    var userController = require_userController();
+    router.get("/login-list", (req, res, next) => userController.getLoginList(req, res, next));
+    router.post("/login", (req, res, next) => userController.login(req, res, next));
+    router.get("/", (req, res, next) => userController.getAll(req, res, next));
+    router.get("/:id", (req, res, next) => userController.getById(req, res, next));
+    router.post("/", (req, res, next) => userController.create(req, res, next));
+    router.put("/:id", (req, res, next) => userController.update(req, res, next));
+    router.delete("/:id", (req, res, next) => userController.delete(req, res, next));
+    module2.exports = router;
+  }
+});
+
+// src/repositories/staffRepository.js
+var require_staffRepository = __commonJS({
+  "src/repositories/staffRepository.js"(exports2, module2) {
+    var { getDb } = require_database();
+    var StaffRepository = class {
+      getAll({ search, status } = {}) {
+        const db = getDb();
+        const conds = [];
+        const params = [];
+        if (status) {
+          conds.push("status = ?");
+          params.push(status);
+        }
+        if (search) {
+          conds.push("LOWER(name) LIKE ?");
+          params.push(`%${String(search).toLowerCase()}%`);
+        }
+        const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+        return db.prepare(`
+      SELECT * FROM staffs
+      ${where}
+      ORDER BY name ASC
+    `).all(...params);
+      }
+      getById(id) {
+        const db = getDb();
+        return db.prepare("SELECT * FROM staffs WHERE id = ?").get(id);
+      }
+      create({ name }) {
+        const db = getDb();
+        const info = db.prepare(`
+      INSERT INTO staffs (name) VALUES (?)
+    `).run(name);
+        return this.getById(info.lastInsertRowid);
+      }
+      update(id, { name, status }) {
+        const db = getDb();
+        db.prepare(`
+      UPDATE staffs
+      SET name = ?, status = ?, updated_at = datetime('now', 'localtime')
+      WHERE id = ?
+    `).run(name, status || "active", id);
+        return this.getById(id);
+      }
+      delete(id) {
+        const db = getDb();
+        return db.prepare("DELETE FROM staffs WHERE id = ?").run(id);
+      }
+      countServices(id) {
+        const db = getDb();
+        const row = db.prepare("SELECT COUNT(*) AS n FROM services WHERE staff_id = ?").get(id);
+        return row.n;
+      }
+    };
+    module2.exports = new StaffRepository();
+  }
+});
+
+// src/services/staffService.js
+var require_staffService = __commonJS({
+  "src/services/staffService.js"(exports2, module2) {
+    var staffRepository = require_staffRepository();
+    var { AppError } = require_errorHandler();
+    var StaffService = class {
+      getAll(filters) {
+        return staffRepository.getAll(filters);
+      }
+      getById(id) {
+        const staff = staffRepository.getById(id);
+        if (!staff) throw new AppError("Staff not found", 404);
+        return staff;
+      }
+      create(data) {
+        const name = (data && data.name ? String(data.name) : "").trim();
+        if (!name) throw new AppError("Staff name is required", 400);
+        return staffRepository.create({ name });
+      }
+      update(id, data) {
+        this.getById(id);
+        const name = (data && data.name ? String(data.name) : "").trim();
+        if (!name) throw new AppError("Staff name is required", 400);
+        const status = data.status === "inactive" ? "inactive" : "active";
+        return staffRepository.update(id, { name, status });
+      }
+      delete(id) {
+        this.getById(id);
+        if (staffRepository.countServices(id) > 0) {
+          throw new AppError("Cannot delete a staff that is linked to services", 400);
+        }
+        return staffRepository.delete(id);
+      }
+    };
+    module2.exports = new StaffService();
+  }
+});
+
+// src/controllers/staffController.js
+var require_staffController = __commonJS({
+  "src/controllers/staffController.js"(exports2, module2) {
+    var staffService = require_staffService();
+    var StaffController = class {
+      getAll(req, res, next) {
+        try {
+          const { search, status } = req.query;
+          const staffs = staffService.getAll({ search, status });
+          res.json({ success: true, data: staffs });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getById(req, res, next) {
+        try {
+          const staff = staffService.getById(parseInt(req.params.id));
+          res.json({ success: true, data: staff });
+        } catch (err) {
+          next(err);
+        }
+      }
+      create(req, res, next) {
+        try {
+          const staff = staffService.create(req.body);
+          res.status(201).json({ success: true, data: staff });
+        } catch (err) {
+          next(err);
+        }
+      }
+      update(req, res, next) {
+        try {
+          const staff = staffService.update(parseInt(req.params.id), req.body);
+          res.json({ success: true, data: staff });
+        } catch (err) {
+          next(err);
+        }
+      }
+      delete(req, res, next) {
+        try {
+          staffService.delete(parseInt(req.params.id));
+          res.json({ success: true });
+        } catch (err) {
+          next(err);
+        }
+      }
+    };
+    module2.exports = new StaffController();
+  }
+});
+
+// src/routes/staffRoutes.js
+var require_staffRoutes = __commonJS({
+  "src/routes/staffRoutes.js"(exports2, module2) {
+    var express2 = require_express2();
+    var router = express2.Router();
+    var staffController = require_staffController();
+    router.get("/", (req, res, next) => staffController.getAll(req, res, next));
+    router.get("/:id", (req, res, next) => staffController.getById(req, res, next));
+    router.post("/", (req, res, next) => staffController.create(req, res, next));
+    router.put("/:id", (req, res, next) => staffController.update(req, res, next));
+    router.delete("/:id", (req, res, next) => staffController.delete(req, res, next));
+    module2.exports = router;
+  }
+});
+
+// src/repositories/serviceRepository.js
+var require_serviceRepository = __commonJS({
+  "src/repositories/serviceRepository.js"(exports2, module2) {
+    var { getDb } = require_database();
+    var ServiceRepository = class {
+      getNextServiceNumber() {
+        const db = getDb();
+        const row = db.prepare(`
+      SELECT COALESCE(MAX(CAST(service_number AS INTEGER)), 0) + 1 AS next
+      FROM services
+    `).get();
+        return String(row.next);
+      }
+      create(data) {
+        const db = getDb();
+        const info = db.prepare(`
+      INSERT INTO services (
+        service_number, ledger_id, date, item_id, item_name, quantity, imei,
+        staff_id, staff_name, advance_amount, customer_name, customer_mobile,
+        customer_place, remarks, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+          data.service_number,
+          data.ledger_id,
+          data.date,
+          data.item_id || null,
+          data.item_name,
+          data.quantity,
+          data.imei || "",
+          data.staff_id || null,
+          data.staff_name || "",
+          data.advance_amount || 0,
+          data.customer_name || "",
+          data.customer_mobile || "",
+          data.customer_place || "",
+          data.remarks || "",
+          "pending"
+        );
+        return this.getById(info.lastInsertRowid);
+      }
+      getById(id) {
+        const db = getDb();
+        return db.prepare(`
+      SELECT s.*, l.name AS ledger_name
+      FROM services s
+      JOIN ledgers l ON l.id = s.ledger_id
+      WHERE s.id = ?
+    `).get(id);
+      }
+      getAll({ status, ledgerId, fromDate, toDate } = {}) {
+        const db = getDb();
+        const conds = [];
+        const params = [];
+        if (status) {
+          conds.push("s.status = ?");
+          params.push(status);
+        }
+        if (ledgerId) {
+          conds.push("s.ledger_id = ?");
+          params.push(ledgerId);
+        }
+        if (fromDate) {
+          conds.push("s.date >= ?");
+          params.push(fromDate);
+        }
+        if (toDate) {
+          conds.push("s.date <= ?");
+          params.push(toDate);
+        }
+        const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+        return db.prepare(`
+      SELECT s.*, l.name AS ledger_name
+      FROM services s
+      JOIN ledgers l ON l.id = s.ledger_id
+      ${where}
+      ORDER BY s.date DESC, s.id DESC
+    `).all(...params);
+      }
+      /** Update the editable detail fields of a service (does not change status). */
+      updateDetails(id, data) {
+        const db = getDb();
+        db.prepare(`
+      UPDATE services
+      SET ledger_id = ?, date = ?, item_id = ?, item_name = ?, quantity = ?, imei = ?,
+          staff_id = ?, staff_name = ?, advance_amount = ?,
+          customer_name = ?, customer_mobile = ?, customer_place = ?, remarks = ?,
+          updated_at = datetime('now', 'localtime')
+      WHERE id = ?
+    `).run(
+          data.ledger_id,
+          data.date,
+          data.item_id || null,
+          data.item_name,
+          data.quantity,
+          data.imei || "",
+          data.staff_id || null,
+          data.staff_name || "",
+          data.advance_amount || 0,
+          data.customer_name || "",
+          data.customer_mobile || "",
+          data.customer_place || "",
+          data.remarks || "",
+          id
+        );
+        return this.getById(id);
+      }
+      /** Mark a service as closed, storing the closing costs and amount to collect. */
+      close(id, { material_cost, labour_cost, collect_amount, closing_remarks }) {
+        const db = getDb();
+        db.prepare(`
+      UPDATE services
+      SET status = 'closed', material_cost = ?, labour_cost = ?, collect_amount = ?,
+          closing_remarks = ?, closed_at = datetime('now', 'localtime'),
+          updated_at = datetime('now', 'localtime')
+      WHERE id = ?
+    `).run(material_cost, labour_cost, collect_amount, closing_remarks || "", id);
+        return this.getById(id);
+      }
+      delete(id) {
+        const db = getDb();
+        return db.prepare("DELETE FROM services WHERE id = ?").run(id);
+      }
+    };
+    module2.exports = new ServiceRepository();
+  }
+});
+
+// src/services/serviceService.js
+var require_serviceService = __commonJS({
+  "src/services/serviceService.js"(exports2, module2) {
+    var serviceRepository = require_serviceRepository();
+    var ledgerRepository = require_ledgerRepository();
+    var staffRepository = require_staffRepository();
+    var { AppError } = require_errorHandler();
+    function round2(n) {
+      return Math.round((parseFloat(n) || 0) * 100) / 100;
+    }
+    function normaliseDetails(data) {
+      if (!data) throw new AppError("Invalid payload", 400);
+      if (!data.ledger_id) throw new AppError("Customer ledger is required", 400);
+      const item_name = (data.item_name ? String(data.item_name) : "").trim();
+      if (!item_name) throw new AppError("Item is required", 400);
+      const ledger = ledgerRepository.findById(parseInt(data.ledger_id));
+      if (!ledger) throw new AppError("Ledger not found", 404);
+      let staff_id = null;
+      let staff_name = (data.staff_name ? String(data.staff_name) : "").trim();
+      if (data.staff_id) {
+        const staff = staffRepository.getById(parseInt(data.staff_id));
+        if (!staff) throw new AppError("Staff not found", 404);
+        staff_id = staff.id;
+        staff_name = staff.name;
+      }
+      const quantity = parseFloat(data.quantity);
+      return {
+        ledger_id: ledger.id,
+        date: data.date || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+        item_id: data.item_id ? parseInt(data.item_id) : null,
+        item_name,
+        quantity: !quantity || quantity <= 0 ? 1 : quantity,
+        imei: (data.imei ? String(data.imei) : "").trim(),
+        staff_id,
+        staff_name,
+        advance_amount: round2(data.advance_amount),
+        customer_name: (data.customer_name ? String(data.customer_name) : "").trim(),
+        customer_mobile: (data.customer_mobile ? String(data.customer_mobile) : "").trim(),
+        customer_place: (data.customer_place ? String(data.customer_place) : "").trim(),
+        remarks: (data.remarks ? String(data.remarks) : "").trim()
+      };
+    }
+    var ServiceService = class {
+      getAll(filters) {
+        return serviceRepository.getAll(filters);
+      }
+      getById(id) {
+        const service = serviceRepository.getById(id);
+        if (!service) throw new AppError("Service not found", 404);
+        return service;
+      }
+      getNextServiceNumber() {
+        return serviceRepository.getNextServiceNumber();
+      }
+      create(data) {
+        const details = normaliseDetails(data);
+        const service_number = serviceRepository.getNextServiceNumber();
+        return serviceRepository.create({ ...details, service_number });
+      }
+      /** Update the detail fields of a still-open service. */
+      update(id, data) {
+        const existing = this.getById(id);
+        if (existing.status === "closed") {
+          throw new AppError("A closed service can no longer be edited", 400);
+        }
+        const details = normaliseDetails(data);
+        return serviceRepository.updateDetails(id, details);
+      }
+      /**
+       * Close a service. Optionally accepts updated detail fields (the closing
+       * screen lets the operator amend the service before closing). The amount to
+       * collect is material_cost + labour_cost - advance_amount.
+       */
+      close(id, data) {
+        const existing = this.getById(id);
+        if (existing.status === "closed") {
+          throw new AppError("Service is already closed", 400);
+        }
+        const details = normaliseDetails({ ...existing, ...data });
+        serviceRepository.updateDetails(id, details);
+        const material_cost = round2(data.material_cost);
+        const labour_cost = round2(data.labour_cost);
+        if (material_cost < 0 || labour_cost < 0) {
+          throw new AppError("Costs cannot be negative", 400);
+        }
+        const collect_amount = round2(material_cost + labour_cost - details.advance_amount);
+        return serviceRepository.close(id, {
+          material_cost,
+          labour_cost,
+          collect_amount,
+          closing_remarks: (data.closing_remarks ? String(data.closing_remarks) : "").trim()
+        });
+      }
+      delete(id) {
+        this.getById(id);
+        return serviceRepository.delete(id);
+      }
+    };
+    module2.exports = new ServiceService();
+  }
+});
+
+// src/controllers/serviceController.js
+var require_serviceController = __commonJS({
+  "src/controllers/serviceController.js"(exports2, module2) {
+    var serviceService = require_serviceService();
+    var ServiceController = class {
+      getAll(req, res, next) {
+        try {
+          const { status, ledgerId, fromDate, toDate } = req.query;
+          const services = serviceService.getAll({
+            status,
+            ledgerId: ledgerId ? parseInt(ledgerId) : void 0,
+            fromDate,
+            toDate
+          });
+          res.json({ success: true, data: services });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getNextNumber(req, res, next) {
+        try {
+          const service_number = serviceService.getNextServiceNumber();
+          res.json({ success: true, data: { service_number } });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getById(req, res, next) {
+        try {
+          const service = serviceService.getById(parseInt(req.params.id));
+          res.json({ success: true, data: service });
+        } catch (err) {
+          next(err);
+        }
+      }
+      create(req, res, next) {
+        try {
+          const service = serviceService.create(req.body);
+          res.status(201).json({ success: true, data: service });
+        } catch (err) {
+          next(err);
+        }
+      }
+      update(req, res, next) {
+        try {
+          const service = serviceService.update(parseInt(req.params.id), req.body);
+          res.json({ success: true, data: service });
+        } catch (err) {
+          next(err);
+        }
+      }
+      close(req, res, next) {
+        try {
+          const service = serviceService.close(parseInt(req.params.id), req.body);
+          res.json({ success: true, data: service });
+        } catch (err) {
+          next(err);
+        }
+      }
+      delete(req, res, next) {
+        try {
+          serviceService.delete(parseInt(req.params.id));
+          res.json({ success: true });
+        } catch (err) {
+          next(err);
+        }
+      }
+    };
+    module2.exports = new ServiceController();
+  }
+});
+
+// src/routes/serviceRoutes.js
+var require_serviceRoutes = __commonJS({
+  "src/routes/serviceRoutes.js"(exports2, module2) {
+    var express2 = require_express2();
+    var router = express2.Router();
+    var serviceController = require_serviceController();
+    router.get("/next-number", (req, res, next) => serviceController.getNextNumber(req, res, next));
+    router.get("/", (req, res, next) => serviceController.getAll(req, res, next));
+    router.get("/:id", (req, res, next) => serviceController.getById(req, res, next));
+    router.post("/", (req, res, next) => serviceController.create(req, res, next));
+    router.put("/:id", (req, res, next) => serviceController.update(req, res, next));
+    router.post("/:id/close", (req, res, next) => serviceController.close(req, res, next));
+    router.delete("/:id", (req, res, next) => serviceController.delete(req, res, next));
+    module2.exports = router;
+  }
+});
+
+// src/controllers/customerController.js
+var require_customerController = __commonJS({
+  "src/controllers/customerController.js"(exports2, module2) {
+    var customerService = require_customerService();
+    var CustomerController = class {
+      getAll(req, res, next) {
+        try {
+          const { search, status } = req.query;
+          const customers = customerService.getAll({ search, status });
+          res.json({ success: true, data: customers });
+        } catch (err) {
+          next(err);
+        }
+      }
+      getById(req, res, next) {
+        try {
+          const customer = customerService.getById(parseInt(req.params.id));
+          res.json({ success: true, data: customer });
+        } catch (err) {
+          next(err);
+        }
+      }
+      create(req, res, next) {
+        try {
+          const customer = customerService.create(req.body);
+          res.status(201).json({ success: true, data: customer });
+        } catch (err) {
+          next(err);
+        }
+      }
+      update(req, res, next) {
+        try {
+          const customer = customerService.update(parseInt(req.params.id), req.body);
+          res.json({ success: true, data: customer });
+        } catch (err) {
+          next(err);
+        }
+      }
+      delete(req, res, next) {
+        try {
+          customerService.delete(parseInt(req.params.id));
+          res.json({ success: true });
+        } catch (err) {
+          next(err);
+        }
+      }
+    };
+    module2.exports = new CustomerController();
+  }
+});
+
+// src/routes/customerRoutes.js
+var require_customerRoutes = __commonJS({
+  "src/routes/customerRoutes.js"(exports2, module2) {
+    var express2 = require_express2();
+    var router = express2.Router();
+    var customerController = require_customerController();
+    router.get("/", (req, res, next) => customerController.getAll(req, res, next));
+    router.get("/:id", (req, res, next) => customerController.getById(req, res, next));
+    router.post("/", (req, res, next) => customerController.create(req, res, next));
+    router.put("/:id", (req, res, next) => customerController.update(req, res, next));
+    router.delete("/:id", (req, res, next) => customerController.delete(req, res, next));
+    module2.exports = router;
+  }
+});
+
 // src/index.js
 var express = require_express2();
 var path = require("path");
 var cors = require_lib3();
 var morgan = require_morgan();
-var { initializeDatabase } = require_database();
+var { initializeDatabase, extractTenant, runWithTenant } = require_database();
 var { errorHandler } = require_errorHandler();
 var { triggerDailyBackup } = require_backupService();
+var { register, httpRequestCounter } = require_metrics();
 var ledgerRoutes = require_ledgerRoutes();
 var ledgerTypeRoutes = require_accountRoutes();
 var transactionRoutes = require_paymentRoutes();
@@ -26113,12 +35718,33 @@ var dashboardRoutes = require_dashboardRoutes();
 var interestRoutes = require_interestRoutes();
 var expenseRoutes = require_expenseRoutes();
 var interestSchemeRoutes = require_interestSchemeRoutes();
+var transactionCategoryRoutes = require_transactionCategoryRoutes();
+var itemRoutes = require_itemRoutes();
+var saleRoutes = require_saleRoutes();
+var purchaseRoutes = require_purchaseRoutes();
+var estimationRoutes = require_estimationRoutes();
+var salesReturnRoutes = require_salesReturnRoutes();
+var purchaseReturnRoutes = require_purchaseReturnRoutes();
+var userRoutes = require_userRoutes();
+var staffRoutes = require_staffRoutes();
+var serviceRoutes = require_serviceRoutes();
+var customerRoutes = require_customerRoutes();
 var app = express();
 var PORT = process.env.PORT || 3456;
 app.use(cors());
 app.use(morgan("dev"));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
+app.use((req, res, next) => {
+  res.on("finish", () => {
+    httpRequestCounter.labels(req.method, req.path, String(res.statusCode)).inc();
+  });
+  next();
+});
+app.use((req, res, next) => {
+  const tenant = extractTenant(req.hostname);
+  runWithTenant(tenant, next);
+});
 app.use((req, res, next) => {
   if (["POST", "PUT", "DELETE", "PATCH"].includes(req.method)) {
     res.on("finish", () => {
@@ -26130,6 +35756,10 @@ app.use((req, res, next) => {
   next();
 });
 initializeDatabase();
+app.get("/metrics", async (req, res) => {
+  res.set("Content-Type", register.contentType);
+  res.end(await register.metrics());
+});
 app.use("/api/ledgers", ledgerRoutes);
 app.use("/api/ledger-types", ledgerTypeRoutes);
 app.use("/api/transactions", transactionRoutes);
@@ -26139,6 +35769,17 @@ app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/interest", interestRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/interest-schemes", interestSchemeRoutes);
+app.use("/api/transaction-categories", transactionCategoryRoutes);
+app.use("/api/items", itemRoutes);
+app.use("/api/sales", saleRoutes);
+app.use("/api/purchases", purchaseRoutes);
+app.use("/api/estimations", estimationRoutes);
+app.use("/api/sales-returns", salesReturnRoutes);
+app.use("/api/purchase-returns", purchaseReturnRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/staffs", staffRoutes);
+app.use("/api/services", serviceRoutes);
+app.use("/api/customers", customerRoutes);
 var clientBuildPath = process.env.CLIENT_DIST_PATH || path.join(__dirname, "..", "..", "client", "dist");
 app.use(express.static(clientBuildPath));
 app.get("*", (req, res) => {

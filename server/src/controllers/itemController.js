@@ -61,6 +61,13 @@ class ItemController {
     } catch (err) { next(err); }
   }
 
+  adjustStocks(req, res, next) {
+    try {
+      const updated = itemService.adjustStocks(req.body && req.body.adjustments);
+      res.json({ success: true, data: { updated } });
+    } catch (err) { next(err); }
+  }
+
   getImeis(req, res, next) {
     try {
       const imeis = itemService.getAvailableImeis(parseInt(req.params.id));

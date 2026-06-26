@@ -45,6 +45,29 @@ class ItemService {
     return itemRepository.getStockReport(filters);
   }
 
+  /**
+   * Bulk-overwrite the on-hand stock of items. Accepts an array of
+   * `{ id, stock }`; validates each entry and applies them atomically.
+   * Returns the number of items updated.
+   */
+  adjustStocks(adjustments) {
+    if (!Array.isArray(adjustments) || adjustments.length === 0) {
+      throw new AppError('No stock adjustments provided', 400);
+    }
+    const clean = adjustments.map((a) => {
+      const id = parseInt(a && a.id, 10);
+      const stock = Number(a && a.stock);
+      if (!id || isNaN(id)) {
+        throw new AppError('Invalid item in stock adjustment', 400);
+      }
+      if (a == null || a.stock === '' || a.stock == null || isNaN(stock)) {
+        throw new AppError('Invalid stock value in adjustment', 400);
+      }
+      return { id, stock };
+    });
+    return itemRepository.bulkSetStock(clean);
+  }
+
   getAvailableImeis(id) {
     this.getById(id);
     return imeiRepository.getAvailableByItem(id);

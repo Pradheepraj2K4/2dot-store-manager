@@ -9,6 +9,7 @@ router.get('/',           (req, res, next) => itemController.getAll(req, res, ne
 router.get('/:id/imeis/breakdown', (req, res, next) => itemController.getImeiBreakdown(req, res, next));
 router.get('/:id/imeis',  (req, res, next) => itemController.getImeis(req, res, next));
 router.get('/:id',        (req, res, next) => itemController.getById(req, res, next));
+router.post('/adjust-stock', (req, res, next) => itemController.adjustStocks(req, res, next));
 router.post('/',          (req, res, next) => itemController.create(req, res, next));
 router.put('/:id',        (req, res, next) => itemController.update(req, res, next));
 router.delete('/:id',     (req, res, next) => itemController.delete(req, res, next));

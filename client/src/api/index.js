@@ -63,6 +63,7 @@ export const settingsApi = {
   getBackupStatus: () => api.get('/settings/backup/status'),
   backupNow: () => api.post('/settings/backup/now'),
   clearData: () => api.post('/settings/data/clear'),
+  clearTransactions: () => api.post('/settings/data/clear-transactions'),
   resetSettings: () => api.post('/settings/reset'),
 };
 
@@ -148,6 +149,7 @@ export const itemApi = {
     const qs = new URLSearchParams(params).toString();
     return api.get(`/items/stock-report${qs ? `?${qs}` : ''}`);
   },
+  adjustStock: (adjustments) => api.post('/items/adjust-stock', { adjustments }),
   getImeis: (id) => api.get(`/items/${id}/imeis`),
   getImeiBreakdown: (id) => api.get(`/items/${id}/imeis/breakdown`),
 };
@@ -240,4 +242,15 @@ export const serviceApi = {
   close: (id, data) => api.post(`/services/${id}/close`, data),
   delete: (id) => api.delete(`/services/${id}`),
   isEnabled: () => api.get('/settings/service_module_enabled'),
+};
+
+export const customerApi = {
+  getAll: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return api.get(`/customers${qs ? `?${qs}` : ''}`);
+  },
+  getById: (id) => api.get(`/customers/${id}`),
+  create: (data) => api.post('/customers', data),
+  update: (id, data) => api.put(`/customers/${id}`, data),
+  delete: (id) => api.delete(`/customers/${id}`),
 };

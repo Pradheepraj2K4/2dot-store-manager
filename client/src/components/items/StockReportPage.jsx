@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { MagnifyingGlassIcon, ArrowDownTrayIcon, CubeIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon, ArrowDownTrayIcon, CubeIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
 import { itemApi } from '../../api';
 import { formatCurrency } from '../../utils/helpers';
 import { exportToExcel } from '../../utils/exportUtils';
@@ -9,6 +10,7 @@ import EmptyState from '../ui/EmptyState';
 import ImeiInfoButton from '../ui/ImeiInfoButton';
 
 export default function StockReportPage() {
+  const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [brands, setBrands] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -135,13 +137,21 @@ export default function StockReportPage() {
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="page-title">Stock Report</h1>
-        <button
-          onClick={handleExport}
-          disabled={filtered.length === 0}
-          className="btn-secondary flex items-center gap-2 disabled:opacity-50"
-        >
-          <ArrowDownTrayIcon className="w-5 h-5" /> Export
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/stock-adjustment')}
+            className="btn-secondary flex items-center gap-2"
+          >
+            <AdjustmentsHorizontalIcon className="w-5 h-5" /> Adjust Stocks
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={filtered.length === 0}
+            className="btn-secondary flex items-center gap-2 disabled:opacity-50"
+          >
+            <ArrowDownTrayIcon className="w-5 h-5" /> Export
+          </button>
+        </div>
       </div>
 
       <div className="card flex flex-wrap items-center gap-3">

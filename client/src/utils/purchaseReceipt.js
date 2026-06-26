@@ -382,7 +382,7 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format }) {
 
     .head {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 6fr 4fr;
       border-bottom: 1px solid #000;
     }
     .head .left, .head .right { padding: ${isA5 ? '4mm' : '6mm'}; }

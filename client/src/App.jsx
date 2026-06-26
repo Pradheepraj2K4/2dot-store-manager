@@ -32,10 +32,12 @@ import SalesReturnListPage from "./components/sales/SalesReturnListPage";
 import PurchaseReturnEntryPage from "./components/purchases/PurchaseReturnEntryPage";
 import PurchaseReturnListPage from "./components/purchases/PurchaseReturnListPage";
 import StockReportPage from "./components/items/StockReportPage";
+import StockAdjustmentPage from "./components/items/StockAdjustmentPage";
 import StaffListPage from "./components/staff/StaffListPage";
 import ServiceEntryPage from "./components/services/ServiceEntryPage";
 import ServiceListPage from "./components/services/ServiceListPage";
 import ServiceClosePage from "./components/services/ServiceClosePage";
+import CustomerListPage from "./components/customers/CustomerListPage";
 
 export default function App() {
   return (
@@ -54,6 +56,7 @@ export default function App() {
                 />
                 <Route path="/ledgers" element={<LedgerListPage />} />
                 <Route path="/ledger/:id" element={<LedgerPage />} />
+                <Route path="/customers" element={<CustomerListPage />} />
                 <Route
                   path="/pending-interest"
                   element={<PendingInterestPage />}
@@ -117,6 +120,7 @@ export default function App() {
                 <Route path="/purchase-return" element={<PurchaseReturnEntryPage />} />
                 <Route path="/purchase-return/:id/edit" element={<PurchaseReturnEntryPage />} />
                 <Route path="/stock-report" element={<StockReportPage />} />
+                <Route path="/stock-adjustment" element={<StockAdjustmentPage />} />
                 <Route path="/staffs" element={<StaffListPage />} />
                 <Route path="/services/new" element={<ServiceEntryPage />} />
                 <Route path="/services/pending" element={<ServiceListPage status="pending" />} />

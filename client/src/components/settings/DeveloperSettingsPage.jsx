@@ -77,6 +77,8 @@ export default function DeveloperSettingsPage() {
   const [resettingSettings, setResettingSettings] = useState(false);
   const [confirmClearData, setConfirmClearData] = useState(false);
   const [confirmResetSettings, setConfirmResetSettings] = useState(false);
+  const [clearingTransactions, setClearingTransactions] = useState(false);
+  const [confirmClearTransactions, setConfirmClearTransactions] = useState(false);
 
   // Backup state
   const [backupEnabled, setBackupEnabled] = useState(false);
@@ -1456,109 +1458,138 @@ export default function DeveloperSettingsPage() {
 
           {/* Danger Zone */}
           <div className="card border-red-100">
-            <div className="flex items-center gap-3 mb-1">
+            <div className="flex items-center gap-2 mb-4">
               <ExclamationTriangleIcon className="h-5 w-5 text-red-500" />
               <h2 className="text-base font-semibold text-slate-900">Danger Zone</h2>
+              <span className="text-xs text-slate-400">Irreversible — back up first.</span>
             </div>
-            <p className="text-xs text-slate-500 mb-6">
-              These actions are irreversible. Make a backup before proceeding.
-            </p>
 
-            <div className="space-y-4">
-              {/* Clear Data */}
-              <div className="flex items-start justify-between p-4 rounded-lg border border-red-200 bg-red-50">
-                <div className="flex-1 pr-4">
-                  <h3 className="text-sm font-semibold text-slate-800">Clear All Data</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Permanently deletes all ledgers, transactions, interest entries, and expenses.
-                    Settings and store profile are kept intact.
-                  </p>
+            <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+              {/* Clear All Data */}
+              <div className="flex items-center justify-between gap-4 px-4 py-3">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-medium text-slate-800">Clear All Data</h3>
+                  <p className="text-xs text-slate-500 truncate">Deletes ledgers, transactions, interest & expenses. Settings kept.</p>
                 </div>
                 {!confirmClearData ? (
                   <button
                     onClick={() => setConfirmClearData(true)}
-                    className="flex-shrink-0 px-4 py-2 rounded-lg text-sm font-semibold bg-white border border-red-300 text-red-600 hover:bg-red-100 transition-colors"
+                    className="flex-shrink-0 px-3 py-1.5 rounded-md text-xs font-semibold border border-red-300 text-red-600 hover:bg-red-50 transition-colors"
                   >
                     Clear Data
                   </button>
                 ) : (
-                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                    <p className="text-xs font-semibold text-red-600">Are you sure?</p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setConfirmClearData(false)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium btn-secondary"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        disabled={clearingData}
-                        onClick={async () => {
-                          try {
-                            setClearingData(true);
-                            await settingsApi.clearData();
-                            toast.success('All data cleared');
-                          } catch (err) {
-                            toast.error(err.message);
-                          } finally {
-                            setClearingData(false);
-                            setConfirmClearData(false);
-                          }
-                        }}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50"
-                      >
-                        {clearingData ? 'Clearing…' : 'Yes, Clear'}
-                      </button>
-                    </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => setConfirmClearData(false)}
+                      className="px-3 py-1.5 rounded-md text-xs font-medium btn-secondary"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      disabled={clearingData}
+                      onClick={async () => {
+                        try {
+                          setClearingData(true);
+                          await settingsApi.clearData();
+                          toast.success('All data cleared');
+                        } catch (err) {
+                          toast.error(err.message);
+                        } finally {
+                          setClearingData(false);
+                          setConfirmClearData(false);
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-md text-xs font-semibold bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50"
+                    >
+                      {clearingData ? 'Clearing…' : 'Confirm'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Clear Transactional Data */}
+              <div className="flex items-center justify-between gap-4 px-4 py-3">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-medium text-slate-800">Clear Transactional Data</h3>
+                  <p className="text-xs text-slate-500 truncate">Clears sales, purchases, returns, services & resets balances. Masters kept.</p>
+                </div>
+                {!confirmClearTransactions ? (
+                  <button
+                    onClick={() => setConfirmClearTransactions(true)}
+                    className="flex-shrink-0 px-3 py-1.5 rounded-md text-xs font-semibold border border-red-300 text-red-600 hover:bg-red-50 transition-colors"
+                  >
+                    Clear Transactions
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => setConfirmClearTransactions(false)}
+                      className="px-3 py-1.5 rounded-md text-xs font-medium btn-secondary"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      disabled={clearingTransactions}
+                      onClick={async () => {
+                        try {
+                          setClearingTransactions(true);
+                          await settingsApi.clearTransactions();
+                          toast.success('Transactional data cleared');
+                        } catch (err) {
+                          toast.error(err.message);
+                        } finally {
+                          setClearingTransactions(false);
+                          setConfirmClearTransactions(false);
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-md text-xs font-semibold bg-red-600 hover:bg-red-700 text-white transition-colors disabled:opacity-50"
+                    >
+                      {clearingTransactions ? 'Clearing…' : 'Confirm'}
+                    </button>
                   </div>
                 )}
               </div>
 
               {/* Reset Settings */}
-              <div className="flex items-start justify-between p-4 rounded-lg border border-amber-200 bg-amber-50">
-                <div className="flex-1 pr-4">
-                  <h3 className="text-sm font-semibold text-slate-800">Reset Settings</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Resets all settings (store profile, modules, receipt config, backup config) back to
-                    factory defaults. Ledger data is not affected.
-                  </p>
+              <div className="flex items-center justify-between gap-4 px-4 py-3">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-medium text-slate-800">Reset Settings</h3>
+                  <p className="text-xs text-slate-500 truncate">Resets all settings to factory defaults. Ledger data not affected.</p>
                 </div>
                 {!confirmResetSettings ? (
                   <button
                     onClick={() => setConfirmResetSettings(true)}
-                    className="flex-shrink-0 px-4 py-2 rounded-lg text-sm font-semibold bg-white border border-amber-300 text-amber-700 hover:bg-amber-100 transition-colors"
+                    className="flex-shrink-0 px-3 py-1.5 rounded-md text-xs font-semibold border border-amber-300 text-amber-700 hover:bg-amber-50 transition-colors"
                   >
                     Reset Settings
                   </button>
                 ) : (
-                  <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                    <p className="text-xs font-semibold text-amber-700">Are you sure?</p>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => setConfirmResetSettings(false)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium btn-secondary"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        disabled={resettingSettings}
-                        onClick={async () => {
-                          try {
-                            setResettingSettings(true);
-                            await settingsApi.resetSettings();
-                            toast.success('Settings reset to defaults');
-                          } catch (err) {
-                            toast.error(err.message);
-                          } finally {
-                            setResettingSettings(false);
-                            setConfirmResetSettings(false);
-                          }
-                        }}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:opacity-50"
-                      >
-                        {resettingSettings ? 'Resetting…' : 'Yes, Reset'}
-                      </button>
-                    </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button
+                      onClick={() => setConfirmResetSettings(false)}
+                      className="px-3 py-1.5 rounded-md text-xs font-medium btn-secondary"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      disabled={resettingSettings}
+                      onClick={async () => {
+                        try {
+                          setResettingSettings(true);
+                          await settingsApi.resetSettings();
+                          toast.success('Settings reset to defaults');
+                        } catch (err) {
+                          toast.error(err.message);
+                        } finally {
+                          setResettingSettings(false);
+                          setConfirmResetSettings(false);
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white transition-colors disabled:opacity-50"
+                    >
+                      {resettingSettings ? 'Resetting…' : 'Confirm'}
+                    </button>
                   </div>
                 )}
               </div>

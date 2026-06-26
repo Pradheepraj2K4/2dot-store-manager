@@ -2,6 +2,7 @@ const saleRepository = require('../repositories/saleRepository');
 const ledgerRepository = require('../repositories/ledgerRepository');
 const itemRepository = require('../repositories/itemRepository');
 const imeiRepository = require('../repositories/imeiRepository');
+const customerService = require('./customerService');
 const { AppError } = require('../middleware/errorHandler');
 const { getDb } = require('../db/database');
 
@@ -114,6 +115,14 @@ class SaleService {
     const run = db.transaction(() => {
       const sale_number = saleRepository.getNextSaleNumber();
       const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
+      // Implicitly retain the buyer: reuse an existing customer (matched by
+      // mobile) or auto-create one when a valid mobile is supplied.
+      const customer_id = customerService.resolveForSale({
+        customer_id: data.customer_id,
+        customer_name: data.customer_name,
+        customer_mobile: data.customer_mobile,
+        customer_place: data.customer_place,
+      });
       const sale = saleRepository.create({
         sale_number,
         ledger_id: parseInt(data.ledger_id),
@@ -128,6 +137,7 @@ class SaleService {
         customer_name: data.customer_name || '',
         customer_mobile: data.customer_mobile || '',
         customer_place: data.customer_place || '',
+        customer_id,
         items: normalisedItems,
       });
 
@@ -188,6 +198,12 @@ class SaleService {
       // mark the newly selected ones as sold.
       imeiRepository.restoreBySale(id);
 
+      const customer_id = customerService.resolveForSale({
+        customer_id: data.customer_id,
+        customer_name: data.customer_name,
+        customer_mobile: data.customer_mobile,
+        customer_place: data.customer_place,
+      });
       const updated = saleRepository.update(id, {
         date: data.date || existing.date,
         time: data.time != null ? data.time : existing.time,
@@ -200,6 +216,7 @@ class SaleService {
         customer_name: data.customer_name || '',
         customer_mobile: data.customer_mobile || '',
         customer_place: data.customer_place || '',
+        customer_id,
         items: normalisedItems,
       });
       consumeImeis(normalisedItems, id);

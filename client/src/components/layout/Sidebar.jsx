@@ -39,6 +39,7 @@ const baseNavigation = [
     icon: Squares2X2Icon,
     children: [
       { name: "Ledgers", href: "/ledgers", icon: BookOpenIcon },
+      { name: "Customers", href: "/customers", icon: UserGroupIcon },
       { name: "Items", href: "/items", icon: CubeIcon },
     ],
   },

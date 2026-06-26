@@ -243,22 +243,27 @@ export function fetchLogoDataUrl(logoPath) {
   if (!logoPath) return Promise.resolve(null);
   // Add cache-buster so we never hit a stale 404 from a previous attempt
   const src = logoPath.includes('?') ? logoPath : `${logoPath}?_t=${Date.now()}`;
-  return new Promise((resolve) => {
-    const img = new window.Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width  = img.naturalWidth;
-        canvas.height = img.naturalHeight;
-        canvas.getContext('2d').drawImage(img, 0, 0);
-        resolve(canvas.toDataURL('image/png'));
-      } catch {
-        // Canvas tainted or other error — fall back to the raw URL
-        resolve(logoPath);
-      }
-    };
-    img.onerror = () => resolve(null);
-    img.src = src;
-  });
+  // Fetch the raw bytes and convert to a base64 data URL via FileReader.
+  // This is more reliable than drawing onto a <canvas> (which yields a blank
+  // image for intrinsic-size-less SVGs and can throw on a tainted canvas) and
+  // embeds the logo directly so it prints from the receipt iframe.
+  return fetch(src)
+    .then((res) => {
+      if (!res.ok) return null;
+      // Guard against dev-server / SPA fallbacks that answer an unmatched route
+      // with index.html — only embed genuine image responses, never HTML.
+      const type = (res.headers.get('content-type') || '').toLowerCase();
+      if (!type.startsWith('image/')) return null;
+      return res.blob();
+    })
+    .then((blob) => {
+      if (!blob) return null;
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(blob);
+      });
+    })
+    .catch(() => null);
 }

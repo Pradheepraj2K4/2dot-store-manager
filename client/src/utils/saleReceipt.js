@@ -421,7 +421,7 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
     /* ── Header band ── */
     .head {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 6fr 4fr;
       border-bottom: 1px solid #000;
     }
     .head .left, .head .right {

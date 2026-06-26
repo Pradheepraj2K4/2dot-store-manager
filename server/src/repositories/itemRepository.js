@@ -113,6 +113,29 @@ class ItemRepository {
     `).run(qty, itemId);
   }
 
+  /**
+   * Overwrite the on-hand stock of multiple items in a single transaction.
+   * Each adjustment is `{ id, stock }`; the absolute new value is stored.
+   */
+  bulkSetStock(adjustments) {
+    const db = getDb();
+    const stmt = db.prepare(`
+      UPDATE items
+      SET current_stock = ?,
+          updated_at    = datetime('now', 'localtime')
+      WHERE id = ?
+    `);
+    const run = db.transaction((list) => {
+      let updated = 0;
+      for (const a of list) {
+        const info = stmt.run(a.stock, a.id);
+        updated += info.changes;
+      }
+      return updated;
+    });
+    return run(adjustments);
+  }
+
   // Distinct brand/category lists for datalist suggestions
   getDistinctBrands() {
     const db = getDb();

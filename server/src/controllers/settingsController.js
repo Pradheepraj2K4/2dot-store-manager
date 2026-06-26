@@ -64,6 +64,15 @@ class SettingsController {
     }
   }
 
+  clearTransactions(req, res, next) {
+    try {
+      settingsService.clearTransactions();
+      res.json({ success: true, data: { message: 'Transactional data cleared' } });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   resetSettings(req, res, next) {
     try {
       settingsService.resetSettings();

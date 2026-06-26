@@ -15,6 +15,7 @@ import { formatCurrency, todayISO } from '../../utils/helpers';
 import { buildSaleReceiptHtml } from '../../utils/saleReceipt';
 import { fetchLogoDataUrl } from '../../utils/interestReceipt';
 import LedgerAutocomplete from '../ui/LedgerAutocomplete';
+import CustomerAutocomplete from '../ui/CustomerAutocomplete';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import Modal from '../ui/Modal';
 import GstSelect from '../ui/GstSelect';
@@ -487,6 +488,9 @@ export default function ItemSalesEntryPage() {
   const [customerName, setCustomerName] = useState('');
   const [customerMobile, setCustomerMobile] = useState('');
   const [customerPlace, setCustomerPlace] = useState('');
+  // Id of the retained customer once one is picked from the suggestions. Left
+  // null for a fresh walk-in — the backend then resolves/creates by mobile.
+  const [customerId, setCustomerId] = useState(null);
   const [billDiscount, setBillDiscount] = useState('0');
   const [lines, setLines] = useState([emptyLine()]);
   const [loading, setLoading] = useState(isEdit);
@@ -631,6 +635,7 @@ export default function ItemSalesEntryPage() {
         if (d.customerName != null) setCustomerName(d.customerName);
         if (d.customerMobile != null) setCustomerMobile(d.customerMobile);
         if (d.customerPlace != null) setCustomerPlace(d.customerPlace);
+        if (d.customerId != null) setCustomerId(d.customerId);
         if (d.billDiscount != null) setBillDiscount(d.billDiscount);
         if (Array.isArray(d.lines) && d.lines.length) setLines(d.lines);
       }
@@ -650,7 +655,7 @@ export default function ItemSalesEntryPage() {
       if (meaningful) {
         localStorage.setItem(SALE_DRAFT_KEY, JSON.stringify({
           ledger, date, time, notes,
-          customerName, customerMobile, customerPlace,
+          customerName, customerMobile, customerPlace, customerId,
           billDiscount, lines,
         }));
       } else {
@@ -726,6 +731,7 @@ export default function ItemSalesEntryPage() {
         setCustomerName(sale.customer_name || '');
         setCustomerMobile(sale.customer_mobile || '');
         setCustomerPlace(sale.customer_place || '');
+        setCustomerId(sale.customer_id || null);
         setBillDiscount(sale.bill_discount != null ? String(sale.bill_discount) : '0');
         setLedger({ id: sale.ledger_id, name: sale.ledger_name, behaviour: 'customer' });
         setLines(
@@ -1037,6 +1043,7 @@ export default function ItemSalesEntryPage() {
         customer_name: isCashLedger ? customerName.trim() : '',
         customer_mobile: isCashLedger ? customerMobile.trim() : '',
         customer_place: isCashLedger ? customerPlace.trim() : '',
+        customer_id: isCashLedger ? (customerId || null) : null,
         bill_discount: parseFloat(billDiscount) || 0,
         items: validLines.map((l) => ({
           item_id: l.item_id,
@@ -1070,6 +1077,7 @@ export default function ItemSalesEntryPage() {
         setCustomerName('');
         setCustomerMobile('');
         setCustomerPlace('');
+        setCustomerId(null);
         setBillDiscount('0');
         setLines([emptyLine()]);
         saleApi.getNextNumber()
@@ -1132,6 +1140,7 @@ export default function ItemSalesEntryPage() {
     setCustomerName('');
     setCustomerMobile('');
     setCustomerPlace('');
+    setCustomerId(null);
     setBillDiscount('0');
     setLines([emptyLine()]);
     setShowImeiErrors(false);
@@ -1405,20 +1414,29 @@ export default function ItemSalesEntryPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-slate-500">Customer Name</label>
-                  <input
-                    type="text"
+                  <CustomerAutocomplete
                     ref={customerNameRef}
                     value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    onFocus={pruneEmptyLines}
-                    onKeyDown={(e) => {
+                    onChange={(v) => {
+                      // Manual typing = potential new walk-in; drop any prior
+                      // selection so the backend re-resolves by mobile.
+                      setCustomerName(v);
+                      setCustomerId(null);
+                    }}
+                    onSelect={(c) => {
+                      setCustomerName(c.name || '');
+                      setCustomerMobile(c.mobile || '');
+                      setCustomerPlace(c.place || '');
+                      setCustomerId(c.id);
+                      setTimeout(() => customerMobileRef.current?.focus(), 0);
+                    }}
+                    onKeyDownExtra={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
                         customerMobileRef.current?.focus();
                       }
                     }}
-                    className="input-field"
-                    placeholder="Walk-in customer name"
+                    placeholder="Search or add walk-in customer"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -1429,7 +1447,7 @@ export default function ItemSalesEntryPage() {
                     maxLength={10}
                     ref={customerMobileRef}
                     value={customerMobile}
-                    onChange={(e) => setCustomerMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    onChange={(e) => { setCustomerMobile(e.target.value.replace(/\D/g, '').slice(0, 10)); setCustomerId(null); }}
                     onFocus={pruneEmptyLines}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {

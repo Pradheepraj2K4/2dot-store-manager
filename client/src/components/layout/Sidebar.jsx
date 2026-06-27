@@ -27,6 +27,7 @@ import {
   CalculatorIcon,
   WrenchScrewdriverIcon,
   UserGroupIcon,
+  PresentationChartLineIcon,
 } from "@heroicons/react/24/outline";
 import { logout, hasPermission, getCurrentUser } from "../../utils/auth";
 import { interestApi, expenseApi, serviceApi } from "../../api";
@@ -90,6 +91,7 @@ const baseNavigation = [
       { name: "Day Book", href: "/day-book", icon: QueueListIcon },
       { name: "Accounts Statement", href: "/statement-of-account", icon: DocumentTextIcon },
       { name: "Outstanding Report", href: "/outstanding-balances", icon: CurrencyRupeeIcon },
+      { name: "Bill Profit Report", href: "/bill-profit-report", icon: PresentationChartLineIcon },
       { name: "Overall Report", href: "/reports", icon: DocumentChartBarIcon },
     ],
   },

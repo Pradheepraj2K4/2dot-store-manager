@@ -42,9 +42,10 @@ class LedgerRepository {
     }
     const stmt = db.prepare(`
       INSERT INTO ledgers (ledger_type_id, name, address, phone, place, gst_no, state_code, igst_status,
-                           current_balance, interest_rate, interest_scheme, interest_scheme_id, ledger_date, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                           opening_balance, current_balance, interest_rate, interest_scheme, interest_scheme_id, ledger_date, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
+    const openingBalance = parseFloat(data.opening_balance) || 0;
     const result = stmt.run(
       data.ledger_type_id,
       data.name,
@@ -54,7 +55,8 @@ class LedgerRepository {
       data.gst_no || '',
       data.state_code || '',
       data.igst_status || 'NO',
-      0,
+      openingBalance,
+      openingBalance,
       data.interest_rate || 0,
       interest_scheme,
       interest_scheme_id,

@@ -162,6 +162,10 @@ export const saleApi = {
   getById: (id) => api.get(`/sales/${id}`),
   getByLedger: (ledgerId) => api.get(`/sales/ledger/${ledgerId}`),
   getNextNumber: () => api.get('/sales/next-number'),
+  getBillProfit: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return api.get(`/sales/bill-profit${qs ? `?${qs}` : ''}`);
+  },
   create: (data) => api.post('/sales', data),
   update: (id, data) => api.put(`/sales/${id}`, data),
   delete: (id) => api.delete(`/sales/${id}`),

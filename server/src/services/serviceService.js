@@ -11,31 +11,64 @@ function round2(n) {
 function normaliseDetails(data) {
   if (!data) throw new AppError('Invalid payload', 400);
   if (!data.ledger_id) throw new AppError('Customer ledger is required', 400);
-  const item_name = (data.item_name ? String(data.item_name) : '').trim();
-  if (!item_name) throw new AppError('Item is required', 400);
 
   const ledger = ledgerRepository.findById(parseInt(data.ledger_id));
   if (!ledger) throw new AppError('Ledger not found', 404);
 
-  let staff_id = null;
-  let staff_name = (data.staff_name ? String(data.staff_name) : '').trim();
-  if (data.staff_id) {
-    const staff = staffRepository.getById(parseInt(data.staff_id));
-    if (!staff) throw new AppError('Staff not found', 404);
-    staff_id = staff.id;
-    staff_name = staff.name;
-  }
+  // Resolve a staff member (id -> {id, name}); returns nulls when none given.
+  const resolveStaff = (staffId, staffName) => {
+    if (staffId) {
+      const staff = staffRepository.getById(parseInt(staffId));
+      if (!staff) throw new AppError('Staff not found', 404);
+      return { staff_id: staff.id, staff_name: staff.name };
+    }
+    return { staff_id: null, staff_name: (staffName ? String(staffName) : '').trim() };
+  };
 
-  const quantity = parseFloat(data.quantity);
+  // Build the items array. Accepts a multi-row `items` payload or falls back to
+  // the legacy single-item fields for backward compatibility.
+  const rawItems = Array.isArray(data.items) && data.items.length
+    ? data.items
+    : [{
+        item_id: data.item_id,
+        item_name: data.item_name,
+        quantity: data.quantity,
+        imei: data.imei,
+        staff_id: data.staff_id,
+        staff_name: data.staff_name,
+      }];
+
+  const items = rawItems
+    .map((it) => {
+      const item_name = (it.item_name ? String(it.item_name) : '').trim();
+      if (!item_name) return null;
+      const quantity = parseFloat(it.quantity);
+      const staff = resolveStaff(it.staff_id, it.staff_name);
+      return {
+        item_id: it.item_id ? parseInt(it.item_id) : null,
+        item_name,
+        quantity: !quantity || quantity <= 0 ? 1 : quantity,
+        imei: (it.imei ? String(it.imei) : '').trim(),
+        staff_id: staff.staff_id,
+        staff_name: staff.staff_name,
+      };
+    })
+    .filter(Boolean);
+
+  if (items.length === 0) throw new AppError('At least one item is required', 400);
+
+  const first = items[0];
   return {
     ledger_id: ledger.id,
     date: data.date || new Date().toISOString().split('T')[0],
-    item_id: data.item_id ? parseInt(data.item_id) : null,
-    item_name,
-    quantity: !quantity || quantity <= 0 ? 1 : quantity,
-    imei: (data.imei ? String(data.imei) : '').trim(),
-    staff_id,
-    staff_name,
+    items,
+    // Legacy summary fields (mirror the first item) kept for list/search screens.
+    item_id: first.item_id,
+    item_name: first.item_name,
+    quantity: first.quantity,
+    imei: first.imei,
+    staff_id: first.staff_id,
+    staff_name: first.staff_name,
     advance_amount: round2(data.advance_amount),
     customer_name: (data.customer_name ? String(data.customer_name) : '').trim(),
     customer_mobile: (data.customer_mobile ? String(data.customer_mobile) : '').trim(),

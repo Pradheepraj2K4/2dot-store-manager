@@ -76,7 +76,7 @@ export default function StockReportPage() {
         acc.salesReturn += r.total_sales_return || 0;
         acc.purchaseReturn += r.total_purchase_return || 0;
         acc.stock += r.current_stock || 0;
-        acc.value += r.stock_value || 0;
+        acc.value += r.stock_cost || 0;
         return acc;
       },
       { purchased: 0, sold: 0, salesReturn: 0, purchaseReturn: 0, stock: 0, value: 0 },
@@ -99,7 +99,7 @@ export default function StockReportPage() {
           salesReturn: r.total_sales_return || 0,
           stock: r.current_stock || 0,
           mrp: r.mrp || 0,
-          value: r.stock_value || 0,
+          value: r.stock_cost || 0,
         })),
         [
           { header: 'Code', key: 'code', width: 12 },
@@ -113,7 +113,7 @@ export default function StockReportPage() {
           { header: 'Sales Return', key: 'salesReturn', width: 12 },
           { header: 'Stock', key: 'stock', width: 10 },
           { header: 'MRP', key: 'mrp', width: 12 },
-          { header: 'Stock Value', key: 'value', width: 14 },
+          { header: 'Stock Cost', key: 'value', width: 14 },
         ],
         'stock-report',
         {
@@ -206,7 +206,7 @@ export default function StockReportPage() {
                   <th className="px-3 py-2 text-right">Sales Return</th>
                   <th className="px-3 py-2 text-right">Stock</th>
                   <th className="px-3 py-2 text-right">MRP</th>
-                  <th className="px-3 py-2 text-right">Stock Value</th>
+                  <th className="px-3 py-2 text-right">Stock Cost</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
@@ -268,7 +268,7 @@ export default function StockReportPage() {
                       </span>
                     </td>
                     <td className="px-3 py-2 text-right">{formatCurrency(r.mrp || 0)}</td>
-                    <td className="px-3 py-2 text-right font-medium">{formatCurrency(r.stock_value || 0)}</td>
+                    <td className="px-3 py-2 text-right font-medium">{formatCurrency(r.stock_cost || 0)}</td>
                   </tr>
                 ))}
               </tbody>

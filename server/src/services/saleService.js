@@ -261,6 +261,37 @@ class SaleService {
   getNextSaleNumber() {
     return saleRepository.getNextSaleNumber();
   }
+
+  /**
+   * Per-bill profit report.
+   *
+   * sale_value = line amounts − bill-level discount
+   * profit     = sale_value − cost (weighted-avg purchase cost)
+   * margin     = profit / sale_value × 100
+   */
+  getBillProfit({ fromDate, toDate } = {}) {
+    const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+    const rows = saleRepository.getBillProfit({ fromDate, toDate });
+    return rows.map((r) => {
+      const saleValue = round2((r.line_amount || 0) - (r.bill_discount || 0));
+      const cost = round2(r.cost || 0);
+      const profit = round2(saleValue - cost);
+      const margin = saleValue ? Math.round((profit / saleValue) * 1000) / 10 : 0;
+      return {
+        id: r.id,
+        sale_number: r.sale_number,
+        date: r.date,
+        time: r.time,
+        party_name: r.party_name,
+        item_count: r.item_count,
+        sale_value: saleValue,
+        cost,
+        profit,
+        margin,
+        unknown_cost_lines: r.unknown_cost_lines || 0,
+      };
+    });
+  }
 }
 
 module.exports = new SaleService();

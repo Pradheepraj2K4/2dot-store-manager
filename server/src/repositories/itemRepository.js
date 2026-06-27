@@ -192,7 +192,7 @@ class ItemRepository {
         COALESCE(sr.total_sales_return, 0)  AS total_sales_return,
         COALESCE(pr.total_purchase_return, 0) AS total_purchase_return,
         COALESCE(im.imei_count, 0)          AS imei_count,
-        (i.mrp * i.current_stock)           AS stock_value
+        (COALESCE(ic.avg_cost, 0) * i.current_stock) AS stock_cost
       FROM items i
       LEFT JOIN (
         SELECT item_id, SUM(quantity) AS total_purchased
@@ -214,6 +214,10 @@ class ItemRepository {
         SELECT item_id, COUNT(*) AS imei_count
         FROM item_imeis GROUP BY item_id
       ) im ON im.item_id = i.id
+      LEFT JOIN (
+        SELECT item_id, SUM(rate * quantity) / NULLIF(SUM(quantity), 0) AS avg_cost
+        FROM purchase_items WHERE item_id IS NOT NULL GROUP BY item_id
+      ) ic ON ic.item_id = i.id
       ${where}
       ORDER BY i.name ASC
     `).all(...params);

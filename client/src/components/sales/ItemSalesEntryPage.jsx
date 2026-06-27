@@ -210,6 +210,7 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
                   <span className="font-medium text-slate-800">{it.name}</span>
                   <span className="text-xs text-slate-400">{[it.brand, it.category].filter(Boolean).join(' · ')}</span>
                   <span className="text-xs text-slate-500">{formatCurrency(it.mrp)}</span>
+                  <span className="ml-auto text-xs font-medium text-slate-600">Stock: {Number(it.current_stock ?? 0)}</span>
                 </div>
               </button>
             ))
@@ -1532,6 +1533,15 @@ export default function ItemSalesEntryPage() {
         <div className="flex items-center justify-between gap-2 px-4 py-2 border-t border-slate-100">
           {/* Footer info — shows stock + cost rate of the focused item row */}
           <div className="flex items-center gap-4 text-xs min-h-[1.5rem]">
+            {ledger && (
+              <span className="flex items-center gap-1">
+                <span className="text-slate-400">{ledger.name} Balance:</span>
+                <span className={`font-bold ${(parseFloat(ledger.current_balance) || 0) < 0 ? 'text-debit-red' : 'text-credit-green'}`}>
+                  {formatCurrency(Math.abs(parseFloat(ledger.current_balance) || 0))}
+                  {(parseFloat(ledger.current_balance) || 0) < 0 ? ' Dr' : ' Cr'}
+                </span>
+              </span>
+            )}
             {focusedItemInfo && (
               <>
                 <span className="font-medium text-slate-600 truncate max-w-[160px]" title={focusedItemInfo.name}>

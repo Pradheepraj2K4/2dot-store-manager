@@ -5,7 +5,7 @@ import { ArrowLeftIcon, CheckCircleIcon } from '@heroicons/react/24/outline';
 import { itemApi, staffApi, serviceApi } from '../../api';
 import { formatCurrency } from '../../utils/helpers';
 import LoadingSpinner from '../ui/LoadingSpinner';
-import ServiceFormFields from './ServiceFormFields';
+import ServiceFormFields, { emptyServiceLine } from './ServiceFormFields';
 
 export default function ServiceClosePage() {
   const navigate = useNavigate();
@@ -15,6 +15,7 @@ export default function ServiceClosePage() {
   const [staffs, setStaffs] = useState([]);
   const [ledger, setLedger] = useState(null);
   const [form, setForm] = useState(null);
+  const [lines, setLines] = useState([emptyServiceLine()]);
   const [serviceNumber, setServiceNumber] = useState('');
   const [materialCost, setMaterialCost] = useState('');
   const [labourCost, setLabourCost] = useState('');
@@ -38,12 +39,17 @@ export default function ServiceClosePage() {
         }
         setServiceNumber(svc.service_number);
         setLedger({ id: svc.ledger_id, name: svc.ledger_name, behaviour: 'customer' });
+        const svcItems = Array.isArray(svc.items) && svc.items.length
+          ? svc.items
+          : [{ item_id: svc.item_id, item_name: svc.item_name, quantity: svc.quantity, imei: svc.imei, staff_id: svc.staff_id }];
+        setLines(svcItems.map((it) => ({
+          item: { id: it.item_id || null, name: it.item_name },
+          imei: it.imei || '',
+          quantity: String(it.quantity ?? 1),
+          staff_id: it.staff_id ? String(it.staff_id) : '',
+        })));
         setForm({
           date: svc.date,
-          item: svc.item_id ? { id: svc.item_id, name: svc.item_name } : { id: null, name: svc.item_name },
-          quantity: String(svc.quantity ?? 1),
-          imei: svc.imei || '',
-          staff_id: svc.staff_id ? String(svc.staff_id) : '',
           advance_amount: svc.advance_amount != null ? String(svc.advance_amount) : '',
           customer_name: svc.customer_name || '',
           customer_mobile: svc.customer_mobile || '',
@@ -69,11 +75,15 @@ export default function ServiceClosePage() {
   const buildDetails = () => ({
     ledger_id: ledger?.id,
     date: form.date,
-    item_id: form.item?.id || null,
-    item_name: form.item?.name || '',
-    quantity: parseFloat(form.quantity) || 1,
-    imei: form.imei,
-    staff_id: form.staff_id || null,
+    items: lines
+      .filter((l) => l.item && l.item.name)
+      .map((l) => ({
+        item_id: l.item.id || null,
+        item_name: l.item.name,
+        quantity: parseFloat(l.quantity) || 1,
+        imei: l.imei,
+        staff_id: l.staff_id || null,
+      })),
     advance_amount: parseFloat(form.advance_amount) || 0,
     customer_name: form.customer_name,
     customer_mobile: form.customer_mobile,
@@ -83,7 +93,7 @@ export default function ServiceClosePage() {
 
   const validate = () => {
     if (!ledger) { toast.error('Select a customer ledger'); return false; }
-    if (!form.item || !form.item.name) { toast.error('Select an item'); return false; }
+    if (lines.filter((l) => l.item && l.item.name).length === 0) { toast.error('Add at least one item'); return false; }
     if (form.customer_mobile && form.customer_mobile.length !== 10) {
       toast.error('Customer mobile must be exactly 10 digits');
       return false;
@@ -149,6 +159,8 @@ export default function ServiceClosePage() {
         <ServiceFormFields
           form={form}
           setForm={setForm}
+          lines={lines}
+          setLines={setLines}
           ledger={ledger}
           setLedger={setLedger}
           items={items}

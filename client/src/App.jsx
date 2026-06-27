@@ -10,6 +10,7 @@ import PendingInterestPage from "./components/accounts/PendingInterestPage";
 import PaidInterestPage from "./components/accounts/PaidInterestPage";
 import ReportsPage from "./components/reports/ReportsPage";
 import OutstandingBalanceReportPage from "./components/reports/OutstandingBalanceReportPage";
+import BillProfitReportPage from "./components/reports/BillProfitReportPage";
 import StatementOfAccountPage from "./components/reports/StatementOfAccountPage";
 import SettingsPage from "./components/settings/SettingsPage";
 import DeveloperSettingsPage from "./components/settings/DeveloperSettingsPage";
@@ -66,6 +67,10 @@ export default function App() {
                 <Route
                   path="/outstanding-balances"
                   element={<OutstandingBalanceReportPage />}
+                />
+                <Route
+                  path="/bill-profit-report"
+                  element={<BillProfitReportPage />}
                 />
                 <Route
                   path="/statement-of-account"

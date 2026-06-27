@@ -131,6 +131,53 @@ class SaleRepository {
     return sales.map((s) => ({ ...s, items: itemStmt.all(s.id) }));
   }
 
+  /**
+   * Per-bill profit over a date range.
+   *
+   * Revenue per line = its stored `amount` (what the customer pays for that
+   * line). Cost per line = the item's weighted-average purchase rate × qty,
+   * derived from all `purchase_items` rows for that item. Bill-level discount
+   * is returned separately so the service can subtract it from revenue.
+   *
+   * `unknown_cost_lines` counts lines with no purchase history (or no linked
+   * item) so the UI can flag bills whose cost is incomplete.
+   */
+  getBillProfit({ fromDate, toDate } = {}) {
+    const db = getDb();
+    const conds = [];
+    const params = [];
+    if (fromDate) { conds.push('s.date >= ?'); params.push(fromDate); }
+    if (toDate)   { conds.push('s.date <= ?'); params.push(toDate); }
+    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+    return db.prepare(`
+      WITH item_cost AS (
+        SELECT item_id,
+               SUM(rate * quantity) / NULLIF(SUM(quantity), 0) AS avg_cost
+        FROM purchase_items
+        WHERE item_id IS NOT NULL
+        GROUP BY item_id
+      )
+      SELECT
+        s.id,
+        s.sale_number,
+        s.date,
+        s.time,
+        s.bill_discount,
+        s.item_count,
+        COALESCE(NULLIF(TRIM(s.customer_name), ''), l.name) AS party_name,
+        COALESCE(SUM(si.amount), 0)                              AS line_amount,
+        COALESCE(SUM(COALESCE(ic.avg_cost, 0) * si.quantity), 0) AS cost,
+        SUM(CASE WHEN si.id IS NOT NULL AND ic.avg_cost IS NULL THEN 1 ELSE 0 END) AS unknown_cost_lines
+      FROM sales s
+      JOIN ledgers l ON l.id = s.ledger_id
+      LEFT JOIN sale_items si ON si.sale_id = s.id
+      LEFT JOIN item_cost ic ON ic.item_id = si.item_id
+      ${where}
+      GROUP BY s.id
+      ORDER BY s.date DESC, s.id DESC
+    `).all(...params);
+  }
+
   delete(id) {
     const db = getDb();
     return db.prepare('DELETE FROM sales WHERE id = ?').run(id);

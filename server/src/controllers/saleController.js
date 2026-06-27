@@ -35,6 +35,14 @@ class SaleController {
     } catch (err) { next(err); }
   }
 
+  getBillProfit(req, res, next) {
+    try {
+      const { fromDate, toDate } = req.query;
+      const rows = saleService.getBillProfit({ fromDate, toDate });
+      res.json({ success: true, data: rows });
+    } catch (err) { next(err); }
+  }
+
   create(req, res, next) {
     try {
       const sale = saleService.create(req.body);

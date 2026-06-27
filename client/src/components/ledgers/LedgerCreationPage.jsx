@@ -34,6 +34,7 @@ const EMPTY_FORM = {
   gst_no: '',
   state_code: '',
   igst_status: 'NO',
+  opening_balance: '',
 };
 
 export default function LedgerCreationPage() {
@@ -55,6 +56,7 @@ export default function LedgerCreationPage() {
   const gstNoRef = useRef(null);
   const stateCodeRef = useRef(null);
   const addressRef = useRef(null);
+  const openingBalanceRef = useRef(null);
   const submitRef = useRef(null);
 
   useEffect(() => {
@@ -101,6 +103,7 @@ export default function LedgerCreationPage() {
         name: form.name.trim(),
         gst_no: form.gst_no.trim().toUpperCase(),
         state_code: form.state_code.trim(),
+        opening_balance: parseFloat(form.opening_balance) || 0,
       });
       toast.success('Ledger created successfully');
       const newId = res.data?.id || res.data?.ledger?.id;
@@ -290,9 +293,31 @@ export default function LedgerCreationPage() {
                 name="address"
                 value={form.address}
                 onChange={handleChange}
-                onKeyDown={(e) => focusNext(e, submitRef)}
+                onKeyDown={(e) => focusNext(e, openingBalanceRef)}
                 className="input-field"
               />
+            </div>
+          </div>
+
+          {/* Opening Balance */}
+          <div className="flex gap-4">
+            <label className="w-32 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">Opening Balance</label>
+            <div className="flex-1">
+              <input
+                ref={openingBalanceRef}
+                type="number"
+                step="0.01"
+                name="opening_balance"
+                value={form.opening_balance}
+                onChange={handleChange}
+                onKeyDown={(e) => focusNext(e, submitRef)}
+                placeholder="0.00"
+                className="input-field"
+                inputMode="decimal"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                Starting balance for this ledger. Positive = customer owes you / you owe the supplier.
+              </p>
             </div>
           </div>
 

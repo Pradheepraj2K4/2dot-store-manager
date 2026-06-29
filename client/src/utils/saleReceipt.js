@@ -74,24 +74,51 @@ const PAGE_SIZES = {
   thermal: { cssSize: '80mm auto', width: '76mm'  },
 };
 
+// Document-type label sets. `sale` renders a tax invoice; `estimation`
+// renders a non-posting quotation/estimate with the same layout.
+const DOC_LABELS = {
+  sale: {
+    title: 'Tax Invoice',
+    numberLabelThermal: 'Bill No.',
+    numberLabelPaper: 'Invoice No.',
+    dateLabelPaper: 'Invoice Date',
+    docWord: 'Invoice',
+    thanks: 'Thank you for your business',
+    thanksThermal: 'Thank you · Visit again',
+    terms: 'Goods once sold will not be taken back or exchanged. All disputes are subject to local jurisdiction.',
+  },
+  estimation: {
+    title: 'Estimate',
+    numberLabelThermal: 'Estimate No.',
+    numberLabelPaper: 'Estimate No.',
+    dateLabelPaper: 'Estimate Date',
+    docWord: 'Estimate',
+    thanks: 'This is an estimate — not a tax invoice',
+    thanksThermal: 'Estimate · Not a tax invoice',
+    terms: 'This is an estimate and not a tax invoice. Prices are subject to change and stock availability.',
+  },
+};
+
 export function buildSaleReceiptHtml({
   sale,
   ledgerName, // unused for non-CASH; customer comes from sale.customer_name
   store = {},
   logoDataUrl = null,
   format = 'thermal',
+  docType = 'sale',
 }) {
   const ps = PAGE_SIZES[format] || PAGE_SIZES.thermal;
   const isThermal = format === 'thermal';
+  const labels = DOC_LABELS[docType] || DOC_LABELS.sale;
 
-  if (isThermal) return buildThermal({ sale, ledgerName, store, logoDataUrl, ps });
-  return buildPaper({ sale, store, logoDataUrl, ps, format });
+  if (isThermal) return buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels });
+  return buildPaper({ sale, store, logoDataUrl, ps, format, labels });
 }
 
 // ───────────────────────────────────────────────────────────────────────────
 // Thermal (80mm) — POS-style monospaced receipt
 // ───────────────────────────────────────────────────────────────────────────
-function buildThermal({ sale, ledgerName, store, logoDataUrl, ps }) {
+function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels }) {
   const items = Array.isArray(sale.items) ? sale.items : [];
   const totalQty          = items.reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0);
   const totalItemDiscount = parseFloat(sale.total_discount) || 0;
@@ -163,7 +190,7 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps }) {
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Invoice ${sale.sale_number || ''}</title>
+  <title>${labels.docWord} ${sale.sale_number || ''}</title>
   <style>
     @page { size: ${ps.cssSize}; margin: 3mm 2mm; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -285,11 +312,11 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps }) {
     </div>
   </div>
 
-  <div class="title-band">Tax Invoice</div>
+  <div class="title-band">${escapeHtml(labels.title)}</div>
 
   <!-- Meta -->
   <div class="meta">
-    <div class="row"><span class="lbl">Bill No.</span><span class="val">${escapeHtml(sale.sale_number || '—')}</span></div>
+    <div class="row"><span class="lbl">${escapeHtml(labels.numberLabelThermal)}</span><span class="val">${escapeHtml(sale.sale_number || '—')}</span></div>
     <div class="row"><span class="lbl">Date</span><span class="val">${fmt(sale.date)}${sale.time ? '  ' + escapeHtml(sale.time) : ''}</span></div>
     ${sale.customer_name && sale.customer_name.trim() ? `<div class="row"><span class="lbl">Customer</span><span class="val">${escapeHtml(sale.customer_name.trim())}</span></div>` : ''}
   </div>
@@ -313,7 +340,7 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps }) {
   ${sale.notes ? `<div class="notes"><span class="lbl">Notes:</span> ${escapeHtml(sale.notes)}</div>` : ''}
 
   <div class="footer">
-    <div class="thanks">Thank you · Visit again</div>
+    <div class="thanks">${escapeHtml(labels.thanksThermal)}</div>
     <div class="system-tag">* * *</div>
   </div>
 
@@ -325,7 +352,7 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps }) {
 // ───────────────────────────────────────────────────────────────────────────
 // A4 / A5 — standard monochrome tax invoice
 // ───────────────────────────────────────────────────────────────────────────
-function buildPaper({ sale, store, logoDataUrl, ps, format }) {
+function buildPaper({ sale, store, logoDataUrl, ps, format, labels }) {
   const isA5 = format === 'a5';
   const items = Array.isArray(sale.items) ? sale.items : [];
 
@@ -400,7 +427,7 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Invoice ${sale.sale_number || ''}</title>
+  <title>${labels.docWord} ${sale.sale_number || ''}</title>
   <style>
     @page { size: ${ps.cssSize}; margin: ${isA5 ? '8mm' : '14mm'}; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -591,10 +618,10 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
         </div>
       </div>
       <div class="right">
-        <div class="doc-title">Tax Invoice</div>
+        <div class="doc-title">${escapeHtml(labels.title)}</div>
         <div class="doc-meta">
-          <div><span class="lbl">Invoice No.</span><span class="val">${escapeHtml(sale.sale_number || '—')}</span></div>
-          <div><span class="lbl">Invoice Date</span><span class="val">${fmt(sale.date)}${sale.time ? ' · ' + escapeHtml(sale.time) : ''}</span></div>
+          <div><span class="lbl">${escapeHtml(labels.numberLabelPaper)}</span><span class="val">${escapeHtml(sale.sale_number || '—')}</span></div>
+          <div><span class="lbl">${escapeHtml(labels.dateLabelPaper)}</span><span class="val">${fmt(sale.date)}${sale.time ? ' · ' + escapeHtml(sale.time) : ''}</span></div>
           <div><span class="lbl">Items</span><span class="val">${items.length}</span></div>
         </div>
       </div>
@@ -659,8 +686,7 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
     <div class="foot">
       <div class="col terms">
         <span class="lbl">Terms &amp; Conditions</span>
-        Goods once sold will not be taken back or exchanged.
-        All disputes are subject to local jurisdiction.
+        ${escapeHtml(labels.terms)}
       </div>
       <div class="col">
         <span class="lbl">For ${escapeHtml(store.store_name || 'Store')}</span>
@@ -668,7 +694,7 @@ function buildPaper({ sale, store, logoDataUrl, ps, format }) {
       </div>
     </div>
 
-    <div class="thanks">Thank you for your business</div>
+    <div class="thanks">${escapeHtml(labels.thanks)}</div>
 
   </div>
 </div>

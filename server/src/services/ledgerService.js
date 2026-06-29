@@ -51,7 +51,19 @@ class LedgerService {
     if (!existing) throw new AppError('Ledger not found', 404);
     if (!data.name || data.name.trim().length === 0) throw new AppError('Ledger name is required.', 400);
     if (!data.ledger_type_id) throw new AppError('Ledger type is required', 400);
-    return ledgerRepository.update(id, { ...data, name: data.name.trim() });
+
+    const updateData = { ...data, name: data.name.trim() };
+    // Opening balance can only be set/changed while the current balance is exactly 0
+    // (i.e. the ledger has no posted transactions affecting it).
+    if (data.opening_balance !== undefined && data.opening_balance !== null && data.opening_balance !== '') {
+      if (existing.current_balance !== 0) {
+        throw new AppError('Opening balance can only be changed when the current balance is 0.', 400);
+      }
+      updateData.opening_balance = parseFloat(data.opening_balance) || 0;
+    } else {
+      delete updateData.opening_balance;
+    }
+    return ledgerRepository.update(id, updateData);
   }
 
   deleteLedger(id) {

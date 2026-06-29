@@ -75,6 +75,29 @@ class LedgerRepository {
       const scheme = db.prepare('SELECT nature FROM interest_schemes WHERE id = ?').get(interest_scheme_id);
       if (scheme) interest_scheme = scheme.nature;
     }
+    // When an opening balance is supplied (only allowed when current balance is 0),
+    // reset both opening_balance and current_balance to the new value.
+    const setOpening = data.opening_balance !== undefined && data.opening_balance !== null && data.opening_balance !== '';
+    if (setOpening) {
+      const openingBalance = parseFloat(data.opening_balance) || 0;
+      db.prepare(`
+        UPDATE ledgers
+        SET ledger_type_id = ?, name = ?, address = ?, phone = ?, place = ?,
+            gst_no = ?, state_code = ?, igst_status = ?,
+            interest_rate = ?, interest_scheme = ?, interest_scheme_id = ?,
+            ledger_date = ?, notes = ?, status = ?,
+            opening_balance = ?, current_balance = ?,
+            updated_at = datetime('now', 'localtime')
+        WHERE id = ?
+      `).run(
+        data.ledger_type_id, data.name, data.address || '', data.phone || '', data.place || '',
+        data.gst_no || '', data.state_code || '', data.igst_status || 'NO',
+        data.interest_rate || 0, interest_scheme, interest_scheme_id,
+        data.ledger_date || '', data.notes || '',
+        data.status || 'active', openingBalance, openingBalance, id
+      );
+      return this.findById(id);
+    }
     db.prepare(`
       UPDATE ledgers
       SET ledger_type_id = ?, name = ?, address = ?, phone = ?, place = ?,

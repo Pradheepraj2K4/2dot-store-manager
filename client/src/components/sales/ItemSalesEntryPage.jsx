@@ -183,7 +183,7 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
             minWidth: 420,
             zIndex: 1000,
           }}
-          className="bg-white rounded-lg border border-slate-200 shadow-lg max-h-60 overflow-y-auto"
+          className="bg-white rounded-lg border-2 border-trust-blue shadow-lg max-h-60 overflow-y-auto"
         >
           {filtered.length === 0 ? (
             <div className="px-3 py-3 text-center text-xs text-slate-400">
@@ -201,7 +201,6 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
                 }`}
               >
                 <div className="flex items-center gap-4 whitespace-nowrap">
-                  <span className="text-[10px] font-mono text-slate-400">{it.id}</span>
                   {it.item_code ? (
                     <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600">
                       {it.item_code}
@@ -684,6 +683,12 @@ export default function ItemSalesEntryPage() {
       ledgerApi.getCash().then((r) => { if (r.data && !draftLedgerRestored.current) setLedger(r.data); }).catch(() => {});
     }
   }, [refreshItems, isEdit]);
+
+  // Focus the first item-name field by default when the page opens.
+  useEffect(() => {
+    focusCell(0, 'itemName');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // When returning from the ledger-creation page (opened via the '+' button),
   // auto-select the freshly created ledger.

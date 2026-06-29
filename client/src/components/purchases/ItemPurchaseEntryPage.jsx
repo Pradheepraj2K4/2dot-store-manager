@@ -186,7 +186,6 @@ function ItemNameCell({ value, items, selected, onSelect, onChange, registerRef,
                 }`}
               >
                 <div className="flex items-center gap-4 whitespace-nowrap">
-                  <span className="text-[10px] font-mono text-slate-400">{it.id}</span>
                   {it.item_code ? (
                     <span className="inline-block rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600">
                       {it.item_code}

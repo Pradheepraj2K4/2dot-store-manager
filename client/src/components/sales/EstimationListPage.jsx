@@ -1,18 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import {
   PlusIcon,
   MagnifyingGlassIcon,
   PencilSquareIcon,
+  PrinterIcon,
   ArrowRightCircleIcon,
   TrashIcon,
   ChevronRightIcon,
   ChevronDownIcon,
   CalculatorIcon,
 } from '@heroicons/react/24/outline';
-import { estimationApi } from '../../api';
+import { estimationApi, settingsApi } from '../../api';
 import { formatCurrency, formatDate } from '../../utils/helpers';
+import { buildSaleReceiptHtml } from '../../utils/saleReceipt';
+import { fetchLogoDataUrl } from '../../utils/interestReceipt';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
 import Modal from '../ui/Modal';
@@ -34,6 +37,13 @@ export default function EstimationListPage() {
   const [deleteModal, setDeleteModal] = useState({ open: false, row: null });
   const [convertModal, setConvertModal] = useState({ open: false, row: null, busy: false });
 
+  // ── Receipt / print state ─────────────────────────────────────────────
+  const [store, setStore] = useState({});
+  const [logoDataUrl, setLogoDataUrl] = useState(null);
+  const [receiptFormat, setReceiptFormat] = useState('thermal');
+  const [previewModal, setPreviewModal] = useState({ open: false, html: '', estimation: null });
+  const previewIframeRef = useRef(null);
+
   const fetchRows = async () => {
     try {
       setLoading(true);
@@ -47,6 +57,24 @@ export default function EstimationListPage() {
   };
 
   useEffect(() => { fetchRows(); /* eslint-disable-next-line */ }, [statusFilter]);
+
+  // Load store profile + receipt config for the printable estimate
+  useEffect(() => {
+    (async () => {
+      const [profileRes, configRes] = await Promise.all([
+        settingsApi.getStoreProfile().catch(() => ({ data: {} })),
+        settingsApi.getReceiptConfig().catch(() => ({ data: {} })),
+      ]);
+      const profile = profileRes.data || {};
+      setStore(profile);
+      const fmt = (configRes.data && configRes.data.format) || 'thermal';
+      setReceiptFormat(['a4', 'a5', 'thermal'].includes(fmt) ? fmt : 'thermal');
+      if (profile.logo_path) {
+        const dl = await fetchLogoDataUrl(profile.logo_path);
+        setLogoDataUrl(dl);
+      }
+    })();
+  }, []);
 
   const toggleExpand = async (id) => {
     if (expanded[id]) {
@@ -84,6 +112,28 @@ export default function EstimationListPage() {
       setConvertModal((p) => ({ ...p, busy: false }));
     }
   };
+
+  const buildEstimationHtml = (estimation, format) =>
+    buildSaleReceiptHtml({
+      sale: { ...estimation, sale_number: estimation.estimation_number },
+      ledgerName: estimation.ledger_name || estimation.customer_name,
+      store,
+      logoDataUrl,
+      format,
+      docType: 'estimation',
+    });
+
+  const handlePrint = async (row) => {
+    try {
+      const res = await estimationApi.getById(row.id);
+      const html = buildEstimationHtml(res.data, receiptFormat);
+      setPreviewModal({ open: true, html, estimation: res.data });
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const closePreview = () => setPreviewModal({ open: false, html: '', estimation: null });
 
   const filtered = rows.filter((r) => {
     if (!search) return true;
@@ -203,6 +253,13 @@ export default function EstimationListPage() {
                             </button>
                           )}
                           <button
+                            onClick={() => handlePrint(r)}
+                            className="text-slate-400 hover:text-trust-blue transition-colors"
+                            title="Print estimate"
+                          >
+                            <PrinterIcon className="w-4 h-4" />
+                          </button>
+                          <button
                             onClick={() => navigate(`/estimation/${r.id}/edit`)}
                             className="text-slate-400 hover:text-trust-blue transition-colors"
                             title="Edit"
@@ -290,6 +347,57 @@ export default function EstimationListPage() {
           <button onClick={handleConvert} className="btn-primary" disabled={convertModal.busy}>
             {convertModal.busy ? 'Converting…' : 'Convert'}
           </button>
+        </div>
+      </Modal>
+
+      {/* Receipt Preview Modal */}
+      <Modal open={previewModal.open} onClose={closePreview} title="Estimate Preview" size="lg">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-slate-500">Format:</span>
+            {['thermal', 'a5', 'a4'].map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => {
+                  setReceiptFormat(f);
+                  if (previewModal.estimation) {
+                    const html = buildEstimationHtml(previewModal.estimation, f);
+                    setPreviewModal((prev) => ({ ...prev, html }));
+                  }
+                }}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium border ${
+                  receiptFormat === f
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                {f === 'thermal' ? 'Thermal 80mm' : f.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <iframe
+            ref={previewIframeRef}
+            srcDoc={previewModal.html}
+            title="Estimate Preview"
+            className="w-full border border-slate-200 rounded bg-white"
+            style={{ minHeight: 380, maxHeight: 600, overflowX: 'hidden' }}
+            onLoad={(e) => {
+              const doc = e.target.contentDocument;
+              if (doc) e.target.style.height = Math.min(doc.body.scrollHeight + 8, 600) + 'px';
+            }}
+          />
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={closePreview} className="btn-secondary">Close</button>
+            <button
+              type="button"
+              onClick={() => previewIframeRef.current?.contentWindow?.print()}
+              className="btn-primary inline-flex items-center gap-1.5"
+            >
+              <PrinterIcon className="h-4 w-4" />
+              Print
+            </button>
+          </div>
         </div>
       </Modal>
     </div>

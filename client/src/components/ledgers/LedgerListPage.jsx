@@ -105,6 +105,8 @@ export default function LedgerListPage() {
       interest_rate:
         ledger.interest_rate != null ? String(ledger.interest_rate) : "",
       interest_scheme: ledger.interest_scheme || "NONE",
+      opening_balance:
+        ledger.opening_balance != null ? String(ledger.opening_balance) : "",
     });
     setEditErrors({});
     setEditTouched({});
@@ -140,6 +142,11 @@ export default function LedgerListPage() {
         gst_no: editForm.gst_no.trim().toUpperCase(),
         state_code: editForm.state_code.trim(),
         ledger_date: editForm.ledger_date || "",
+        // Opening balance is only editable while the current balance is 0.
+        opening_balance:
+          (editModal.ledger?.current_balance || 0) === 0
+            ? editForm.opening_balance
+            : undefined,
       });
       toast.success("Ledger updated successfully");
       setEditModal({ open: false, ledger: null });
@@ -556,6 +563,24 @@ export default function LedgerListPage() {
               className="input-field"
             />
           </div>
+          {(editModal.ledger?.current_balance || 0) === 0 && (
+            <div>
+              <label className="label">Opening Balance</label>
+              <input
+                type="number"
+                name="opening_balance"
+                value={editForm.opening_balance || ""}
+                onChange={handleEditChange}
+                onWheel={(e) => e.target.blur()}
+                className="input-field"
+                placeholder="0"
+                step="0.01"
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Positive = customer owes you / you owe the supplier.
+              </p>
+            </div>
+          )}
           {interestEnabled && (
             <div className="border-t border-slate-200 pt-4">
               <h3 className="text-sm font-semibold text-slate-700 mb-3">

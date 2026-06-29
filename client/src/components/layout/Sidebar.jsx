@@ -28,6 +28,8 @@ import {
   WrenchScrewdriverIcon,
   UserGroupIcon,
   PresentationChartLineIcon,
+  ArrowsPointingOutIcon,
+  ArrowsPointingInIcon,
 } from "@heroicons/react/24/outline";
 import { logout, hasPermission, getCurrentUser } from "../../utils/auth";
 import { interestApi, expenseApi, serviceApi } from "../../api";
@@ -105,6 +107,26 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
   const [expenseEnabled, setExpenseEnabled] = useState(false);
   const [serviceEnabled, setServiceEnabled] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState("Master");
+  const [isFullscreen, setIsFullscreen] = useState(
+    typeof document !== "undefined" && Boolean(document.fullscreenElement),
+  );
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen?.();
+    } else {
+      document.documentElement.requestFullscreen?.();
+    }
+  };
 
   useEffect(() => {
     interestApi
@@ -266,6 +288,17 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
             className="md:hidden rounded-lg p-1 text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
           >
             <XMarkIcon className="h-5 w-5" />
+          </button>
+          <button
+            onClick={toggleFullscreen}
+            title={isFullscreen ? "Exit full screen" : "Full screen"}
+            className="hidden md:flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
+          >
+            {isFullscreen ? (
+              <ArrowsPointingInIcon className="h-4 w-4" />
+            ) : (
+              <ArrowsPointingOutIcon className="h-4 w-4" />
+            )}
           </button>
           <button
             onClick={onToggleCollapse}

@@ -1,12 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { ArrowLeftIcon, ArrowRightCircleIcon } from '@heroicons/react/24/outline';
-import { itemApi, estimationApi } from '../../api';
+import { ArrowLeftIcon, ArrowRightCircleIcon, PrinterIcon } from '@heroicons/react/24/outline';
+import { itemApi, estimationApi, settingsApi } from '../../api';
 import { DEFAULT_ITEM_UNIT } from '../../utils/itemConstants';
 import { formatCurrency, todayISO } from '../../utils/helpers';
+import { buildSaleReceiptHtml } from '../../utils/saleReceipt';
+import { fetchLogoDataUrl } from '../../utils/interestReceipt';
 import LedgerAutocomplete from '../ui/LedgerAutocomplete';
 import LoadingSpinner from '../ui/LoadingSpinner';
+import Modal from '../ui/Modal';
 import ItemLineGrid, { emptyLine, computeAmount } from '../ui/ItemLineGrid';
 
 const STATUS_COLORS = {
@@ -35,6 +38,14 @@ export default function EstimationEntryPage() {
   const [saving, setSaving] = useState(false);
   const [converting, setConverting] = useState(false);
 
+  // ── Receipt / print state ─────────────────────────────────────────────
+  const [store, setStore] = useState({});
+  const [logoDataUrl, setLogoDataUrl] = useState(null);
+  const [receiptFormat, setReceiptFormat] = useState('thermal');
+  const [previewModal, setPreviewModal] = useState({ open: false, html: '', estimation: null });
+  const previewIframeRef = useRef(null);
+  const navigateAfterPreviewRef = useRef(false);
+
   const readOnly = status === 'converted';
 
   const refreshItems = useCallback(async () => {
@@ -44,6 +55,24 @@ export default function EstimationEntryPage() {
     } catch (err) {
       toast.error(err.message);
     }
+  }, []);
+
+  // Load store profile + receipt config for the printable estimate
+  useEffect(() => {
+    (async () => {
+      const [profileRes, configRes] = await Promise.all([
+        settingsApi.getStoreProfile().catch(() => ({ data: {} })),
+        settingsApi.getReceiptConfig().catch(() => ({ data: {} })),
+      ]);
+      const profile = profileRes.data || {};
+      setStore(profile);
+      const fmt = (configRes.data && configRes.data.format) || 'thermal';
+      setReceiptFormat(['a4', 'a5', 'thermal'].includes(fmt) ? fmt : 'thermal');
+      if (profile.logo_path) {
+        const dl = await fetchLogoDataUrl(profile.logo_path);
+        setLogoDataUrl(dl);
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -161,11 +190,45 @@ export default function EstimationEntryPage() {
         ? await estimationApi.update(estimationIdParam, payload)
         : await estimationApi.create(payload);
       toast.success(isEdit ? 'Estimation updated' : `Estimation ${res.data.estimation_number} saved`);
-      navigate('/estimations');
+      if (res.data) {
+        openEstimationPreview(res.data, true);
+      } else {
+        navigate('/estimations');
+      }
     } catch (err) {
       toast.error(err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const openEstimationPreview = (estimation, navigateAfter = false) => {
+    const html = buildSaleReceiptHtml({
+      sale: { ...estimation, sale_number: estimation.estimation_number },
+      ledgerName: estimation.ledger_name || ledger?.name,
+      store,
+      logoDataUrl,
+      format: receiptFormat,
+      docType: 'estimation',
+    });
+    navigateAfterPreviewRef.current = navigateAfter;
+    setPreviewModal({ open: true, html, estimation });
+  };
+
+  const closePreview = () => {
+    const shouldNavigate = navigateAfterPreviewRef.current;
+    navigateAfterPreviewRef.current = false;
+    setPreviewModal({ open: false, html: '', estimation: null });
+    if (shouldNavigate) navigate('/estimations');
+  };
+
+  const handlePrintCurrent = async () => {
+    if (!isEdit) return;
+    try {
+      const res = await estimationApi.getById(estimationIdParam);
+      openEstimationPreview(res.data, false);
+    } catch (err) {
+      toast.error(err.message);
     }
   };
 
@@ -225,6 +288,17 @@ export default function EstimationEntryPage() {
             >
               <ArrowRightCircleIcon className="h-4 w-4" />
               {converting ? 'Converting…' : 'Convert to Sale'}
+            </button>
+          )}
+          {isEdit && (
+            <button
+              type="button"
+              onClick={handlePrintCurrent}
+              className="ml-2 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              title="Print estimate"
+            >
+              <PrinterIcon className="h-4 w-4" />
+              Print
             </button>
           )}
         </div>
@@ -337,6 +411,64 @@ export default function EstimationEntryPage() {
           </button>
         </div>
       </div>
+
+      {/* Receipt Preview Modal */}
+      <Modal open={previewModal.open} onClose={closePreview} title="Estimate Preview" size="lg">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-slate-500">Format:</span>
+            {['thermal', 'a5', 'a4'].map((f) => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => {
+                  setReceiptFormat(f);
+                  if (previewModal.estimation) {
+                    const html = buildSaleReceiptHtml({
+                      sale: { ...previewModal.estimation, sale_number: previewModal.estimation.estimation_number },
+                      ledgerName: previewModal.estimation.ledger_name || ledger?.name,
+                      store,
+                      logoDataUrl,
+                      format: f,
+                      docType: 'estimation',
+                    });
+                    setPreviewModal((prev) => ({ ...prev, html }));
+                  }
+                }}
+                className={`rounded-md px-2.5 py-1 text-xs font-medium border ${
+                  receiptFormat === f
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                {f === 'thermal' ? 'Thermal 80mm' : f.toUpperCase()}
+              </button>
+            ))}
+          </div>
+          <iframe
+            ref={previewIframeRef}
+            srcDoc={previewModal.html}
+            title="Estimate Preview"
+            className="w-full border border-slate-200 rounded bg-white"
+            style={{ minHeight: 380, maxHeight: 600, overflowX: 'hidden' }}
+            onLoad={(e) => {
+              const doc = e.target.contentDocument;
+              if (doc) e.target.style.height = Math.min(doc.body.scrollHeight + 8, 600) + 'px';
+            }}
+          />
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={closePreview} className="btn-secondary">Close</button>
+            <button
+              type="button"
+              onClick={() => previewIframeRef.current?.contentWindow?.print()}
+              className="btn-primary inline-flex items-center gap-1.5"
+            >
+              <PrinterIcon className="h-4 w-4" />
+              Print
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -23,6 +23,34 @@ import {
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 
+// Compact toggle row for the Feature Modules section. Persists the setting and
+// shows a toast; parent keeps the state.
+function ModuleToggle({ label, settingKey, checked, onChange, toastLabel }) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border border-slate-200 bg-white">
+      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={async (e) => {
+            const newVal = e.target.checked;
+            try {
+              await settingsApi.update(settingKey, String(newVal));
+              onChange(newVal);
+              toast.success(`${toastLabel} ${newVal ? 'enabled' : 'disabled'}`);
+            } catch (err) {
+              toast.error(err.message);
+            }
+          }}
+          className="sr-only peer"
+        />
+        <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
+      </label>
+    </div>
+  );
+}
+
 export default function DeveloperSettingsPage() {
   const navigate = useNavigate();
   const [authenticated, setAuthenticated] = useState(isDevAuthenticated());
@@ -37,6 +65,7 @@ export default function DeveloperSettingsPage() {
   const [profile, setProfile] = useState({
     store_name: '',
     address: '',
+    place: '',
     gst_tax_id: '',
     phone: '',
     email: '',
@@ -63,6 +92,13 @@ export default function DeveloperSettingsPage() {
   const [expenseModuleEnabled, setExpenseModuleEnabled] = useState(false);
   // Service module state
   const [serviceModuleEnabled, setServiceModuleEnabled] = useState(false);
+  // Restaurant module state
+  const [restaurantModuleEnabled, setRestaurantModuleEnabled] = useState(false);
+  const [multiCounterEnabled, setMultiCounterEnabled] = useState(false);
+  // Purchase module state (default enabled)
+  const [purchaseModuleEnabled, setPurchaseModuleEnabled] = useState(true);
+  // Account transaction module state (default enabled)
+  const [accountTransactionEnabled, setAccountTransactionEnabled] = useState(true);
   // GST fields state
   const [gstFieldsEnabled, setGstFieldsEnabled] = useState(false);
   // IMEI tracking state
@@ -71,6 +107,10 @@ export default function DeveloperSettingsPage() {
   const [printReceiptsPaymentEnabled, setPrintReceiptsPaymentEnabled] = useState(false);
   const [printReceiptsInterestEnabled, setPrintReceiptsInterestEnabled] = useState(false);
   const [printReceiptsSaleEnabled, setPrintReceiptsSaleEnabled] = useState(false);
+  // Default print format (thermal / a5 / a4) stored inside receipt_config
+  const [receiptConfig, setReceiptConfig] = useState({});
+  const [defaultPrintFormat, setDefaultPrintFormat] = useState('thermal');
+  const [savingPrintFormat, setSavingPrintFormat] = useState(false);
 
   // Data tab state
   const [clearingData, setClearingData] = useState(false);
@@ -119,6 +159,7 @@ export default function DeveloperSettingsPage() {
       setProfile({
         store_name: data.store_name || '',
         address: data.address || '',
+        place: data.place || '',
         gst_tax_id: data.gst_tax_id || '',
         phone: data.phone || '',
         email: data.email || '',
@@ -133,6 +174,14 @@ export default function DeveloperSettingsPage() {
       setExpenseModuleEnabled(data.expense_module_enabled === true || data.expense_module_enabled === 'true');
       // Load service module setting
       setServiceModuleEnabled(data.service_module_enabled === true || data.service_module_enabled === 'true');
+      // Load restaurant module setting
+      setRestaurantModuleEnabled(data.restaurant_module_enabled === true || data.restaurant_module_enabled === 'true');
+      // Load purchase module setting (default enabled — missing key counts as on)
+      setPurchaseModuleEnabled(data.purchase_module_enabled !== false && data.purchase_module_enabled !== 'false');
+      // Load account transaction module setting (default enabled)
+      setAccountTransactionEnabled(data.account_transaction_enabled !== false && data.account_transaction_enabled !== 'false');
+      // Load multi-counter setting
+      setMultiCounterEnabled(data.multi_counter_enabled === true || data.multi_counter_enabled === 'true');
       // Load GST fields setting
       setGstFieldsEnabled(data.gst_fields_enabled === true || data.gst_fields_enabled === 'true');
       // Load IMEI tracking setting
@@ -141,6 +190,10 @@ export default function DeveloperSettingsPage() {
       setPrintReceiptsPaymentEnabled(data.print_receipts_payment_enabled === true || data.print_receipts_payment_enabled === 'true');
       setPrintReceiptsInterestEnabled(data.print_receipts_interest_enabled === true || data.print_receipts_interest_enabled === 'true');
       setPrintReceiptsSaleEnabled(data.print_receipts_sale_enabled === true || data.print_receipts_sale_enabled === 'true');
+      // Load default print format from receipt_config
+      const cfg = data.receipt_config && typeof data.receipt_config === 'object' ? data.receipt_config : {};
+      setReceiptConfig(cfg);
+      setDefaultPrintFormat(['thermal', 'a5', 'a4'].includes(cfg.format) ? cfg.format : 'thermal');
       // Load backup settings
       try {
         const bRes = await settingsApi.getBackupStatus();
@@ -589,6 +642,16 @@ export default function DeveloperSettingsPage() {
                   placeholder="Store address"
                 />
               </div>
+              <div>
+                <label className="label">Place</label>
+                <input
+                  type="text"
+                  value={profile.place}
+                  onChange={(e) => setProfile((p) => ({ ...p, place: e.target.value }))}
+                  className="input-field"
+                  placeholder="City / Town"
+                />
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="label">Phone</label>
@@ -848,158 +911,93 @@ export default function DeveloperSettingsPage() {
       {activeTab === 'modules' && (
         <div className="space-y-4">
           <div className="card">
-            <h2 className="text-base font-semibold text-slate-900 mb-4">Feature Modules</h2>
+            <h2 className="text-base font-semibold text-slate-900 mb-1">Feature Modules</h2>
             <p className="text-xs text-slate-500 mb-6">Enable or disable optional feature modules. Changes take effect immediately.</p>
 
-            <div className="space-y-4">
-              {/* Interest Module Toggle */}
-              <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-white">
-                <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-slate-800">Interest Module</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Enable interest-based payments for parties. Adds interest rate and scheme fields to
-                    customer/supplier creation and tracks daily/monthly interest on outstanding balances.
-                  </p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer ml-4">
-                  <input
-                    type="checkbox"
-                    checked={interestModuleEnabled}
-                    onChange={async (e) => {
-                      const newVal = e.target.checked;
-                      try {
-                        await settingsApi.update('interest_module_enabled', String(newVal));
-                        setInterestModuleEnabled(newVal);
-                        toast.success(`Interest module ${newVal ? 'enabled' : 'disabled'}`);
-                      } catch (err) {
-                        toast.error(err.message);
-                      }
-                    }}
-                    className="sr-only peer"
+            <div className="space-y-6">
+              {/* Group: Inventory & Sales */}
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Inventory &amp; Sales</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <ModuleToggle
+                    label="Purchase Module"
+                    settingKey="purchase_module_enabled"
+                    checked={purchaseModuleEnabled}
+                    onChange={setPurchaseModuleEnabled}
+                    toastLabel="Purchase module"
                   />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
-                </label>
-              </div>
-
-              {/* Expense Module Toggle */}
-              <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-white">
-                <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-slate-800">Expense Module</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Track business expenses like salary, stationery and utilities. Adds expense entry,
-                    expense reports and expense summary to the dashboard.
-                  </p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer ml-4">
-                  <input
-                    type="checkbox"
-                    checked={expenseModuleEnabled}
-                    onChange={async (e) => {
-                      const newVal = e.target.checked;
-                      try {
-                        await settingsApi.update('expense_module_enabled', String(newVal));
-                        setExpenseModuleEnabled(newVal);
-                        toast.success(`Expense module ${newVal ? 'enabled' : 'disabled'}`);
-                      } catch (err) {
-                        toast.error(err.message);
-                      }
-                    }}
-                    className="sr-only peer"
+                  <ModuleToggle
+                    label="Multi Counter (Item Sales)"
+                    settingKey="multi_counter_enabled"
+                    checked={multiCounterEnabled}
+                    onChange={setMultiCounterEnabled}
+                    toastLabel="Multi counter"
                   />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
-                </label>
-              </div>
-
-              {/* Service Module Toggle */}
-              <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-white">
-                <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-slate-800">Service Module</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Manage repair / service jobs. Adds a Staffs master, a Service menu with
-                    service entry, pending services and closed services. Closing a service
-                    records material &amp; labour cost and computes the amount to collect.
-                  </p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer ml-4">
-                  <input
-                    type="checkbox"
-                    checked={serviceModuleEnabled}
-                    onChange={async (e) => {
-                      const newVal = e.target.checked;
-                      try {
-                        await settingsApi.update('service_module_enabled', String(newVal));
-                        setServiceModuleEnabled(newVal);
-                        toast.success(`Service module ${newVal ? 'enabled' : 'disabled'}`);
-                      } catch (err) {
-                        toast.error(err.message);
-                      }
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
-                </label>
-              </div>
-
-              {/* GST Fields Toggle */}
-              <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-white">
-                <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-slate-800">GST / Tax Fields</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Show GST Number, State Code and IGST fields in the Ledger Creation form.
-                    Disable to hide these fields for non-GST businesses.
-                  </p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer ml-4">
-                  <input
-                    type="checkbox"
-                    checked={gstFieldsEnabled}
-                    onChange={async (e) => {
-                      const newVal = e.target.checked;
-                      try {
-                        await settingsApi.update('gst_fields_enabled', String(newVal));
-                        setGstFieldsEnabled(newVal);
-                        toast.success(`GST fields ${newVal ? 'enabled' : 'disabled'}`);
-                      } catch (err) {
-                        toast.error(err.message);
-                      }
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
-                </label>
-              </div>
-
-              {/* IMEI Tracking Toggle */}
-              <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-white">
-                <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-slate-800">IMEI / Serial Tracking</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Master switch for IMEI / serial tracking. When enabled, items flagged with
-                    "IMEI Enable" prompt for one IMEI per unit during purchase entry, and sales
-                    entry requires picking which of those IMEIs are sold. Sold IMEIs are removed
-                    from the available pool.
-                  </p>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer ml-4">
-                  <input
-                    type="checkbox"
+                  <ModuleToggle
+                    label="IMEI / Serial Tracking"
+                    settingKey="imei_tracking_enabled"
                     checked={imeiTrackingEnabled}
-                    onChange={async (e) => {
-                      const newVal = e.target.checked;
-                      try {
-                        await settingsApi.update('imei_tracking_enabled', String(newVal));
-                        setImeiTrackingEnabled(newVal);
-                        toast.success(`IMEI tracking ${newVal ? 'enabled' : 'disabled'}`);
-                      } catch (err) {
-                        toast.error(err.message);
-                      }
-                    }}
-                    className="sr-only peer"
+                    onChange={setImeiTrackingEnabled}
+                    toastLabel="IMEI tracking"
                   />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
-                </label>
+                  <ModuleToggle
+                    label="GST / Tax Fields"
+                    settingKey="gst_fields_enabled"
+                    checked={gstFieldsEnabled}
+                    onChange={setGstFieldsEnabled}
+                    toastLabel="GST fields"
+                  />
+                </div>
               </div>
 
+              {/* Group: Accounts */}
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Accounts</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <ModuleToggle
+                    label="Account Transaction"
+                    settingKey="account_transaction_enabled"
+                    checked={accountTransactionEnabled}
+                    onChange={setAccountTransactionEnabled}
+                    toastLabel="Account transaction"
+                  />
+                  <ModuleToggle
+                    label="Interest Module"
+                    settingKey="interest_module_enabled"
+                    checked={interestModuleEnabled}
+                    onChange={setInterestModuleEnabled}
+                    toastLabel="Interest module"
+                  />
+                  <ModuleToggle
+                    label="Expense Module"
+                    settingKey="expense_module_enabled"
+                    checked={expenseModuleEnabled}
+                    onChange={setExpenseModuleEnabled}
+                    toastLabel="Expense module"
+                  />
+                </div>
+              </div>
+
+              {/* Group: Business Type */}
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">Business Type</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <ModuleToggle
+                    label="Service Module"
+                    settingKey="service_module_enabled"
+                    checked={serviceModuleEnabled}
+                    onChange={setServiceModuleEnabled}
+                    toastLabel="Service module"
+                  />
+                  <ModuleToggle
+                    label="Restaurant Module"
+                    settingKey="restaurant_module_enabled"
+                    checked={restaurantModuleEnabled}
+                    onChange={setRestaurantModuleEnabled}
+                    toastLabel="Restaurant module"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -1034,6 +1032,53 @@ export default function DeveloperSettingsPage() {
             <div className="card">
               <h2 className="text-base font-semibold text-slate-900 mb-1">Receipt Printing</h2>
               <p className="text-xs text-slate-500 mb-6">Enable or disable automatic print-preview per module. Disabled by default.</p>
+
+              {/* Default Print Format */}
+              <div className="p-4 rounded-lg border border-slate-200 bg-white mb-6">
+                <h3 className="text-sm font-semibold text-slate-800">Default Print Format</h3>
+                <p className="text-xs text-slate-500 mt-0.5 mb-3">
+                  The paper size used when opening a receipt/invoice preview across the app.
+                  You can still switch the format inside any preview.
+                </p>
+                <div className="inline-flex rounded-lg border border-slate-200 overflow-hidden">
+                  {[
+                    { value: 'thermal', label: 'Thermal 80mm' },
+                    { value: 'a5', label: 'A5' },
+                    { value: 'a4', label: 'A4' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      disabled={savingPrintFormat}
+                      onClick={async () => {
+                        if (opt.value === defaultPrintFormat) return;
+                        const prev = defaultPrintFormat;
+                        setDefaultPrintFormat(opt.value);
+                        setSavingPrintFormat(true);
+                        try {
+                          const newCfg = { ...receiptConfig, format: opt.value };
+                          await settingsApi.update('receipt_config', newCfg);
+                          setReceiptConfig(newCfg);
+                          toast.success(`Default print format set to ${opt.label}`);
+                        } catch (err) {
+                          setDefaultPrintFormat(prev);
+                          toast.error(err.message);
+                        } finally {
+                          setSavingPrintFormat(false);
+                        }
+                      }}
+                      className={`px-4 py-2 text-sm font-medium transition-colors border-r border-slate-200 last:border-r-0 disabled:opacity-60 ${
+                        defaultPrintFormat === opt.value
+                          ? 'bg-trust-blue text-white'
+                          : 'bg-white text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="space-y-4">
                 {/* Receipt Printing — Payment/Receipt */}
                 <div className="flex items-center justify-between p-4 rounded-lg border border-slate-200 bg-white">

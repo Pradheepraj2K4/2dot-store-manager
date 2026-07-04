@@ -166,6 +166,10 @@ export const saleApi = {
     const qs = new URLSearchParams(params).toString();
     return api.get(`/sales/bill-profit${qs ? `?${qs}` : ''}`);
   },
+  getFoodSalesReport: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return api.get(`/sales/food-report${qs ? `?${qs}` : ''}`);
+  },
   create: (data) => api.post('/sales', data),
   update: (id, data) => api.put(`/sales/${id}`, data),
   delete: (id) => api.delete(`/sales/${id}`),
@@ -232,6 +236,18 @@ export const staffApi = {
   create: (data) => api.post('/staffs', data),
   update: (id, data) => api.put(`/staffs/${id}`, data),
   delete: (id) => api.delete(`/staffs/${id}`),
+};
+
+export const waiterApi = {
+  getAll: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return api.get(`/waiters${qs ? `?${qs}` : ''}`);
+  },
+  getById: (id) => api.get(`/waiters/${id}`),
+  create: (data) => api.post('/waiters', data),
+  update: (id, data) => api.put(`/waiters/${id}`, data),
+  delete: (id) => api.delete(`/waiters/${id}`),
+  isEnabled: () => api.get('/settings/restaurant_module_enabled'),
 };
 
 export const serviceApi = {

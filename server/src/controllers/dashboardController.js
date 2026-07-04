@@ -4,6 +4,7 @@ const ledgerTypeService = require('../services/accountService');
 const settingsRepository = require('../repositories/settingsRepository');
 const expenseService = require('../services/expenseService');
 const interestRepository = require('../repositories/interestRepository');
+const saleRepository = require('../repositories/saleRepository');
 
 class DashboardController {
   getSummary(req, res, next) {
@@ -59,7 +60,6 @@ class DashboardController {
           byCategory: expenseService.getSummary({ fromDate: monthStart, toDate: todayLocal }).byCategory,
         };
       }
-
       const interestModuleEnabled = settingsRepository.get('interest_module_enabled');
       const interestEnabled = interestModuleEnabled === true || interestModuleEnabled === 'true';
       const pendingInterest = interestEnabled ? interestRepository.getTotalPendingAll() : undefined;
@@ -69,6 +69,20 @@ class DashboardController {
       const customerOutstanding = totalReceivable + customerPendingInterest;
       const supplierOutstanding = totalPayable + supplierPendingInterest;
       const interestProfit = interestEnabled ? customerPendingInterest - supplierPendingInterest : 0;
+
+      // Sales figures for the dashboard (always shown).
+      const now = new Date();
+      const pad = (n) => String(n).padStart(2, '0');
+      const today = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+      const monthStart = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+      const salesSummary = saleRepository.getSalesStats({ today, monthStart });
+
+      // Restaurant-specific decoration when the restaurant module is on.
+      const restaurantModuleEnabled = settingsRepository.get('restaurant_module_enabled');
+      const restaurantEnabled = restaurantModuleEnabled === true || restaurantModuleEnabled === 'true';
+      const restaurantSummary = restaurantEnabled
+        ? saleRepository.getRestaurantStats({ today, monthStart })
+        : null;
 
       res.json({
         success: true,
@@ -90,6 +104,9 @@ class DashboardController {
           topOutstanding,
           outstandingByType: Object.values(outstandingByType),
           expenseSummary,
+          salesSummary,
+          restaurantEnabled,
+          restaurantSummary,
           ...(pendingInterest !== undefined && { pendingInterest }),
         },
       });

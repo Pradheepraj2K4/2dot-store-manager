@@ -45,11 +45,11 @@ class ItemRepository {
     return db.prepare('SELECT * FROM items WHERE id = ?').get(id);
   }
 
-  create({ name, unit, mrp, sales_rate, brand, category, gst_percent, item_code, imei_enabled }) {
+  create({ name, unit, mrp, sales_rate, brand, category, gst_percent, item_code, imei_enabled, ac_rate, non_ac_rate }) {
     const db = getDb();
     const info = db.prepare(`
-      INSERT INTO items (name, unit, mrp, sales_rate, brand, category, gst_percent, item_code, imei_enabled)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO items (name, unit, mrp, sales_rate, brand, category, gst_percent, item_code, imei_enabled, ac_rate, non_ac_rate)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       name.trim(),
       (unit || 'Nos').trim(),
@@ -59,18 +59,22 @@ class ItemRepository {
       (category || '').trim(),
       parseFloat(gst_percent) || 0,
       (item_code || '').trim(),
-      imei_enabled ? 1 : 0
+      imei_enabled ? 1 : 0,
+      ac_rate != null && ac_rate !== '' ? parseFloat(ac_rate) : null,
+      non_ac_rate != null && non_ac_rate !== '' ? parseFloat(non_ac_rate) : null
     );
     return this.getById(info.lastInsertRowid);
   }
 
-  update(id, { name, unit, mrp, sales_rate, brand, category, gst_percent, item_code, status, imei_enabled }) {
+  update(id, { name, unit, mrp, sales_rate, brand, category, gst_percent, item_code, status, imei_enabled, ac_rate, non_ac_rate }) {
     const db = getDb();
     db.prepare(`
       UPDATE items
       SET name = ?, unit = ?, mrp = ?, sales_rate = ?, brand = ?, category = ?, gst_percent = ?,
           item_code = ?,
           imei_enabled = ?,
+          ac_rate = ?,
+          non_ac_rate = ?,
           status = COALESCE(?, status),
           updated_at = datetime('now', 'localtime')
       WHERE id = ?
@@ -84,6 +88,8 @@ class ItemRepository {
       parseFloat(gst_percent) || 0,
       (item_code || '').trim(),
       imei_enabled ? 1 : 0,
+      ac_rate != null && ac_rate !== '' ? parseFloat(ac_rate) : null,
+      non_ac_rate != null && non_ac_rate !== '' ? parseFloat(non_ac_rate) : null,
       status || null,
       id
     );

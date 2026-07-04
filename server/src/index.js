@@ -24,6 +24,7 @@ const salesReturnRoutes = require('./routes/salesReturnRoutes');
 const purchaseReturnRoutes = require('./routes/purchaseReturnRoutes');
 const userRoutes = require('./routes/userRoutes');
 const staffRoutes = require('./routes/staffRoutes');
+const waiterRoutes = require('./routes/waiterRoutes');
 const serviceRoutes = require('./routes/serviceRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 
@@ -92,6 +93,7 @@ app.use('/api/sales-returns', salesReturnRoutes);
 app.use('/api/purchase-returns', purchaseReturnRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/staffs', staffRoutes);
+app.use('/api/waiters', waiterRoutes);
 app.use('/api/services', serviceRoutes);
 app.use('/api/customers', customerRoutes);
 

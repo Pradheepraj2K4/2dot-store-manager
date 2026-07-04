@@ -28,6 +28,10 @@ export default function AppLayout({ children }) {
         e.preventDefault();
         setFinderOpen(true);
       }
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'b' || e.key === 'B')) {
+        e.preventDefault();
+        setSidebarCollapsed((c) => !c);
+      }
       if (e.key === 'Escape' && !finderOpen) {
         // Skip if a modal/dialog is currently open — it handles its own Escape.
         if (document.querySelector('[role="dialog"]')) return;

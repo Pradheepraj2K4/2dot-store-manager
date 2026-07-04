@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import Modal from '../ui/Modal';
 import ImportContactsModal from './ImportContactsModal';
 import UsersSettings from './UsersSettings';
-import { LockClosedIcon, EyeIcon, EyeSlashIcon, PlusIcon, PencilIcon, TrashIcon, TagIcon, ArrowUpTrayIcon, Cog6ToothIcon, UsersIcon } from '@heroicons/react/24/outline';
+import { LockClosedIcon, EyeIcon, EyeSlashIcon, PlusIcon, PencilIcon, TrashIcon, TagIcon, ArrowUpTrayIcon, Cog6ToothIcon, UsersIcon, CommandLineIcon } from '@heroicons/react/24/outline';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState('general');
@@ -207,9 +207,20 @@ export default function SettingsPage() {
           <UsersIcon className="h-4 w-4" />
           Users
         </button>
+        <button
+          onClick={() => setActiveTab('shortcuts')}
+          className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'shortcuts' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <CommandLineIcon className="h-4 w-4" />
+          Shortcuts
+        </button>
       </div>
 
       {activeTab === 'users' && <UsersSettings />}
+
+      {activeTab === 'shortcuts' && <ShortcutsSettings />}
 
       {activeTab === 'general' && (
       <>      {/* ── Import Contacts ───────────────────────────────────────────── */}
@@ -462,6 +473,86 @@ export default function SettingsPage() {
         open={importContactsOpen}
         onClose={() => setImportContactsOpen(false)}
       />
+    </div>
+  );
+}
+
+// ── Keyboard Shortcuts reference ─────────────────────────────────────────
+const SHORTCUT_GROUPS = [
+  {
+    title: 'Global',
+    hint: 'Available anywhere in the app',
+    items: [
+      { keys: ['Ctrl', 'F'], desc: 'Open the global finder / search' },
+      { keys: ['Ctrl', 'B'], desc: 'Show or hide the sidebar' },
+      { keys: ['Esc'], desc: 'Go back to the previous page' },
+    ],
+  },
+  {
+    title: 'Item Sales Entry',
+    hint: 'On the item sales entry screen',
+    items: [
+      { keys: ['F2'], desc: 'Switch between sale counters (multi-counter mode)' },
+      { keys: ['F10'], desc: 'Open the Sales Report' },
+      { keys: ['Ctrl', 'I'], desc: 'Open the sales settings panel' },
+    ],
+  },
+  {
+    title: 'Item Purchase Entry',
+    hint: 'On the item purchase entry screen',
+    items: [
+      { keys: ['F10'], desc: 'Open the Purchase Report' },
+    ],
+  },
+  {
+    title: 'Payments & Receipts',
+    hint: 'On the payment / receipt entry screen',
+    items: [
+      { keys: ['F10'], desc: 'Open the matching Payment / Receipt Report' },
+    ],
+  },
+];
+
+function Kbd({ children }) {
+  return (
+    <kbd className="inline-flex min-w-[1.75rem] items-center justify-center rounded-md border border-slate-300 bg-slate-50 px-2 py-1 text-xs font-semibold text-slate-600 shadow-sm">
+      {children}
+    </kbd>
+  );
+}
+
+function ShortcutsSettings() {
+  return (
+    <div className="card">
+      <div className="flex items-center gap-2 mb-1">
+        <CommandLineIcon className="h-5 w-5 text-trust-blue" />
+        <h2 className="text-base font-semibold text-slate-900">Keyboard Shortcuts</h2>
+      </div>
+      <p className="text-xs text-slate-500 mb-6">Speed up common actions with these shortcuts.</p>
+
+      <div className="space-y-6">
+        {SHORTCUT_GROUPS.map((group) => (
+          <div key={group.title}>
+            <h3 className="text-sm font-semibold text-slate-800">{group.title}</h3>
+            <p className="text-xs text-slate-400 mb-2">{group.hint}</p>
+            <div className="divide-y divide-slate-100 rounded-lg border border-slate-200">
+              {group.items.map((item) => (
+                <div key={item.desc} className="flex items-center justify-between gap-4 px-4 py-2.5">
+                  <span className="text-sm text-slate-600">{item.desc}</span>
+                  <span className="flex items-center gap-1 shrink-0">
+                    {item.keys.map((k, i) => (
+                      <span key={k} className="flex items-center gap-1">
+                        {i > 0 && <span className="text-xs text-slate-400">+</span>}
+                        <Kbd>{k}</Kbd>
+                      </span>
+                    ))}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

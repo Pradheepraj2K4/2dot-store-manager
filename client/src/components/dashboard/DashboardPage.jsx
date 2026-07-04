@@ -13,6 +13,11 @@ import {
   ClockIcon,
   ChevronDownIcon,
   SparklesIcon,
+  ShoppingBagIcon,
+  ReceiptPercentIcon,
+  BuildingStorefrontIcon,
+  UserGroupIcon,
+  FireIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -168,6 +173,179 @@ export default function DashboardPage() {
           </div>
         );
       })()}
+
+      {/* Sales overview (always shown) */}
+      {data.salesSummary && (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-base font-semibold text-slate-900">Sales</h2>
+            <button
+              onClick={() => navigate('/sales-report')}
+              className="text-xs font-medium text-trust-blue hover:underline"
+            >
+              View sales report →
+            </button>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
+            {/* Left: compact stat cards stacked */}
+            <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
+              {/* Today's sales — gradient hero */}
+              <div
+                onClick={() => navigate('/sales-report')}
+                className="relative overflow-hidden rounded-xl p-4 cursor-pointer text-white shadow-sm hover:shadow-md transition-all duration-150 bg-gradient-to-br from-trust-blue to-blue-600 flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-blue-100">Today's Sales</span>
+                  <ShoppingBagIcon className="h-5 w-5 text-blue-100/80" />
+                </div>
+                <p className="text-2xl font-bold mt-3 leading-tight">{formatCurrency(data.salesSummary.todayTotal)}</p>
+                <span className="mt-1 text-xs text-blue-100">
+                  {data.salesSummary.todayCount} bill{data.salesSummary.todayCount !== 1 ? 's' : ''} today
+                </span>
+                <ShoppingBagIcon className="pointer-events-none absolute -right-3 -bottom-3 h-20 w-20 text-white/10" />
+              </div>
+              {/* This month's sales */}
+              <div
+                onClick={() => navigate('/sales-report')}
+                className="card cursor-pointer hover:shadow-md transition-all duration-150 flex flex-col justify-between"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">This Month</span>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-500">
+                    <ReceiptPercentIcon className="h-4 w-4" />
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-slate-900 mt-3 leading-tight">{formatCurrency(data.salesSummary.monthTotal)}</p>
+                <span className="mt-1 text-xs text-slate-400">
+                  {data.salesSummary.monthCount} bill{data.salesSummary.monthCount !== 1 ? 's' : ''} this month
+                </span>
+              </div>
+            </div>
+            {/* Right: recent sales */}
+            <div className="lg:col-span-2 card flex flex-col">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-slate-700">Recent Sales</h3>
+                <button
+                  onClick={() => navigate('/item-sales/new')}
+                  className="text-xs font-medium text-trust-blue hover:underline"
+                >
+                  + New sale
+                </button>
+              </div>
+              {data.salesSummary.recent?.length ? (
+                <div className="-mr-1 pr-1 overflow-y-auto flex-1">
+                  {data.salesSummary.recent.map((s) => (
+                    <div
+                      key={s.id}
+                      className="flex items-center gap-3 py-2 border-b border-slate-100 last:border-0 cursor-pointer hover:bg-slate-50 rounded-lg px-1.5 -mx-1.5 transition-colors"
+                      onClick={() => navigate(`/item-sales/${s.id}/edit`)}
+                    >
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-trust-blue">
+                        <ShoppingBagIcon className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-slate-800 truncate">{s.party_name}</p>
+                        <p className="text-xs text-slate-400 truncate">
+                          #{s.sale_number} · {formatDate(s.date)}
+                          {s.item_count ? ` · ${s.item_count} item${s.item_count !== 1 ? 's' : ''}` : ''}
+                          {data.restaurantEnabled && s.service_type ? ` · ${s.service_type === 'ac' ? 'A/C' : 'Non-A/C'}` : ''}
+                        </p>
+                      </div>
+                      <span className="text-sm font-bold text-slate-900 ml-2 shrink-0">
+                        {formatCurrency(s.total_amount)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center py-6 text-center">
+                  <ShoppingBagIcon className="h-8 w-8 text-slate-200 mb-2" />
+                  <p className="text-sm text-slate-400">No sales yet</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restaurant decorations (shown when restaurant module is enabled) */}
+      {data.restaurantEnabled && data.restaurantSummary && (
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <FireIcon className="h-5 w-5 text-amber-500" />
+            <h2 className="text-base font-semibold text-slate-900">Restaurant · Today</h2>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
+            {/* Left: A/C and Non-A/C stacked */}
+            <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
+              {/* A/C sales */}
+              <div className="card flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">A/C Sales</span>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-sky-500">
+                    <BuildingStorefrontIcon className="h-4 w-4" />
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-slate-900 mt-3 leading-tight">{formatCurrency(data.restaurantSummary.acTotal)}</p>
+                <span className="mt-1 text-xs text-slate-400">
+                  {data.restaurantSummary.acCount} bill{data.restaurantSummary.acCount !== 1 ? 's' : ''} today
+                </span>
+              </div>
+              {/* Non-A/C sales */}
+              <div className="card flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Non-A/C Sales</span>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-500">
+                    <FireIcon className="h-4 w-4" />
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-slate-900 mt-3 leading-tight">{formatCurrency(data.restaurantSummary.nonAcTotal)}</p>
+                <span className="mt-1 text-xs text-slate-400">
+                  {data.restaurantSummary.nonAcCount} bill{data.restaurantSummary.nonAcCount !== 1 ? 's' : ''} today
+                </span>
+              </div>
+            </div>
+            {/* Right: top waiters this month */}
+            <div className="lg:col-span-2 card flex flex-col">
+              <div className="flex items-center gap-2 mb-3">
+                <UserGroupIcon className="h-4 w-4 text-slate-400" />
+                <h3 className="text-sm font-semibold text-slate-700">Top Waiters (This Month)</h3>
+              </div>
+              {data.restaurantSummary.topWaiters?.length ? (
+                <div className="space-y-2.5 flex-1">
+                  {data.restaurantSummary.topWaiters.map((w, idx) => {
+                    const max = data.restaurantSummary.topWaiters[0].total || 1;
+                    const pct = (w.total / max) * 100;
+                    const rankColors = ['bg-amber-400', 'bg-amber-300', 'bg-amber-200', 'bg-amber-200', 'bg-amber-200'];
+                    return (
+                      <div key={w.waiter_name}>
+                        <div className="flex items-center justify-between text-sm mb-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500">{idx + 1}</span>
+                            <span className="text-slate-700 font-medium truncate">{w.waiter_name}</span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs text-slate-400">{w.count} bill{w.count !== 1 ? 's' : ''}</span>
+                            <span className="font-bold text-amber-700">{formatCurrency(w.total)}</span>
+                          </div>
+                        </div>
+                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden ml-7">
+                          <div className={`h-full rounded-full ${rankColors[idx] || 'bg-amber-200'}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center py-6 text-center">
+                  <UserGroupIcon className="h-8 w-8 text-slate-200 mb-2" />
+                  <p className="text-sm text-slate-400">No waiter sales this month</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Expense Summary (shown when expense module is enabled) */}
       {data.expenseSummary && (

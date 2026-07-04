@@ -169,7 +169,7 @@ function buildThermal({ purchase, store, logoDataUrl, ps }) {
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
-    @media screen { html, body { width: 100%; max-width: 100%; overflow-x: hidden; } }
+    @media screen { html { background: #eef0f2; } body { margin: 0 auto; box-shadow: 0 0 6px rgba(0,0,0,0.15); } }
     .page { width: 100%; padding: 1mm 2mm; }
 
     .logo-wrap { text-align: center; margin-bottom: 1.5mm; }
@@ -256,6 +256,7 @@ function buildThermal({ purchase, store, logoDataUrl, ps }) {
     <div class="store-name">${escapeHtml(store.store_name || 'Store')}</div>
     <div class="store-meta">
       ${store.address ? `${escapeHtml(store.address).replace(/\n/g, '<br>')}<br>` : ''}
+      ${store.place ? `${escapeHtml(store.place)}<br>` : ''}
       ${store.phone ? `Ph: ${escapeHtml(store.phone)}` : ''}${store.phone && store.email ? '  ·  ' : ''}${store.email ? escapeHtml(store.email) : ''}
       ${store.gst_tax_id ? `<br>GSTIN: ${escapeHtml(store.gst_tax_id)}` : ''}
     </div>
@@ -293,6 +294,25 @@ function buildThermal({ purchase, store, logoDataUrl, ps }) {
   </div>
 
 </div>
+<script>
+(function () {
+  var b = document.body, fe = window.frameElement;
+  function fit() {
+    if (!fe) return;
+    b.style.transformOrigin = 'top left';
+    b.style.transform = 'none';
+    var avail = fe.clientWidth || fe.offsetWidth || b.scrollWidth;
+    var bw = b.scrollWidth || 1;
+    var s = bw > avail ? avail / bw : 1;
+    if (s < 1) b.style.transform = 'scale(' + s + ')';
+    fe.style.height = Math.min(Math.ceil(b.scrollHeight * s) + 6, 620) + 'px';
+  }
+  addEventListener('load', function () { fit(); setTimeout(fit, 0); setTimeout(fit, 60); });
+  addEventListener('resize', fit);
+  addEventListener('beforeprint', function () { b.style.transform = 'none'; });
+  addEventListener('afterprint', fit);
+})();
+</script>
 </body>
 </html>`;
 }
@@ -375,7 +395,7 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format }) {
       line-height: 1.4;
       width: ${ps.width};
     }
-    @media screen { html, body { width: 100%; max-width: 100%; overflow-x: hidden; } }
+    @media screen { html { background: #eef0f2; } body { margin: 0 auto; box-shadow: 0 0 6px rgba(0,0,0,0.15); } }
     .page { width: 100%; }
 
     .doc { border: 1px solid #000; }
@@ -530,6 +550,7 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format }) {
             <div class="store-name">${escapeHtml(store.store_name || 'Store')}</div>
             <div class="store-meta">
               ${store.address ? `${escapeHtml(store.address).replace(/\n/g, '<br>')}<br>` : ''}
+              ${store.place ? `${escapeHtml(store.place)}<br>` : ''}
               ${store.phone ? `Phone: ${escapeHtml(store.phone)}<br>` : ''}
               ${store.email ? `Email: ${escapeHtml(store.email)}<br>` : ''}
               ${store.gst_tax_id ? `GSTIN: ${escapeHtml(store.gst_tax_id)}` : ''}
@@ -619,6 +640,25 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format }) {
 
   </div>
 </div>
+<script>
+(function () {
+  var b = document.body, fe = window.frameElement;
+  function fit() {
+    if (!fe) return;
+    b.style.transformOrigin = 'top left';
+    b.style.transform = 'none';
+    var avail = fe.clientWidth || fe.offsetWidth || b.scrollWidth;
+    var bw = b.scrollWidth || 1;
+    var s = bw > avail ? avail / bw : 1;
+    if (s < 1) b.style.transform = 'scale(' + s + ')';
+    fe.style.height = Math.min(Math.ceil(b.scrollHeight * s) + 6, 620) + 'px';
+  }
+  addEventListener('load', function () { fit(); setTimeout(fit, 0); setTimeout(fit, 60); });
+  addEventListener('resize', fit);
+  addEventListener('beforeprint', function () { b.style.transform = 'none'; });
+  addEventListener('afterprint', fit);
+})();
+</script>
 </body>
 </html>`;
 }

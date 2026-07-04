@@ -9,7 +9,7 @@ import {
   PrinterIcon,
   TrashIcon,
 } from '@heroicons/react/24/outline';
-import { itemApi, saleApi, settingsApi, ledgerApi } from '../../api';
+import { itemApi, saleApi, settingsApi, ledgerApi, waiterApi } from '../../api';
 import { ITEM_UNITS, DEFAULT_ITEM_UNIT } from '../../utils/itemConstants';
 import { formatCurrency, todayISO } from '../../utils/helpers';
 import { buildSaleReceiptHtml } from '../../utils/saleReceipt';
@@ -25,6 +25,11 @@ const FIELD_ORDER = ['itemName', 'unit', 'rate', 'qty', 'discount'];
 // localStorage key for the in-progress (new) sale entry, so partially filled
 // data survives navigating to another menu and back.
 const SALE_DRAFT_KEY = 'item_sale_entry_draft';
+// When the multi-counter dev setting is on, two independent sale drafts are
+// kept side by side. Counter 1 reuses the legacy key (so existing drafts carry
+// over); counter 2 gets its own slot.
+const ACTIVE_COUNTER_KEY = 'item_sale_active_counter';
+const draftKeyFor = (counter) => (counter === 2 ? `${SALE_DRAFT_KEY}_2` : SALE_DRAFT_KEY);
 
 function nowHHMM() {
   const d = new Date();
@@ -58,7 +63,25 @@ function emptyLine() {
     current_stock: null,
     original_quantity: 0,
     imeis: [],
+    // Restaurant module: retained so a line can be re-priced when the bill's
+    // A/C vs Non-A/C service type changes.
+    sales_rate: null,
+    ac_rate: null,
+    non_ac_rate: null,
   };
+}
+
+// Resolves the rate a line should use for the given service type, falling back
+// to the item's sales rate, then MRP, when a fixed A/C / Non-A/C rate is absent.
+function rateForServiceType({ sales_rate, mrp, ac_rate, non_ac_rate }, serviceType) {
+  const base = sales_rate != null && sales_rate !== '' ? parseFloat(sales_rate) : (parseFloat(mrp) || 0);
+  if (serviceType === 'ac') {
+    return ac_rate != null && ac_rate !== '' ? parseFloat(ac_rate) : base;
+  }
+  if (serviceType === 'non_ac') {
+    return non_ac_rate != null && non_ac_rate !== '' ? parseFloat(non_ac_rate) : base;
+  }
+  return base;
 }
 
 // Max quantity that can be entered on a line without driving stock negative.
@@ -69,7 +92,7 @@ function maxQtyFor(line) {
   return (parseFloat(line.current_stock) || 0) + (parseFloat(line.original_quantity) || 0);
 }
 
-function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnter, onAddNew, onKeyBack }) {
+function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnter, onAddNew, onKeyBack, hideStock }) {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(-1);
   const [anchorRect, setAnchorRect] = useState(null);
@@ -173,7 +196,7 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
         </button>
       </div>
 
-      {open && anchorRect && (
+      {open && anchorRect && (value || '').trim() && (
         <div
           ref={dropdownRef}
           style={{
@@ -183,7 +206,7 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
             minWidth: 420,
             zIndex: 1000,
           }}
-          className="bg-white rounded-lg border-2 border-trust-blue shadow-lg max-h-60 overflow-y-auto"
+          className="bg-white rounded-lg border border-slate-200 shadow-lg max-h-60 overflow-y-auto"
         >
           {filtered.length === 0 ? (
             <div className="px-3 py-3 text-center text-xs text-slate-400">
@@ -196,8 +219,8 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
                 key={it.id}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => { onSelect(it); setOpen(false); }}
-                className={`w-full px-3 py-2 text-left text-sm border-b border-slate-100 last:border-0 hover:bg-slate-50 ${
-                  idx === highlight ? 'bg-trust-blue/10' : ''
+                className={`w-full px-3 py-2 text-left text-sm border-b border-slate-100 last:border-0 hover:bg-trust-blue/20 ${
+                  idx === highlight ? 'bg-trust-blue/20' : ''
                 }`}
               >
                 <div className="flex items-center gap-4 whitespace-nowrap">
@@ -209,7 +232,9 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
                   <span className="font-medium text-slate-800">{it.name}</span>
                   <span className="text-xs text-slate-400">{[it.brand, it.category].filter(Boolean).join(' · ')}</span>
                   <span className="text-xs text-slate-500">{formatCurrency(it.mrp)}</span>
-                  <span className="ml-auto text-xs font-medium text-slate-600">Stock: {Number(it.current_stock ?? 0)}</span>
+                  {!hideStock && (
+                    <span className="ml-auto text-xs font-medium text-slate-600">Stock: {Number(it.current_stock ?? 0)}</span>
+                  )}
                 </div>
               </button>
             ))
@@ -492,10 +517,27 @@ export default function ItemSalesEntryPage() {
   // null for a fresh walk-in — the backend then resolves/creates by mobile.
   const [customerId, setCustomerId] = useState(null);
   const [billDiscount, setBillDiscount] = useState('0');
+  // Split payment: amount tendered in cash vs UPI. The two are kept in sync so
+  // they always add up to the bill's net total (see the netTotal effect below).
+  const [cashAmount, setCashAmount] = useState('');
+  const [upiAmount, setUpiAmount] = useState('');
   const [lines, setLines] = useState([emptyLine()]);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [imeiEnabled, setImeiEnabled] = useState(false);
+  // Restaurant module: when enabled the bill can be tagged A/C or Non-A/C and
+  // assigned to a waiter, and item lines resolve to the matching fixed rate.
+  const [restaurantEnabled, setRestaurantEnabled] = useState(false);
+  const [waiters, setWaiters] = useState([]);
+  const [waiterId, setWaiterId] = useState('');
+  const [serviceType, setServiceType] = useState(''); // '', 'ac', 'non_ac'
+  // Multi-counter: keep two independent in-progress sales and switch between
+  // them mid-entry. Enabled via the developer settings toggle.
+  const [multiCounterEnabled, setMultiCounterEnabled] = useState(false);
+  const [activeCounter, setActiveCounter] = useState(() => {
+    const v = parseInt(localStorage.getItem(ACTIVE_COUNTER_KEY) || '1', 10);
+    return v === 2 ? 2 : 1;
+  });
   // Cache of available (in-stock) IMEIs per item id, fetched lazily.
   const [availableImeis, setAvailableImeis] = useState({});
   // When a save is attempted with missing IMEIs, highlight the offending rows
@@ -519,6 +561,10 @@ export default function ItemSalesEntryPage() {
     localStorage.setItem('sales_stock_lock', String(val));
   };
 
+  // Restaurant items are made-to-order and carry no inventory, so stock is
+  // never enforced or displayed while the restaurant module is on.
+  const stockEnforced = stockLock && !restaurantEnabled;
+
   // Rate tax treatment: 'inclusive' (rate includes GST) or 'taxable' (rate is
   // pre-tax and GST is added on top). Defaults to inclusive.
   const [rateTaxMode, setRateTaxMode] = useState(() => {
@@ -531,7 +577,27 @@ export default function ItemSalesEntryPage() {
     localStorage.setItem('sales_rate_tax_mode', val);
   };
 
-  // Ctrl+I opens settings dialog; F10 → purchase report
+  // Whether the Unit / Discount fields are skipped entirely by Enter-key
+  // navigation. When disabled (true), Enter jumps straight over that field to
+  // the next one in the chain (e.g. Item Name -> Rate, skipping Unit). Each is
+  // independently configurable, defaulting to false (fields included).
+  const [disableAutoFocusUnit, setDisableAutoFocusUnit] = useState(() => {
+    return localStorage.getItem('sales_disable_autofocus_unit') === 'true';
+  });
+  const [disableAutoFocusDiscount, setDisableAutoFocusDiscount] = useState(() => {
+    return localStorage.getItem('sales_disable_autofocus_discount') === 'true';
+  });
+
+  const toggleDisableAutoFocusUnit = (val) => {
+    setDisableAutoFocusUnit(val);
+    localStorage.setItem('sales_disable_autofocus_unit', String(val));
+  };
+  const toggleDisableAutoFocusDiscount = (val) => {
+    setDisableAutoFocusDiscount(val);
+    localStorage.setItem('sales_disable_autofocus_discount', String(val));
+  };
+
+  // Ctrl+I opens settings dialog; F10 → sales report
   useEffect(() => {
     const handler = (e) => {
       if (e.ctrlKey && e.key === 'i') {
@@ -540,7 +606,7 @@ export default function ItemSalesEntryPage() {
       }
       if (e.key === 'F10') {
         e.preventDefault();
-        navigate('/purchase-report');
+        navigate('/sales-report');
       }
     };
     window.addEventListener('keydown', handler);
@@ -619,28 +685,64 @@ export default function ItemSalesEntryPage() {
       .catch(() => {});
   }, []);
 
+  // Load the restaurant module flag and, when enabled, the waiter list.
+  useEffect(() => {
+    settingsApi.get('restaurant_module_enabled')
+      .then((r) => {
+        const v = r.data?.value;
+        const enabled = v === true || v === 'true';
+        setRestaurantEnabled(enabled);
+        if (enabled) {
+          waiterApi.getAll({ status: 'active' })
+            .then((res) => setWaiters(res.data || []))
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Load the multi-counter flag. When disabled, always fall back to counter 1.
+  useEffect(() => {
+    settingsApi.get('multi_counter_enabled')
+      .then((r) => {
+        const v = r.data?.value;
+        const enabled = v === true || v === 'true';
+        setMultiCounterEnabled(enabled);
+        if (!enabled) {
+          setActiveCounter(1);
+          localStorage.setItem(ACTIVE_COUNTER_KEY, '1');
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // ── Draft persistence ───────────────────────────────────────────
   // Restore a partially-filled new sale when returning to this page, and
   // auto-save changes so switching to another menu doesn't lose the data.
+  const applyDraftData = (d) => {
+    if (d.ledger) { setLedger(d.ledger); draftLedgerRestored.current = true; }
+    if (d.date) setDate(d.date);
+    if (d.time != null) setTime(d.time);
+    if (d.notes != null) setNotes(d.notes);
+    if (d.customerName != null) setCustomerName(d.customerName);
+    if (d.customerMobile != null) setCustomerMobile(d.customerMobile);
+    if (d.customerPlace != null) setCustomerPlace(d.customerPlace);
+    if (d.customerId != null) setCustomerId(d.customerId);
+    if (d.billDiscount != null) setBillDiscount(d.billDiscount);
+    if (d.waiterId != null) setWaiterId(d.waiterId);
+    if (d.serviceType != null) setServiceType(d.serviceType);
+    if (Array.isArray(d.lines) && d.lines.length) setLines(d.lines);
+  };
+
   useEffect(() => {
     if (isEdit) { draftLoaded.current = true; return; }
     try {
-      const raw = localStorage.getItem(SALE_DRAFT_KEY);
-      if (raw) {
-        const d = JSON.parse(raw);
-        if (d.ledger) { setLedger(d.ledger); draftLedgerRestored.current = true; }
-        if (d.date) setDate(d.date);
-        if (d.time != null) setTime(d.time);
-        if (d.notes != null) setNotes(d.notes);
-        if (d.customerName != null) setCustomerName(d.customerName);
-        if (d.customerMobile != null) setCustomerMobile(d.customerMobile);
-        if (d.customerPlace != null) setCustomerPlace(d.customerPlace);
-        if (d.customerId != null) setCustomerId(d.customerId);
-        if (d.billDiscount != null) setBillDiscount(d.billDiscount);
-        if (Array.isArray(d.lines) && d.lines.length) setLines(d.lines);
-      }
+      const raw = localStorage.getItem(draftKeyFor(activeCounter));
+      if (raw) applyDraftData(JSON.parse(raw));
     } catch (_) { /* ignore malformed draft */ }
     draftLoaded.current = true;
+    // Only run on mount; counter switches are handled by switchCounter.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEdit]);
 
   useEffect(() => {
@@ -653,16 +755,83 @@ export default function ItemSalesEntryPage() {
       lines.some((l) => l.item_name && l.item_name.trim());
     try {
       if (meaningful) {
-        localStorage.setItem(SALE_DRAFT_KEY, JSON.stringify({
+        localStorage.setItem(draftKeyFor(activeCounter), JSON.stringify({
           ledger, date, time, notes,
           customerName, customerMobile, customerPlace, customerId,
-          billDiscount, lines,
+          billDiscount, waiterId, serviceType, lines,
         }));
       } else {
-        localStorage.removeItem(SALE_DRAFT_KEY);
+        localStorage.removeItem(draftKeyFor(activeCounter));
       }
     } catch (_) { /* ignore storage quota errors */ }
-  }, [isEdit, ledger, date, time, notes, customerName, customerMobile, customerPlace, billDiscount, lines]);
+  }, [isEdit, activeCounter, ledger, date, time, notes, customerName, customerMobile, customerPlace, customerId, billDiscount, waiterId, serviceType, lines]);
+
+  // Switch between the two sale counters, persisting the current one and
+  // loading the target's saved draft (or a fresh blank entry).
+  const switchCounter = (target) => {
+    if (target === activeCounter || isEdit) return;
+    // Persist the current counter explicitly so switching never loses data.
+    const meaningful =
+      (customerName && customerName.trim()) ||
+      (customerMobile && customerMobile.trim()) ||
+      (customerPlace && customerPlace.trim()) ||
+      (notes && notes.trim()) ||
+      lines.some((l) => l.item_name && l.item_name.trim());
+    try {
+      if (meaningful) {
+        localStorage.setItem(draftKeyFor(activeCounter), JSON.stringify({
+          ledger, date, time, notes,
+          customerName, customerMobile, customerPlace, customerId,
+          billDiscount, waiterId, serviceType, lines,
+        }));
+      } else {
+        localStorage.removeItem(draftKeyFor(activeCounter));
+      }
+    } catch (_) { /* ignore */ }
+
+    setActiveCounter(target);
+    localStorage.setItem(ACTIVE_COUNTER_KEY, String(target));
+
+    // Reset the form, then load the target counter's draft if it has one.
+    draftLedgerRestored.current = false;
+    setLedger(null);
+    setDate(todayISO());
+    setTime(nowHHMM());
+    setNotes('');
+    setCustomerName('');
+    setCustomerMobile('');
+    setCustomerPlace('');
+    setCustomerId(null);
+    setBillDiscount('0');
+    setCashAmount('');
+    setUpiAmount('');
+    setWaiterId('');
+    setServiceType('');
+    setLines([emptyLine()]);
+    setShowImeiErrors(false);
+    let restored = false;
+    try {
+      const raw = localStorage.getItem(draftKeyFor(target));
+      if (raw) { applyDraftData(JSON.parse(raw)); restored = true; }
+    } catch (_) { /* ignore */ }
+    if (!restored) {
+      ledgerApi.getCash().then((r) => { if (r.data) setLedger(r.data); }).catch(() => {});
+    }
+    toast.success(`Switched to Counter ${target}`);
+  };
+
+  // F2 toggles between the two sale counters (multi-counter mode only).
+  useEffect(() => {
+    if (!multiCounterEnabled || isEdit) return;
+    const handler = (e) => {
+      if (e.key === 'F2') {
+        e.preventDefault();
+        switchCounter(activeCounter === 1 ? 2 : 1);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [multiCounterEnabled, isEdit, activeCounter, switchCounter]);
 
   // Fetch (and cache) the in-stock IMEIs for an item so the picker can offer
   // them. Re-fetches on demand to reflect units sold in other tabs.
@@ -715,9 +884,16 @@ export default function ItemSalesEntryPage() {
         const item = items.find((it) => it.id === l.item_id);
         if (!item) return l;
         const stock = Number(item.current_stock ?? 0);
-        if (l.current_stock === stock) return l;
+        const patch = {};
+        if (l.current_stock !== stock) patch.current_stock = stock;
+        // Backfill the master rates so a loaded (edit-mode) line can be
+        // re-priced when the A/C / Non-A/C service type changes.
+        if (l.sales_rate == null && item.sales_rate != null) patch.sales_rate = item.sales_rate;
+        if (l.ac_rate == null && item.ac_rate != null) patch.ac_rate = item.ac_rate;
+        if (l.non_ac_rate == null && item.non_ac_rate != null) patch.non_ac_rate = item.non_ac_rate;
+        if (Object.keys(patch).length === 0) return l;
         changed = true;
-        return { ...l, current_stock: stock };
+        return { ...l, ...patch };
       });
       return changed ? next : prev;
     });
@@ -739,6 +915,10 @@ export default function ItemSalesEntryPage() {
         setCustomerPlace(sale.customer_place || '');
         setCustomerId(sale.customer_id || null);
         setBillDiscount(sale.bill_discount != null ? String(sale.bill_discount) : '0');
+        setCashAmount(sale.cash_amount != null ? String(sale.cash_amount) : '');
+        setUpiAmount(sale.upi_amount ? String(sale.upi_amount) : '');
+        setWaiterId(sale.waiter_id != null ? String(sale.waiter_id) : '');
+        setServiceType(sale.service_type || '');
         setLedger({ id: sale.ledger_id, name: sale.ledger_name, behaviour: 'customer' });
         setLines(
           (sale.items || []).map((l) => ({
@@ -754,6 +934,9 @@ export default function ItemSalesEntryPage() {
             current_stock: null,
             original_quantity: parseFloat(l.quantity) || 0,
             imeis: Array.isArray(l.imeis) ? l.imeis : [],
+            sales_rate: null,
+            ac_rate: null,
+            non_ac_rate: null,
           }))
         );
       })
@@ -780,15 +963,18 @@ export default function ItemSalesEntryPage() {
           item_name: newItem.name,
           unit: newItem.unit || DEFAULT_ITEM_UNIT,
           mrp: newItem.mrp || 0,
-          rate: String(newItem.sales_rate != null ? newItem.sales_rate : (newItem.mrp || '')),
+          rate: String(rateForServiceType(newItem, serviceType) || ''),
           quantity: '1',
           gst_percent: newItem.gst_percent ? String(newItem.gst_percent) : '',
-          amount: computeAmount({ rate: newItem.sales_rate != null ? newItem.sales_rate : newItem.mrp, quantity: 1, discount_percent: 0, gst_percent: newItem.gst_percent || 0 }, rateTaxMode),
+          amount: computeAmount({ rate: rateForServiceType(newItem, serviceType), quantity: 1, discount_percent: 0, gst_percent: newItem.gst_percent || 0 }, rateTaxMode),
+          sales_rate: newItem.sales_rate != null ? newItem.sales_rate : null,
+          ac_rate: newItem.ac_rate != null ? newItem.ac_rate : null,
+          non_ac_rate: newItem.non_ac_rate != null ? newItem.non_ac_rate : null,
         };
         return next;
       });
     } catch (_) { /* noop */ }
-  }, [location.key, refreshItems]);
+  }, [location.key, refreshItems, serviceType]);
 
   // Recompute every line amount when the rate tax treatment changes so the
   // grid reflects the newly selected inclusive / taxable behaviour.
@@ -804,6 +990,19 @@ export default function ItemSalesEntryPage() {
       next[idx] = merged;
       return next;
     });
+  };
+
+  // Restaurant module: switching the bill's A/C / Non-A/C service type re-prices
+  // every item line to the matching fixed rate (falling back to sales rate / MRP).
+  const handleServiceTypeChange = (type) => {
+    setServiceType(type);
+    setLines((prev) => prev.map((l) => {
+      if (!l.item_id) return l;
+      const rate = rateForServiceType(l, type);
+      const merged = { ...l, rate: String(rate) };
+      merged.amount = computeAmount(merged, rateTaxMode);
+      return merged;
+    }));
   };
 
   const removeLine = (idx) => {
@@ -835,11 +1034,11 @@ export default function ItemSalesEntryPage() {
 
   const handleSelectItem = (idx, item) => {
     const stock = Number(item.current_stock ?? 0);
-    if (stockLock && stock <= 0) {
+    if (stockEnforced && stock <= 0) {
       toast.error(`"${item.name}" is out of stock`);
       return;
     }
-    const defaultRate = item.sales_rate != null ? item.sales_rate : (item.mrp || 0);
+    const defaultRate = rateForServiceType(item, serviceType);
     updateLine(idx, {
       item_id: item.id,
       item_name: item.name,
@@ -851,6 +1050,9 @@ export default function ItemSalesEntryPage() {
       current_stock: stock,
       original_quantity: 0,
       imeis: [],
+      sales_rate: item.sales_rate != null ? item.sales_rate : null,
+      ac_rate: item.ac_rate != null ? item.ac_rate : null,
+      non_ac_rate: item.non_ac_rate != null ? item.non_ac_rate : null,
     });
     if (imeiEnabled && (item.imei_enabled === 1 || item.imei_enabled === true)) {
       loadImeis(item.id, { force: true });
@@ -861,7 +1063,7 @@ export default function ItemSalesEntryPage() {
     const line = lines[idx];
     const max = maxQtyFor(line);
     const num = parseFloat(value);
-    if (stockLock && !isNaN(num) && num > max) {
+    if (stockEnforced && !isNaN(num) && num > max) {
       toast.error(`Only ${max} ${line.unit || ''} available in stock`);
       updateLine(idx, { quantity: String(max) });
       return;
@@ -875,19 +1077,30 @@ export default function ItemSalesEntryPage() {
     updateLine(idx, patch);
   };
 
+  // Whether Enter-key navigation should skip over a given field entirely.
+  const isFieldAutoFocusDisabled = (field) =>
+    (field === 'unit' && disableAutoFocusUnit) ||
+    (field === 'discount' && disableAutoFocusDiscount);
+
   const handleCellBack = (rowIdx, field) => {
     const currentIdx = FIELD_ORDER.indexOf(field);
-    if (currentIdx > 0) {
-      focusCell(rowIdx, FIELD_ORDER[currentIdx - 1]);
+    let prevIdx = currentIdx - 1;
+    while (prevIdx >= 0 && isFieldAutoFocusDisabled(FIELD_ORDER[prevIdx])) prevIdx--;
+    if (prevIdx >= 0) {
+      focusCell(rowIdx, FIELD_ORDER[prevIdx]);
     } else if (rowIdx > 0) {
-      focusCell(rowIdx - 1, FIELD_ORDER[FIELD_ORDER.length - 1]);
+      let lastIdx = FIELD_ORDER.length - 1;
+      while (lastIdx >= 0 && isFieldAutoFocusDisabled(FIELD_ORDER[lastIdx])) lastIdx--;
+      focusCell(rowIdx - 1, FIELD_ORDER[lastIdx]);
     }
   };
 
   const handleCellEnter = (rowIdx, field) => {
     const currentIdx = FIELD_ORDER.indexOf(field);
-    if (currentIdx < FIELD_ORDER.length - 1) {
-      focusCell(rowIdx, FIELD_ORDER[currentIdx + 1]);
+    let nextIdx = currentIdx + 1;
+    while (nextIdx < FIELD_ORDER.length && isFieldAutoFocusDisabled(FIELD_ORDER[nextIdx])) nextIdx++;
+    if (nextIdx < FIELD_ORDER.length) {
+      focusCell(rowIdx, FIELD_ORDER[nextIdx]);
     } else {
       // Last field (discount) — decide whether to add a new row or jump to
       // the walk-in customer fields.
@@ -946,6 +1159,32 @@ export default function ItemSalesEntryPage() {
 
   const netTotal = Math.max(0, totals.total - (parseFloat(billDiscount) || 0));
 
+  // Keep the Cash/UPI split summed to the invoice total: hold the UPI amount
+  // (clamped to the total) and put whatever remains into Cash. This defaults a
+  // fresh bill to "full amount in cash" and rebalances as the total changes.
+  useEffect(() => {
+    const upi = Math.min(Math.max(parseFloat(upiAmount) || 0, 0), netTotal);
+    const cash = Math.round((netTotal - upi) * 100) / 100;
+    setUpiAmount(upi ? String(upi) : '');
+    setCashAmount(String(cash));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [netTotal]);
+
+  // Editing one field auto-fills the other so the pair always equals netTotal.
+  const handleCashChange = (val) => {
+    setCashAmount(val);
+    const cash = Math.min(Math.max(parseFloat(val) || 0, 0), netTotal);
+    setUpiAmount(String(Math.round((netTotal - cash) * 100) / 100));
+  };
+  const handleUpiChange = (val) => {
+    setUpiAmount(val);
+    const upi = Math.min(Math.max(parseFloat(val) || 0, 0), netTotal);
+    setCashAmount(String(Math.round((netTotal - upi) * 100) / 100));
+  };
+
+  const paymentBalanced =
+    Math.abs(((parseFloat(cashAmount) || 0) + (parseFloat(upiAmount) || 0)) - netTotal) <= 0.01;
+
   // Derives stock + cost info for the currently focused item row.
   const focusedItemInfo = useMemo(() => {
     if (focusedRow == null) return null;
@@ -996,7 +1235,7 @@ export default function ItemSalesEntryPage() {
     // Stock check — aggregate quantities per item and ensure they don't
     // exceed each item's available stock (plus this sale's original quantity
     // if editing). Skipped when Stock Lock is disabled.
-    if (stockLock) {
+    if (stockEnforced) {
       const perItem = new Map();
       for (const l of validLines) {
         if (!l.item_id) continue;
@@ -1039,6 +1278,11 @@ export default function ItemSalesEntryPage() {
       setShowImeiErrors(false);
     }
 
+    if (!paymentBalanced) {
+      toast.error('Cash and UPI amounts must add up to the total');
+      return;
+    }
+
     try {
       setSaving(true);
       const payload = {
@@ -1051,6 +1295,13 @@ export default function ItemSalesEntryPage() {
         customer_place: isCashLedger ? customerPlace.trim() : '',
         customer_id: isCashLedger ? (customerId || null) : null,
         bill_discount: parseFloat(billDiscount) || 0,
+        cash_amount: parseFloat(cashAmount) || 0,
+        upi_amount: parseFloat(upiAmount) || 0,
+        waiter_id: restaurantEnabled && waiterId ? parseInt(waiterId) : null,
+        waiter_name: restaurantEnabled && waiterId
+          ? (waiters.find((w) => String(w.id) === String(waiterId))?.name || '')
+          : '',
+        service_type: restaurantEnabled ? serviceType : '',
         items: validLines.map((l) => ({
           item_id: l.item_id,
           item_name: l.item_name.trim(),
@@ -1075,7 +1326,7 @@ export default function ItemSalesEntryPage() {
         openSalePreview(res.data, ledger?.name, false);
       }
       if (!isEdit) {
-        localStorage.removeItem(SALE_DRAFT_KEY);
+        localStorage.removeItem(draftKeyFor(activeCounter));
         setLedger(null);
         setDate(todayISO());
         setTime(nowHHMM());
@@ -1085,6 +1336,10 @@ export default function ItemSalesEntryPage() {
         setCustomerPlace('');
         setCustomerId(null);
         setBillDiscount('0');
+        setCashAmount('');
+        setUpiAmount('');
+        setWaiterId('');
+        setServiceType('');
         setLines([emptyLine()]);
         saleApi.getNextNumber()
           .then((r) => setSaleNumber(r.data?.sale_number || ''))
@@ -1137,7 +1392,7 @@ export default function ItemSalesEntryPage() {
 
   // Clear the cached draft and reset the form to a fresh, empty entry.
   const handleResetDraft = () => {
-    localStorage.removeItem(SALE_DRAFT_KEY);
+    localStorage.removeItem(draftKeyFor(activeCounter));
     draftLedgerRestored.current = false;
     setLedger(null);
     setDate(todayISO());
@@ -1148,6 +1403,10 @@ export default function ItemSalesEntryPage() {
     setCustomerPlace('');
     setCustomerId(null);
     setBillDiscount('0');
+    setCashAmount('');
+    setUpiAmount('');
+    setWaiterId('');
+    setServiceType('');
     setLines([emptyLine()]);
     setShowImeiErrors(false);
     ledgerApi.getCash().then((r) => { if (r.data) setLedger(r.data); }).catch(() => {});
@@ -1159,8 +1418,8 @@ export default function ItemSalesEntryPage() {
   return (
     <div className="flex flex-col flex-1 min-h-0">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 flex-shrink-0">
-        <div className="flex items-center gap-2">
+      <div className="flex items-end justify-between gap-3 flex-shrink-0 flex-nowrap overflow-x-auto">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={() => navigate(-1)}
             className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
@@ -1169,7 +1428,7 @@ export default function ItemSalesEntryPage() {
             <ArrowLeftIcon className="h-5 w-5" />
           </button>
           <div>
-            <h1 className="page-title">{isEdit ? 'Edit Sale' : 'Item Sales Entry'}</h1>
+            <h1 className="page-title whitespace-nowrap">{isEdit ? 'Edit Sale' : 'Item Sales Entry'}</h1>
             <p className="text-sm text-slate-500">
               Sale {saleNumber || '—'}
             </p>
@@ -1178,7 +1437,7 @@ export default function ItemSalesEntryPage() {
             <button
               type="button"
               onClick={handleResetDraft}
-              className="ml-1 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+              className="ml-1 rounded-lg border border-amber-200 bg-amber-50 p-2 text-amber-600 shadow-sm hover:border-amber-300 hover:bg-amber-100 hover:text-amber-700 hover:shadow transition-all"
               title="Reset entry (clear cached draft)"
             >
               <ArrowPathIcon className="h-4 w-4" />
@@ -1198,16 +1457,37 @@ export default function ItemSalesEntryPage() {
           <button
             type="button"
             onClick={() => setSettingsOpen(true)}
-            className="ml-1 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+            className="ml-1 rounded-lg border border-slate-300 bg-white p-2 text-slate-500 shadow-sm hover:border-trust-blue/40 hover:bg-trust-blue/10 hover:text-trust-blue hover:shadow transition-all"
             title="Sales settings (Ctrl+I)"
           >
             <Cog6ToothIcon className="h-4 w-4" />
           </button>
+          {multiCounterEnabled && !isEdit && (
+            <div className="ml-2 flex items-center rounded-lg border border-slate-300 bg-white p-0.5 shadow-sm" title="Switch sale counter (F2)">
+              {[1, 2].map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => switchCounter(c)}
+                  className={`rounded-md px-3 py-1 text-sm font-semibold transition-colors ${
+                    activeCounter === c
+                      ? 'bg-trust-blue text-white shadow'
+                      : 'text-slate-500 hover:bg-slate-100'
+                  }`}
+                >
+                  Counter {c}
+                </button>
+              ))}
+              <kbd className="ml-1 mr-1 hidden rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 sm:inline-block" title="Press F2 to switch">
+                F2
+              </kbd>
+            </div>
+          )}
         </div>
 
         {/* Top-right: customer ledger + date + time */}
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="w-52">
+        <div className="flex flex-nowrap items-end gap-2 shrink-0">
+          <div className="w-44">
             <label className="text-xs text-slate-500">Customer Ledger *</label>
             <div className="flex items-center gap-1">
               <button
@@ -1228,7 +1508,7 @@ export default function ItemSalesEntryPage() {
               </div>
             </div>
           </div>
-          <div className="w-40">
+          <div className="w-36">
             <label className="text-xs text-slate-500">Date</label>
             <input
               type="date"
@@ -1237,7 +1517,7 @@ export default function ItemSalesEntryPage() {
               className="input-field"
             />
           </div>
-          <div className="w-36">
+          <div className="w-28">
             <label className="text-xs text-slate-500">Time</label>
             <input
               type="time"
@@ -1246,6 +1526,42 @@ export default function ItemSalesEntryPage() {
               className="input-field"
             />
           </div>
+          {restaurantEnabled && (
+            <div className="flex items-end gap-2">
+              <div className="w-32">
+                <label className="text-xs text-slate-500">Service Type</label>
+                <div className="flex h-9 rounded-lg border border-slate-300 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => handleServiceTypeChange(serviceType === 'ac' ? '' : 'ac')}
+                    className={`flex-1 text-xs font-semibold transition-colors ${serviceType === 'ac' ? 'bg-trust-blue text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    A/C
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleServiceTypeChange(serviceType === 'non_ac' ? '' : 'non_ac')}
+                    className={`flex-1 text-xs font-semibold border-l border-slate-300 transition-colors ${serviceType === 'non_ac' ? 'bg-trust-blue text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    Non-A/C
+                  </button>
+                </div>
+              </div>
+              <div className="w-32">
+                <label className="text-xs text-slate-500">Waiter</label>
+                <select
+                  value={waiterId}
+                  onChange={(e) => setWaiterId(e.target.value)}
+                  className="input-field"
+                >
+                  <option value="">— None —</option>
+                  {waiters.map((w) => (
+                    <option key={w.id} value={w.id}>{w.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1297,6 +1613,7 @@ export default function ItemSalesEntryPage() {
                       onKeyEnter={() => handleCellEnter(idx, 'itemName')}
                       onKeyBack={() => handleCellBack(idx, 'itemName')}
                       onAddNew={() => handleAddNewItem(idx)}
+                      hideStock={restaurantEnabled}
                     />
                   </td>
                   <td className="px-3 py-2">
@@ -1347,12 +1664,12 @@ export default function ItemSalesEntryPage() {
                       onKeyEnter={() => handleCellEnter(idx, 'qty')}
                       onKeyBack={() => handleCellBack(idx, 'qty')}
                       invalid={
-                        (Boolean(line.item_id) && parseFloat(line.quantity) > maxQtyFor(line)) ||
+                        (stockEnforced && Boolean(line.item_id) && parseFloat(line.quantity) > maxQtyFor(line)) ||
                         (showImeiErrors && itemImeiTracked(line) &&
                           (Array.isArray(line.imeis) ? line.imeis.filter(Boolean).length : 0) !==
                             Math.floor(parseFloat(line.quantity) || 0))
                       }
-                      stockTitle={line.item_id && line.current_stock != null ? `In stock: ${line.current_stock}` : undefined}
+                      stockTitle={!restaurantEnabled && line.item_id && line.current_stock != null ? `In stock: ${line.current_stock}` : undefined}
                     />
                   </td>
                   <td className="px-3 py-2">
@@ -1532,6 +1849,35 @@ export default function ItemSalesEntryPage() {
               <span className="font-semibold text-slate-700">Total Amount</span>
               <span className="font-bold text-lg text-debit-red">{formatCurrency(netTotal)}</span>
             </div>
+            <div className="space-y-1 border-t border-slate-200 pt-2 mt-1">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-500">Cash</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={cashAmount}
+                  onChange={(e) => handleCashChange(e.target.value)}
+                  className="w-28 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm font-medium text-slate-700 focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
+                />
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-500">UPI</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={upiAmount}
+                  onChange={(e) => handleUpiChange(e.target.value)}
+                  className="w-28 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm font-medium text-slate-700 focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
+                />
+              </div>
+              {!paymentBalanced && (
+                <div className="text-right text-xs font-medium text-debit-red">
+                  Cash + UPI must equal {formatCurrency(netTotal)}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1552,13 +1898,15 @@ export default function ItemSalesEntryPage() {
                 <span className="font-medium text-slate-600 truncate max-w-[160px]" title={focusedItemInfo.name}>
                   {focusedItemInfo.name}
                 </span>
-                <span className="flex items-center gap-1">
-                  <span className="text-slate-400">Stock:</span>
-                  <span className={`font-bold ${focusedItemInfo.stock <= 0 ? 'text-debit-red' : 'text-credit-green'}`}>
-                    {focusedItemInfo.stock}
+                {!restaurantEnabled && (
+                  <span className="flex items-center gap-1">
+                    <span className="text-slate-400">Stock:</span>
+                    <span className={`font-bold ${focusedItemInfo.stock <= 0 ? 'text-debit-red' : 'text-credit-green'}`}>
+                      {focusedItemInfo.stock}
+                    </span>
+                    {focusedItemInfo.unit && <span className="text-slate-400">{focusedItemInfo.unit}</span>}
                   </span>
-                  {focusedItemInfo.unit && <span className="text-slate-400">{focusedItemInfo.unit}</span>}
-                </span>
+                )}
                 {focusedItemInfo.cost && (
                   <span className="flex items-center gap-1">
                     <span className="text-slate-400">Cost Rate:</span>
@@ -1607,6 +1955,7 @@ export default function ItemSalesEntryPage() {
       {/* Item Sales Settings dialog */}
       <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} title="Item Sales Settings">
         <div className="space-y-4 py-1">
+          {!restaurantEnabled && (
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-sm font-medium text-slate-700">Stock Lock</p>
@@ -1631,6 +1980,7 @@ export default function ItemSalesEntryPage() {
               />
             </button>
           </div>
+          )}
 
           <div className="border-t border-slate-100 pt-4">
             <p className="text-sm font-medium text-slate-700">Rate Tax Treatment</p>
@@ -1657,6 +2007,58 @@ export default function ItemSalesEntryPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 border-t border-slate-100 pt-4">
+            <div>
+              <p className="text-sm font-medium text-slate-700">Disable Auto-focus Unit field</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                When enabled, Enter on the Item Name field skips the Unit
+                field and focuses Rate directly. The Unit field stays usable
+                by clicking or tabbing into it manually.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={disableAutoFocusUnit}
+              onClick={() => toggleDisableAutoFocusUnit(!disableAutoFocusUnit)}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-trust-blue focus:ring-offset-2 ${
+                disableAutoFocusUnit ? 'bg-trust-blue' : 'bg-slate-200'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  disableAutoFocusUnit ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 border-t border-slate-100 pt-4">
+            <div>
+              <p className="text-sm font-medium text-slate-700">Disable Auto-focus Discount field</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                When enabled, Enter on the Quantity field skips the Discount
+                field entirely. The Discount field stays usable by clicking
+                or tabbing into it manually.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={disableAutoFocusDiscount}
+              onClick={() => toggleDisableAutoFocusDiscount(!disableAutoFocusDiscount)}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-trust-blue focus:ring-offset-2 ${
+                disableAutoFocusDiscount ? 'bg-trust-blue' : 'bg-slate-200'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  disableAutoFocusDiscount ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
           </div>
         </div>
       </Modal>

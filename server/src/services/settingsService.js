@@ -25,6 +25,7 @@ class SettingsService {
     return {
       store_name: settingsRepository.get('store_name'),
       address: settingsRepository.get('address'),
+      place: settingsRepository.get('place'),
       gst_tax_id: settingsRepository.get('gst_tax_id'),
       phone: settingsRepository.get('phone'),
       email: settingsRepository.get('email'),

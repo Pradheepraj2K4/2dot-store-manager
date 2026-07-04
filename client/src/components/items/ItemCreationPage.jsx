@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-import { itemApi } from '../../api';
+import { itemApi, waiterApi } from '../../api';
 import { ITEM_UNITS, DEFAULT_ITEM_UNIT } from '../../utils/itemConstants';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import GstSelect from '../ui/GstSelect';
@@ -38,16 +38,25 @@ export default function ItemCreationPage() {
     brand: '',
     category: '',
     imei_enabled: false,
+    ac_rate: '',
+    non_ac_rate: '',
   });
   const [errors, setErrors] = useState({});
   const [brands, setBrands] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [restaurantEnabled, setRestaurantEnabled] = useState(false);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     itemApi.getBrands().then((r) => setBrands(r.data || [])).catch(() => {});
     itemApi.getCategories().then((r) => setCategories(r.data || [])).catch(() => {});
+    waiterApi.isEnabled()
+      .then((r) => {
+        const v = r.data?.value;
+        setRestaurantEnabled(v === true || v === 'true');
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -66,6 +75,8 @@ export default function ItemCreationPage() {
           brand: it.brand || '',
           category: it.category || '',
           imei_enabled: it.imei_enabled === 1 || it.imei_enabled === true,
+          ac_rate: it.ac_rate != null ? String(it.ac_rate) : '',
+          non_ac_rate: it.non_ac_rate != null ? String(it.non_ac_rate) : '',
         });
       })
       .catch((err) => toast.error(err.message))
@@ -115,6 +126,8 @@ export default function ItemCreationPage() {
         brand: form.brand.trim(),
         category: form.category.trim(),
         imei_enabled: form.imei_enabled ? 1 : 0,
+        ac_rate: form.ac_rate !== '' ? parseFloat(form.ac_rate) : null,
+        non_ac_rate: form.non_ac_rate !== '' ? parseFloat(form.non_ac_rate) : null,
       };
       const res = isEdit
         ? await itemApi.update(id, payload)
@@ -246,6 +259,43 @@ export default function ItemCreationPage() {
             <p className="text-xs text-slate-400 mt-1">Used as the default rate in Sales Entry. Leave blank to use MRP.</p>
           </div>
         </div>
+
+        {/* A/C & Non-A/C fixed rates (restaurant module) */}
+        {restaurantEnabled && (
+          <>
+            <div className="flex gap-4">
+              <label className="w-28 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">A/C Rate</label>
+              <div className="flex-1">
+                <input
+                  type="number"
+                  step="0.01"
+                  name="ac_rate"
+                  value={form.ac_rate}
+                  onChange={handleChange}
+                  placeholder="Fixed rate for A/C bills"
+                  className="input-field"
+                />
+                <p className="text-xs text-slate-400 mt-1">Applied when a bill is marked A/C. Falls back to Sales Rate / MRP if blank.</p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <label className="w-28 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">Non-A/C Rate</label>
+              <div className="flex-1">
+                <input
+                  type="number"
+                  step="0.01"
+                  name="non_ac_rate"
+                  value={form.non_ac_rate}
+                  onChange={handleChange}
+                  placeholder="Fixed rate for Non-A/C bills"
+                  className="input-field"
+                />
+                <p className="text-xs text-slate-400 mt-1">Applied when a bill is marked Non-A/C. Falls back to Sales Rate / MRP if blank.</p>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* GST % */}
         <div className="flex gap-4">

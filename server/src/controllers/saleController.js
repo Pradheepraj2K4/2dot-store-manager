@@ -43,6 +43,14 @@ class SaleController {
     } catch (err) { next(err); }
   }
 
+  getFoodSalesReport(req, res, next) {
+    try {
+      const { fromDate, toDate, category, itemId } = req.query;
+      const rows = saleService.getFoodSalesReport({ fromDate, toDate, category, itemId });
+      res.json({ success: true, data: rows });
+    } catch (err) { next(err); }
+  }
+
   create(req, res, next) {
     try {
       const sale = saleService.create(req.body);

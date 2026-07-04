@@ -2,12 +2,20 @@ const saleRepository = require('../repositories/saleRepository');
 const ledgerRepository = require('../repositories/ledgerRepository');
 const itemRepository = require('../repositories/itemRepository');
 const imeiRepository = require('../repositories/imeiRepository');
+const settingsRepository = require('../repositories/settingsRepository');
 const customerService = require('./customerService');
 const { AppError } = require('../middleware/errorHandler');
 const { getDb } = require('../db/database');
 
+/** Restaurant items are made-to-order and carry no inventory. */
+function isRestaurantModuleEnabled() {
+  const v = settingsRepository.get('restaurant_module_enabled');
+  return v === true || v === 'true';
+}
+
 /** Apply +qty per line (use negative sign to reverse). */
 function applyStockDelta(items, sign) {
+  if (isRestaurantModuleEnabled()) return;
   for (const line of items || []) {
     if (!line.item_id) continue;
     const qty = parseFloat(line.quantity) || 0;
@@ -115,6 +123,12 @@ class SaleService {
     const run = db.transaction(() => {
       const sale_number = saleRepository.getNextSaleNumber();
       const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
+      const net_total = Math.round((total_amount - bill_discount_val) * 100) / 100;
+      const cash_amount = Math.round((parseFloat(data.cash_amount) || 0) * 100) / 100;
+      const upi_amount = Math.round((parseFloat(data.upi_amount) || 0) * 100) / 100;
+      if (Math.abs(cash_amount + upi_amount - net_total) > 0.01) {
+        throw new AppError('Cash and UPI amounts must add up to the bill total', 400);
+      }
       // Implicitly retain the buyer: reuse an existing customer (matched by
       // mobile) or auto-create one when a valid mobile is supplied.
       const customer_id = customerService.resolveForSale({
@@ -138,6 +152,11 @@ class SaleService {
         customer_mobile: data.customer_mobile || '',
         customer_place: data.customer_place || '',
         customer_id,
+        cash_amount,
+        upi_amount,
+        waiter_id: data.waiter_id ? parseInt(data.waiter_id) : null,
+        waiter_name: data.waiter_name || '',
+        service_type: data.service_type || '',
         items: normalisedItems,
       });
 
@@ -186,6 +205,11 @@ class SaleService {
       // Reverse previous delta, apply new delta
       const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
       const net_total = Math.round((total_amount - bill_discount_val) * 100) / 100;
+      const cash_amount = Math.round((parseFloat(data.cash_amount) || 0) * 100) / 100;
+      const upi_amount = Math.round((parseFloat(data.upi_amount) || 0) * 100) / 100;
+      if (Math.abs(cash_amount + upi_amount - net_total) > 0.01) {
+        throw new AppError('Cash and UPI amounts must add up to the bill total', 400);
+      }
       const oldDelta = applyLedgerDelta(ledger.behaviour, existing.total_amount);
       const newDelta = applyLedgerDelta(ledger.behaviour, net_total);
       ledgerRepository.updateBalance(ledger.id, ledger.current_balance - oldDelta + newDelta);
@@ -217,6 +241,11 @@ class SaleService {
         customer_mobile: data.customer_mobile || '',
         customer_place: data.customer_place || '',
         customer_id,
+        cash_amount,
+        upi_amount,
+        waiter_id: data.waiter_id ? parseInt(data.waiter_id) : null,
+        waiter_name: data.waiter_name || '',
+        service_type: data.service_type || '',
         items: normalisedItems,
       });
       consumeImeis(normalisedItems, id);
@@ -291,6 +320,25 @@ class SaleService {
         unknown_cost_lines: r.unknown_cost_lines || 0,
       };
     });
+  }
+
+  /**
+   * Item-level food sales report. Aggregates sold quantity, average unit
+   * price, total sales value and total discount per item over a date range,
+   * optionally filtered by category and/or a specific item.
+   */
+  getFoodSalesReport({ fromDate, toDate, category, itemId } = {}) {
+    const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+    const rows = saleRepository.getFoodSalesReport({ fromDate, toDate, category, itemId });
+    return rows.map((r) => ({
+      item_id: r.item_id,
+      item_name: r.item_name,
+      category: r.category || '',
+      qty_sold: round2(r.qty_sold || 0),
+      unit_price: round2(r.unit_price || 0),
+      total_sales: round2(r.total_sales || 0),
+      discount: round2(r.discount || 0),
+    }));
   }
 }
 

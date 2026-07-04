@@ -11,11 +11,11 @@ class SaleRepository {
     return String(row.next);
   }
 
-  create({ sale_number, ledger_id, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, items }) {
+  create({ sale_number, ledger_id, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, cash_amount, upi_amount, waiter_id, waiter_name, service_type, items }) {
     const db = getDb();
     const info = db.prepare(`
-      INSERT INTO sales (sale_number, ledger_id, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO sales (sale_number, ledger_id, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, cash_amount, upi_amount, waiter_id, waiter_name, service_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       sale_number,
       ledger_id,
@@ -30,7 +30,12 @@ class SaleRepository {
       customer_name || '',
       customer_mobile || '',
       customer_place || '',
-      customer_id || null
+      customer_id || null,
+      cash_amount || 0,
+      upi_amount || 0,
+      waiter_id || null,
+      waiter_name || '',
+      service_type || ''
     );
     const saleId = info.lastInsertRowid;
     if (Array.isArray(items)) {
@@ -178,16 +183,115 @@ class SaleRepository {
     `).all(...params);
   }
 
+  getFoodSalesReport({ fromDate, toDate, category, itemId } = {}) {
+    const db = getDb();
+    const conds = [];
+    const params = [];
+    if (fromDate) { conds.push('s.date >= ?'); params.push(fromDate); }
+    if (toDate)   { conds.push('s.date <= ?'); params.push(toDate); }
+    if (category) { conds.push('LOWER(i.category) = ?'); params.push(String(category).toLowerCase()); }
+    if (itemId)   { conds.push('si.item_id = ?'); params.push(parseInt(itemId)); }
+    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
+    return db.prepare(`
+      SELECT
+        si.item_id                              AS item_id,
+        si.item_name                            AS item_name,
+        COALESCE(i.category, '')                AS category,
+        SUM(si.quantity)                        AS qty_sold,
+        CASE WHEN SUM(si.quantity) > 0
+             THEN SUM(si.rate * si.quantity) / SUM(si.quantity)
+             ELSE 0 END                         AS unit_price,
+        COALESCE(SUM(si.amount), 0)             AS total_sales,
+        COALESCE(SUM(
+          (si.rate * si.quantity) * (COALESCE(si.discount_percent, 0) / 100.0)
+        ), 0)                                   AS discount
+      FROM sale_items si
+      JOIN sales s ON s.id = si.sale_id
+      LEFT JOIN items i ON i.id = si.item_id
+      ${where}
+      GROUP BY si.item_name, si.item_id
+      ORDER BY total_sales DESC, si.item_name ASC
+    `).all(...params);
+  }
+
+  /**
+   * Aggregate sales figures for the dashboard. `today` and `monthStart` are
+   * local `YYYY-MM-DD` strings supplied by the caller so the totals line up
+   * with the user's timezone.
+   */
+  getSalesStats({ today, monthStart } = {}) {
+    const db = getDb();
+    const todayRow = db.prepare(`
+      SELECT COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS count
+      FROM sales WHERE date = ?
+    `).get(today);
+    const monthRow = db.prepare(`
+      SELECT COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS count
+      FROM sales WHERE date >= ? AND date <= ?
+    `).get(monthStart, today);
+    const recent = db.prepare(`
+      SELECT s.id, s.sale_number, s.date, s.time, s.total_amount, s.item_count,
+             s.service_type, s.waiter_name,
+             COALESCE(NULLIF(TRIM(s.customer_name), ''), l.name) AS party_name
+      FROM sales s
+      JOIN ledgers l ON l.id = s.ledger_id
+      ORDER BY s.date DESC, s.id DESC
+      LIMIT 6
+    `).all();
+    return {
+      todayTotal: todayRow.total,
+      todayCount: todayRow.count,
+      monthTotal: monthRow.total,
+      monthCount: monthRow.count,
+      recent,
+    };
+  }
+
+  /**
+   * Restaurant-flavoured stats: today's split between A/C and Non-A/C service
+   * and the month's best-performing waiters.
+   */
+  getRestaurantStats({ today, monthStart } = {}) {
+    const db = getDb();
+    const byService = db.prepare(`
+      SELECT service_type,
+             COALESCE(SUM(total_amount), 0) AS total,
+             COUNT(*) AS count
+      FROM sales WHERE date = ?
+      GROUP BY service_type
+    `).all(today);
+    let acTotal = 0, acCount = 0, nonAcTotal = 0, nonAcCount = 0;
+    for (const row of byService) {
+      if (row.service_type === 'ac') {
+        acTotal += row.total; acCount += row.count;
+      } else {
+        nonAcTotal += row.total; nonAcCount += row.count;
+      }
+    }
+    const topWaiters = db.prepare(`
+      SELECT waiter_name,
+             COALESCE(SUM(total_amount), 0) AS total,
+             COUNT(*) AS count
+      FROM sales
+      WHERE date >= ? AND date <= ?
+        AND waiter_name IS NOT NULL AND TRIM(waiter_name) <> ''
+      GROUP BY waiter_name
+      ORDER BY total DESC
+      LIMIT 5
+    `).all(monthStart, today);
+    return { acTotal, acCount, nonAcTotal, nonAcCount, topWaiters };
+  }
+
   delete(id) {
     const db = getDb();
     return db.prepare('DELETE FROM sales WHERE id = ?').run(id);
   }
 
-  update(id, { date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, items }) {
+  update(id, { date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, cash_amount, upi_amount, waiter_id, waiter_name, service_type, items }) {
     const db = getDb();
     db.prepare(`
       UPDATE sales
-      SET date = ?, time = ?, total_amount = ?, total_discount = ?, bill_discount = ?, total_gst = ?, item_count = ?, notes = ?, customer_name = ?, customer_mobile = ?, customer_place = ?, customer_id = ?
+      SET date = ?, time = ?, total_amount = ?, total_discount = ?, bill_discount = ?, total_gst = ?, item_count = ?, notes = ?, customer_name = ?, customer_mobile = ?, customer_place = ?, customer_id = ?, cash_amount = ?, upi_amount = ?, waiter_id = ?, waiter_name = ?, service_type = ?
       WHERE id = ?
     `).run(
       date,
@@ -202,6 +306,11 @@ class SaleRepository {
       customer_mobile || '',
       customer_place || '',
       customer_id || null,
+      cash_amount || 0,
+      upi_amount || 0,
+      waiter_id || null,
+      waiter_name || '',
+      service_type || '',
       id
     );
     if (Array.isArray(items)) {

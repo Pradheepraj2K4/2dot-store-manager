@@ -56,7 +56,8 @@ export function buildTransactionReceiptHtml({ txn, ledgerName, store = {}, logoD
       width: ${ps.width};
     }
     @media screen {
-      html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
+      html { background: #eef0f2; }
+      body { margin: 0 auto; box-shadow: 0 0 6px rgba(0,0,0,0.15); }
     }
     .page { width: 100%; padding: ${isThermal ? '2mm 4mm' : '4mm 14mm'}; }
 
@@ -164,6 +165,7 @@ export function buildTransactionReceiptHtml({ txn, ledgerName, store = {}, logoD
     <div class="store-name">${store.store_name || 'Store'}</div>
     <div class="store-meta">
       ${store.address ? `${store.address}<br>` : ''}
+      ${store.place ? `${store.place}<br>` : ''}
       ${[store.phone ? `Ph: ${store.phone}` : '', store.email || ''].filter(Boolean).join('  ·  ')}
       ${store.gst_tax_id ? `<br>GSTIN: ${store.gst_tax_id}` : ''}
     </div>
@@ -215,6 +217,25 @@ export function buildTransactionReceiptHtml({ txn, ledgerName, store = {}, logoD
   </div>
 
 </div>
+<script>
+(function () {
+  var b = document.body, fe = window.frameElement;
+  function fit() {
+    if (!fe) return;
+    b.style.transformOrigin = 'top left';
+    b.style.transform = 'none';
+    var avail = fe.clientWidth || fe.offsetWidth || b.scrollWidth;
+    var bw = b.scrollWidth || 1;
+    var s = bw > avail ? avail / bw : 1;
+    if (s < 1) b.style.transform = 'scale(' + s + ')';
+    fe.style.height = Math.min(Math.ceil(b.scrollHeight * s) + 6, 620) + 'px';
+  }
+  addEventListener('load', function () { fit(); setTimeout(fit, 0); setTimeout(fit, 60); });
+  addEventListener('resize', fit);
+  addEventListener('beforeprint', function () { b.style.transform = 'none'; });
+  addEventListener('afterprint', fit);
+})();
+</script>
 </body>
 </html>`;
 

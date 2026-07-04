@@ -32,7 +32,7 @@ import {
   ArrowsPointingInIcon,
 } from "@heroicons/react/24/outline";
 import { logout, hasPermission, getCurrentUser } from "../../utils/auth";
-import { interestApi, expenseApi, serviceApi } from "../../api";
+import { interestApi, expenseApi, serviceApi, waiterApi, settingsApi } from "../../api";
 import toast from "react-hot-toast";
 
 const baseNavigation = [
@@ -106,6 +106,10 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
   const [interestEnabled, setInterestEnabled] = useState(false);
   const [expenseEnabled, setExpenseEnabled] = useState(false);
   const [serviceEnabled, setServiceEnabled] = useState(false);
+  const [restaurantEnabled, setRestaurantEnabled] = useState(false);
+  // Default-enabled modules: treat a missing setting as on.
+  const [purchaseEnabled, setPurchaseEnabled] = useState(true);
+  const [accountTxnEnabled, setAccountTxnEnabled] = useState(true);
   const [expandedGroup, setExpandedGroup] = useState("Master");
   const [isFullscreen, setIsFullscreen] = useState(
     typeof document !== "undefined" && Boolean(document.fullscreenElement),
@@ -147,6 +151,27 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
       .then((res) => {
         const val = res.data?.value;
         setServiceEnabled(val === true || val === "true");
+      })
+      .catch(() => {});
+    waiterApi
+      .isEnabled()
+      .then((res) => {
+        const val = res.data?.value;
+        setRestaurantEnabled(val === true || val === "true");
+      })
+      .catch(() => {});
+    settingsApi
+      .get("purchase_module_enabled")
+      .then((res) => {
+        const val = res.data?.value;
+        setPurchaseEnabled(val !== false && val !== "false");
+      })
+      .catch(() => {});
+    settingsApi
+      .get("account_transaction_enabled")
+      .then((res) => {
+        const val = res.data?.value;
+        setAccountTxnEnabled(val !== false && val !== "false");
       })
       .catch(() => {});
   }, []);
@@ -228,6 +253,54 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
         ...nav.slice(insertAt),
       ];
     }
+    if (restaurantEnabled) {
+      // Add a Waiters entry under the Master group.
+      nav = nav.map((item) => {
+        if (item.name === "Master") {
+          return {
+            ...item,
+            children: [
+              ...item.children,
+              { name: "Waiters", href: "/waiters", icon: UserGroupIcon },
+            ],
+          };
+        }
+        if (item.name === "Accounts Reports") {
+          return {
+            ...item,
+            children: [
+              ...item.children,
+              { name: "Food Sales Report", href: "/food-sales-report", icon: DocumentChartBarIcon },
+            ],
+          };
+        }
+        return item;
+      });
+    }
+    // Purchase module disabled: hide all purchase-related menus. Stock Report
+    // also depends on purchase data, so hide it too.
+    if (!purchaseEnabled) {
+      const purchaseHrefs = [
+        "/item-purchases/new",
+        "/purchase-returns",
+        "/purchase-report",
+        "/stock-report",
+      ];
+      nav = nav.map((item) =>
+        item.children
+          ? {
+              ...item,
+              children: item.children.filter(
+                (c) => !purchaseHrefs.includes(c.href),
+              ),
+            }
+          : item,
+      );
+    }
+    // Account transaction module disabled: hide the whole group.
+    if (!accountTxnEnabled) {
+      nav = nav.filter((item) => item.name !== "Account Transaction");
+    }
     // Hide Settings for users without the manage-settings permission
     if (!hasPermission("manage_settings")) {
       nav = nav.filter((item) => item.name !== "Settings");
@@ -302,7 +375,7 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
           </button>
           <button
             onClick={onToggleCollapse}
-            title="Collapse sidebar"
+            title="Collapse sidebar (Ctrl+B)"
             className="hidden md:flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-slate-700 hover:text-white transition-colors"
           >
             <ChevronLeftIcon className="h-4 w-4" />
@@ -460,7 +533,7 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
         <button
           type="button"
           onClick={onToggleCollapse}
-          title="Expand sidebar"
+          title="Expand sidebar (Ctrl+B)"
           className="hidden md:flex fixed bottom-3 left-3 z-40 h-8 w-8 items-center justify-center rounded-full bg-sidebar text-slate-300 shadow-md transition-colors hover:text-white"
         >
           <ChevronRightIcon className="h-4 w-4" />

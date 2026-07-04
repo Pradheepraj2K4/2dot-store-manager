@@ -9,6 +9,7 @@
 const DEFAULT_SETTINGS = [
   ['store_name', '2Dot Inventory'],
   ['address',    ''],
+  ['place',      ''],
   ['gst_tax_id', ''],
   ['logo_path',  ''],
   ['phone',      ''],
@@ -16,6 +17,10 @@ const DEFAULT_SETTINGS = [
   ['interest_module_enabled', 'false'],
   ['expense_module_enabled', 'false'],
   ['service_module_enabled', 'false'],
+  ['restaurant_module_enabled', 'false'],
+  ['multi_counter_enabled', 'false'],
+  ['purchase_module_enabled', 'true'],
+  ['account_transaction_enabled', 'true'],
   ['gst_fields_enabled', 'false'],
   ['print_receipts_payment_enabled', 'false'],
   ['print_receipts_interest_enabled', 'false'],

@@ -16,6 +16,25 @@ function fmt(date) {
   return `${parseInt(d)} ${months[parseInt(m) - 1]} ${y}`;
 }
 
+// Reference-style date: dd/mm/yyyy
+function fmtDMY(date) {
+  if (!date) return '—';
+  const [y, m, d] = date.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+// Convert 24-hour "HH:MM" to 12-hour "hh:mm AM/PM".
+function fmt12(time) {
+  if (!time) return '';
+  const [hStr, mStr] = String(time).split(':');
+  let h = parseInt(hStr, 10);
+  const m = (mStr || '00').padStart(2, '0');
+  if (isNaN(h)) return escapeHtml(time);
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  h = h % 12 || 12;
+  return `${String(h).padStart(2, '0')}:${m} ${ampm}`;
+}
+
 function money(n) {
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -111,26 +130,28 @@ export function buildSaleReceiptHtml({
   const isThermal = format === 'thermal';
   const labels = DOC_LABELS[docType] || DOC_LABELS.sale;
 
-  if (isThermal) return buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels });
+  if (isThermal) return buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docType });
   return buildPaper({ sale, store, logoDataUrl, ps, format, labels });
 }
 
 // ───────────────────────────────────────────────────────────────────────────
 // Thermal (80mm) — POS-style monospaced receipt
 // ───────────────────────────────────────────────────────────────────────────
-function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels }) {
+function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docType }) {
   const items = Array.isArray(sale.items) ? sale.items : [];
   const totalQty          = items.reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0);
   const totalItemDiscount = parseFloat(sale.total_discount) || 0;
   const totalBillDiscount = parseFloat(sale.bill_discount) || 0;
   const totalAmount       = parseFloat(sale.total_amount) || 0;
+  const cashAmt           = parseFloat(sale.cash_amount) || 0;
+  const upiAmt            = parseFloat(sale.upi_amount) || 0;
 
-  const subtotal = items.reduce((s, l) => {
-    const rate = parseFloat(l.rate) || 0;
-    const qty  = parseFloat(l.quantity) || 0;
-    const disc = parseFloat(l.discount_percent) || 0;
-    return s + rate * qty * (1 - disc / 100);
+  // Gross before any discount = Σ(rate × qty). Reconciles as:
+  //   grossBeforeDisc − (itemDiscount + billDiscount) = totalAmount
+  const grossBeforeDisc = items.reduce((s, l) => {
+    return s + (parseFloat(l.rate) || 0) * (parseFloat(l.quantity) || 0);
   }, 0);
+  const totalDiscount = totalItemDiscount + totalBillDiscount;
 
   const gstSlabs = {};
   items.forEach(l => {
@@ -144,47 +165,27 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels }) {
     .map(([rate, amt]) => {
       const halfAmt = Math.round(amt / 2 * 100) / 100;
       const halfPct = parseFloat(rate) / 2;
-      return `<div class="row"><span>CGST ${halfPct}%</span><span>${money(halfAmt)}</span></div>` +
-             `<div class="row"><span>SGST ${halfPct}%</span><span>${money(halfAmt)}</span></div>`;
+      return `<div class="trow"><span class="tl">CGST @ ${num(halfPct, 2)}%</span><span class="tr">${num(halfAmt, 2)}</span></div>` +
+             `<div class="trow"><span class="tl">SGST @ ${num(halfPct, 2)}%</span><span class="tr">${num(halfAmt, 2)}</span></div>`;
     }).join('');
 
-  const logoHtml = logoDataUrl
-    ? `<div class="logo-wrap"><img src="${logoDataUrl}" alt="Logo"/></div>`
-    : '';
+  // Payment mode derived from tender split.
+  const payMode = (cashAmt > 0 && upiAmt > 0)
+    ? 'CASH+UPI'
+    : (upiAmt > 0 ? 'UPI' : 'Cash');
 
-  // Compact monospaced item rows. Each item:
-  //   1. Item Name                                  2,499.00
-  //      2 Nos x 1,250.00  disc 5%  gst 12%
-  const itemsHtml = `
-    <div class="items">
-      <div class="items-head">
-        <span class="ih-item">Item</span>
-        <span class="ih-amt">Amount</span>
-      </div>
-      <div class="rule-solid"></div>
-      ${items.map((l, i) => {
-        const rate = parseFloat(l.rate) || 0;
-        const qty  = parseFloat(l.quantity) || 0;
-        const disc = parseFloat(l.discount_percent) || 0;
-        const gst  = parseFloat(l.gst_percent) || 0;
-        const meta = [
-          `${num(qty, qty % 1 === 0 ? 0 : 2)} ${escapeHtml(l.unit || '')} x ${money(rate)}`,
-          disc ? `disc ${num(disc, disc % 1 === 0 ? 0 : 2)}%` : '',
-          gst  ? `gst ${num(gst, gst % 1 === 0 ? 0 : 2)}%`   : '',
-        ].filter(Boolean).join('  ');
-        return `
-          <div class="row item-row">
-            <span class="i-name">${i + 1}. ${escapeHtml(l.item_name || '')}</span>
-            <span class="i-amt">${money(l.amount)}</span>
-          </div>
-          <div class="row item-meta">
-            <span>${meta}</span>
-          </div>
-        `;
-      }).join('')}
-      <div class="rule-solid"></div>
-    </div>
-  `;
+  const thermalTitle = docType === 'sale' ? 'Retail Invoice' : labels.title;
+
+  // 3-column item table: Item | Qty | Amt
+  const itemsRows = items.map((l) => {
+    const qty = parseFloat(l.quantity) || 0;
+    return `
+      <div class="trow item">
+        <span class="c-item">${escapeHtml(l.item_name || '')}</span>
+        <span class="c-qty">${num(qty, qty % 1 === 0 ? 0 : 2)}</span>
+        <span class="c-amt">${num(l.amount, 2)}</span>
+      </div>`;
+  }).join('');
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -196,16 +197,16 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels }) {
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body, body * { color: #000 !important; background: transparent !important; border-color: #000 !important; }
     body {
-      font-family: 'Courier New', 'Consolas', monospace;
+      font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
       font-size: 9pt;
-      line-height: 1.35;
+      line-height: 1.4;
       width: ${ps.width};
       filter: grayscale(100%);
       -webkit-filter: grayscale(100%);
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
-    @media screen { html, body { width: 100%; max-width: 100%; overflow-x: hidden; } }
+    @media screen { html { background: #eef0f2; } body { margin: 0 auto; box-shadow: 0 0 6px rgba(0,0,0,0.15); } }
     .page { width: 100%; padding: 1mm 2mm; }
 
     .logo-wrap { text-align: center; margin-bottom: 1.5mm; }
@@ -213,63 +214,61 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels }) {
 
     /* ── Centered store header ── */
     .header { text-align: center; }
-    .store-name { font-size: 13pt; font-weight: 900; letter-spacing: 0.5px; }
-    .store-meta { font-size: 8pt; margin-top: 0.8mm; line-height: 1.35; }
+    .store-name { font-size: 14pt; font-weight: 800; letter-spacing: 0.3px; }
+    .store-meta { font-size: 8pt; margin-top: 0.6mm; line-height: 1.4; }
 
-    /* ── Title banner ── */
-    .title-band {
+    /* ── Title ── */
+    .title {
       text-align: center;
       font-weight: 800;
-      letter-spacing: 2.5px;
-      font-size: 9.5pt;
-      text-transform: uppercase;
-      padding: 1mm 0;
+      font-size: 11pt;
       margin: 1.5mm 0 1mm;
-      border-top: 1px solid #000;
-      border-bottom: 1px solid #000;
     }
 
     /* ── Rules ── */
     .rule-dash  { border-top: 1px dashed #000; margin: 1mm 0; }
     .rule-solid { border-top: 1px solid #000;  margin: 0.8mm 0; }
-    .rule-dbl   { border-top: 3px double #000; margin: 1mm 0; }
 
-    /* ── Generic key/value rows (used for meta + totals) ── */
-    .row {
+    /* ── Meta block: left-aligned "Label : value" ── */
+    .meta { font-size: 9pt; }
+    .meta .line { padding: 0.15mm 0; }
+    .meta .party { font-weight: 800; font-size: 9.5pt; padding: 0.4mm 0; }
+
+    /* ── Table rows (items + totals share a 3-col grid) ── */
+    .trow {
+      display: flex;
+      align-items: baseline;
+      font-size: 9pt;
+      padding: 0.3mm 0;
+    }
+    .c-item, .tl { flex: 1; word-break: break-word; padding-right: 1.5mm; }
+    .c-qty { width: 9mm; text-align: center; white-space: nowrap; }
+    .c-amt, .tr { width: 20mm; text-align: right; white-space: nowrap; }
+
+    .items-head { font-weight: 800; }
+    .trow.item { }
+
+    /* Totals section */
+    .trow.sub { font-weight: 700; }
+    .trow.disc .tl,
+    .trow.disc .tr { font-weight: 600; }
+    .gst .tl, .gst .tr { font-size: 8pt; }
+
+    .grand {
       display: flex;
       justify-content: space-between;
-      gap: 2mm;
-      font-size: 9pt;
+      align-items: baseline;
+      font-weight: 900;
+      font-size: 12.5pt;
+      padding: 1.2mm 0;
+      margin: 0.8mm 0;
+      border-top: 1px solid #000;
+      border-bottom: 1px solid #000;
     }
-    .row .lbl { color: #000; }
-    .row .val { font-weight: 700; text-align: right; }
+    .grand .g-amt { white-space: nowrap; }
 
-    /* Meta block: tighter, two narrow rows */
-    .meta { margin: 0.5mm 0; }
-    .meta .row { padding: 0.2mm 0; font-size: 8.5pt; }
-
-    /* Items */
-    .items { margin: 0.5mm 0; }
-    .items-head { display: flex; justify-content: space-between; font-weight: 800; font-size: 8.5pt; padding: 0.5mm 0; }
-    .ih-item { flex: 1; }
-    .ih-amt  { white-space: nowrap; }
-
-    .item-row { font-weight: 700; padding-top: 0.6mm; }
-    .i-name { flex: 1; word-break: break-word; padding-right: 2mm; }
-    .i-amt  { white-space: nowrap; }
-    .item-meta { font-size: 8pt; padding-bottom: 0.6mm; }
-    .item-meta span { color: #000; }
-
-    /* Totals */
-    .totals { margin-top: 0.5mm; }
-    .totals .row { padding: 0.4mm 0; }
-    .totals .grand {
-      margin-top: 1mm; padding: 1.4mm 0;
-      border-top: 3px double #000; border-bottom: 3px double #000;
-      font-weight: 900; font-size: 14pt;
-      letter-spacing: 0.4px;
-    }
-    .totals .grand .lbl { text-transform: uppercase; }
+    .pay { font-size: 9pt; }
+    .pay .trow { padding: 0.2mm 0; }
 
     .words {
       margin-top: 1.2mm;
@@ -287,15 +286,12 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels }) {
     .notes .lbl { font-weight: 700; }
 
     .footer {
-      text-align: center;
       margin-top: 2mm;
-      padding-top: 1.5mm;
-      border-top: 1px dashed #000;
-      font-size: 8.5pt;
+      font-size: 8pt;
       line-height: 1.4;
     }
-    .thanks { font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; }
-    .system-tag { margin-top: 1mm; font-size: 7pt; letter-spacing: 1px; }
+    .eoe { text-align: right; font-style: italic; }
+    .thanks { text-align: center; margin-top: 1mm; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
   </style>
 </head>
 <body>
@@ -303,36 +299,64 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels }) {
 
   <!-- Header -->
   <div class="header">
-    ${logoHtml}
     <div class="store-name">${escapeHtml(store.store_name || 'Store')}</div>
     <div class="store-meta">
       ${store.address ? `${escapeHtml(store.address).replace(/\n/g, '<br>')}<br>` : ''}
-      ${store.phone ? `Ph: ${escapeHtml(store.phone)}` : ''}${store.phone && store.email ? '  ·  ' : ''}${store.email ? escapeHtml(store.email) : ''}
-      ${store.gst_tax_id ? `<br>GSTIN: ${escapeHtml(store.gst_tax_id)}` : ''}
+      ${store.place ? `${escapeHtml(store.place)}<br>` : ''}
+      ${store.phone ? `PHONE : ${escapeHtml(store.phone)}` : ''}${store.phone && store.email ? '<br>' : ''}${store.email ? escapeHtml(store.email) : ''}
+      ${store.gst_tax_id ? `<br>GSTIN : ${escapeHtml(store.gst_tax_id)}` : ''}
     </div>
   </div>
 
-  <div class="title-band">${escapeHtml(labels.title)}</div>
+  <div class="title">${escapeHtml(thermalTitle)}</div>
+
+  <div class="rule-dash"></div>
 
   <!-- Meta -->
   <div class="meta">
-    <div class="row"><span class="lbl">${escapeHtml(labels.numberLabelThermal)}</span><span class="val">${escapeHtml(sale.sale_number || '—')}</span></div>
-    <div class="row"><span class="lbl">Date</span><span class="val">${fmt(sale.date)}${sale.time ? '  ' + escapeHtml(sale.time) : ''}</span></div>
-    ${sale.customer_name && sale.customer_name.trim() ? `<div class="row"><span class="lbl">Customer</span><span class="val">${escapeHtml(sale.customer_name.trim())}</span></div>` : ''}
+    <div class="line">Date : ${fmtDMY(sale.date)}${sale.time ? ', ' + fmt12(sale.time) : ''}</div>
+    ${sale.customer_name && sale.customer_name.trim() ? `<div class="party">${escapeHtml(sale.customer_name.trim())}</div>` : ''}
+    <div class="line">${escapeHtml(labels.numberLabelThermal)} : ${escapeHtml(sale.sale_number || '—')}</div>
+    <div class="line">Payment Mode : ${payMode}</div>
+    ${sale.service_type ? `<div class="line">Dining : ${sale.service_type === 'ac' ? 'A/C' : 'Non-A/C'}</div>` : ''}
+    ${sale.waiter_name && sale.waiter_name.trim() ? `<div class="line">Waiter : ${escapeHtml(sale.waiter_name.trim())}</div>` : ''}
   </div>
 
   <div class="rule-dash"></div>
 
-  ${itemsHtml}
+  <!-- Items -->
+  <div class="items-head trow">
+    <span class="c-item">Item</span>
+    <span class="c-qty">Qty</span>
+    <span class="c-amt">Amt</span>
+  </div>
+  <div class="rule-solid"></div>
+  ${itemsRows}
+  <div class="rule-solid"></div>
+
+  <!-- Sub total -->
+  <div class="trow sub">
+    <span class="c-item">Sub Total</span>
+    <span class="c-qty">${num(totalQty, totalQty % 1 === 0 ? 0 : 2)}</span>
+    <span class="c-amt">${num(grossBeforeDisc, 2)}</span>
+  </div>
 
   <!-- Totals -->
   <div class="totals">
-    <div class="row"><span class="lbl">Qty / Items</span><span class="val">${num(totalQty, totalQty % 1 === 0 ? 0 : 2)} / ${items.length}</span></div>
-    <div class="row"><span class="lbl">Subtotal</span><span class="val">${money(subtotal)}</span></div>
-    ${totalItemDiscount > 0 ? `<div class="row"><span class="lbl">Item Discount</span><span class="val">- ${money(totalItemDiscount)}</span></div>` : ''}
-    ${gstSlabRows}
-    ${totalBillDiscount > 0 ? `<div class="row"><span class="lbl">Bill Discount</span><span class="val">- ${money(totalBillDiscount)}</span></div>` : ''}
-    <div class="row grand"><span class="lbl">Total</span><span class="val">${money(totalAmount)}</span></div>
+    ${totalDiscount > 0 ? `<div class="trow disc"><span class="tl">(-) Discount</span><span class="tr">${num(totalDiscount, 2)}</span></div>` : ''}
+    <div class="gst">${gstSlabRows}</div>
+  </div>
+
+  <div class="grand">
+    <span>TOTAL</span>
+    <span class="g-amt">Rs ${num(totalAmount, 2)}</span>
+  </div>
+
+  <!-- Payment -->
+  <div class="pay">
+    ${cashAmt > 0 ? `<div class="trow"><span class="tl">Cash :</span><span class="tr">Rs ${num(cashAmt, 2)}</span></div>` : ''}
+    ${upiAmt > 0 ? `<div class="trow"><span class="tl">UPI :</span><span class="tr">Rs ${num(upiAmt, 2)}</span></div>` : ''}
+    ${cashAmt > 0 ? `<div class="trow"><span class="tl">Cash tendered :</span><span class="tr">Rs ${num(cashAmt, 2)}</span></div>` : ''}
   </div>
 
   <div class="words">${escapeHtml(amountInWords(totalAmount))}</div>
@@ -340,11 +364,30 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels }) {
   ${sale.notes ? `<div class="notes"><span class="lbl">Notes:</span> ${escapeHtml(sale.notes)}</div>` : ''}
 
   <div class="footer">
+    <div class="eoe">E &amp; O E</div>
     <div class="thanks">${escapeHtml(labels.thanksThermal)}</div>
-    <div class="system-tag">* * *</div>
   </div>
 
 </div>
+<script>
+(function () {
+  var b = document.body, fe = window.frameElement;
+  function fit() {
+    if (!fe) return;
+    b.style.transformOrigin = 'top left';
+    b.style.transform = 'none';
+    var avail = fe.clientWidth || fe.offsetWidth || b.scrollWidth;
+    var bw = b.scrollWidth || 1;
+    var s = bw > avail ? avail / bw : 1;
+    if (s < 1) b.style.transform = 'scale(' + s + ')';
+    fe.style.height = Math.min(Math.ceil(b.scrollHeight * s) + 6, 620) + 'px';
+  }
+  addEventListener('load', function () { fit(); setTimeout(fit, 0); setTimeout(fit, 60); });
+  addEventListener('resize', fit);
+  addEventListener('beforeprint', function () { b.style.transform = 'none'; });
+  addEventListener('afterprint', fit);
+})();
+</script>
 </body>
 </html>`;
 }
@@ -359,6 +402,8 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels }) {
   const totalItemDiscount = parseFloat(sale.total_discount) || 0;
   const totalBillDiscount = parseFloat(sale.bill_discount) || 0;
   const totalAmount       = parseFloat(sale.total_amount) || 0;
+  const cashAmt           = parseFloat(sale.cash_amount) || 0;
+  const upiAmt            = parseFloat(sale.upi_amount) || 0;
 
   // Subtotal before tax = sum of (rate * qty * (1 - disc/100)) per line
   const subtotal = items.reduce((s, l) => {
@@ -439,7 +484,7 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels }) {
       line-height: 1.4;
       width: ${ps.width};
     }
-    @media screen { html, body { width: 100%; max-width: 100%; overflow-x: hidden; } }
+    @media screen { html { background: #eef0f2; } body { margin: 0 auto; box-shadow: 0 0 6px rgba(0,0,0,0.15); } }
     .page { width: 100%; padding: ${padPage}; }
 
     /* ── Outer document frame ── */
@@ -610,6 +655,7 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels }) {
             <div class="store-name">${escapeHtml(store.store_name || 'Store')}</div>
             <div class="store-meta">
               ${store.address ? `${escapeHtml(store.address).replace(/\n/g, '<br>')}<br>` : ''}
+              ${store.place ? `${escapeHtml(store.place)}<br>` : ''}
               ${store.phone ? `Phone: ${escapeHtml(store.phone)}<br>` : ''}
               ${store.email ? `Email: ${escapeHtml(store.email)}<br>` : ''}
               ${store.gst_tax_id ? `GSTIN: ${escapeHtml(store.gst_tax_id)}` : ''}
@@ -623,6 +669,8 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels }) {
           <div><span class="lbl">${escapeHtml(labels.numberLabelPaper)}</span><span class="val">${escapeHtml(sale.sale_number || '—')}</span></div>
           <div><span class="lbl">${escapeHtml(labels.dateLabelPaper)}</span><span class="val">${fmt(sale.date)}${sale.time ? ' · ' + escapeHtml(sale.time) : ''}</span></div>
           <div><span class="lbl">Items</span><span class="val">${items.length}</span></div>
+          ${sale.service_type ? `<div><span class="lbl">Dining</span><span class="val">${sale.service_type === 'ac' ? 'A/C' : 'Non-A/C'}</span></div>` : ''}
+          ${sale.waiter_name && sale.waiter_name.trim() ? `<div><span class="lbl">Waiter</span><span class="val">${escapeHtml(sale.waiter_name.trim())}</span></div>` : ''}
         </div>
       </div>
     </div>
@@ -677,6 +725,8 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels }) {
             ${gstSlabRows}
             ${totalBillDiscount > 0 ? `<tr><td>Bill Discount</td><td class="r">− ${money(totalBillDiscount)}</td></tr>` : ''}
             <tr class="grand"><td>Grand Total</td><td class="r">${money(totalAmount)}</td></tr>
+            ${cashAmt > 0 ? `<tr><td>Cash</td><td class="r">${money(cashAmt)}</td></tr>` : ''}
+            ${upiAmt > 0 ? `<tr><td>UPI</td><td class="r">${money(upiAmt)}</td></tr>` : ''}
           </tbody>
         </table>
       </div>
@@ -698,6 +748,25 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels }) {
 
   </div>
 </div>
+<script>
+(function () {
+  var b = document.body, fe = window.frameElement;
+  function fit() {
+    if (!fe) return;
+    b.style.transformOrigin = 'top left';
+    b.style.transform = 'none';
+    var avail = fe.clientWidth || fe.offsetWidth || b.scrollWidth;
+    var bw = b.scrollWidth || 1;
+    var s = bw > avail ? avail / bw : 1;
+    if (s < 1) b.style.transform = 'scale(' + s + ')';
+    fe.style.height = Math.min(Math.ceil(b.scrollHeight * s) + 6, 620) + 'px';
+  }
+  addEventListener('load', function () { fit(); setTimeout(fit, 0); setTimeout(fit, 60); });
+  addEventListener('resize', fit);
+  addEventListener('beforeprint', function () { b.style.transform = 'none'; });
+  addEventListener('afterprint', fit);
+})();
+</script>
 </body>
 </html>`;
 }

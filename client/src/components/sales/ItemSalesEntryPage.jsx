@@ -4,7 +4,6 @@ import toast from 'react-hot-toast';
 import {
   ArrowLeftIcon,
   ArrowPathIcon,
-  Cog6ToothIcon,
   PlusIcon,
   PrinterIcon,
   TrashIcon,
@@ -590,6 +589,11 @@ export default function ItemSalesEntryPage() {
   const [disableAutoFocusDiscount, setDisableAutoFocusDiscount] = useState(() => {
     return localStorage.getItem('sales_disable_autofocus_discount') === 'true';
   });
+  // When enabled, Enter on the trailing row (after the last item line) saves
+  // the sale directly instead of jumping into the walk-in customer fields.
+  const [disableAutoFocusCustomer, setDisableAutoFocusCustomer] = useState(() => {
+    return localStorage.getItem('sales_disable_autofocus_customer') === 'true';
+  });
 
   const toggleDisableAutoFocusUnit = (val) => {
     setDisableAutoFocusUnit(val);
@@ -602,6 +606,49 @@ export default function ItemSalesEntryPage() {
   const toggleDisableAutoFocusDiscount = (val) => {
     setDisableAutoFocusDiscount(val);
     localStorage.setItem('sales_disable_autofocus_discount', String(val));
+  };
+  const toggleDisableAutoFocusCustomer = (val) => {
+    setDisableAutoFocusCustomer(val);
+    localStorage.setItem('sales_disable_autofocus_customer', String(val));
+  };
+
+  // Individual show/hide toggles for the tax & discount summary lines in the
+  // totals footer. All default to visible (true).
+  const [showCgst, setShowCgst] = useState(() => {
+    return localStorage.getItem('sales_show_cgst') !== 'false';
+  });
+  const [showSgst, setShowSgst] = useState(() => {
+    return localStorage.getItem('sales_show_sgst') !== 'false';
+  });
+  const [showIgst, setShowIgst] = useState(() => {
+    return localStorage.getItem('sales_show_igst') !== 'false';
+  });
+  const [showGst, setShowGst] = useState(() => {
+    return localStorage.getItem('sales_show_gst') !== 'false';
+  });
+  const [showItemDiscount, setShowItemDiscount] = useState(() => {
+    return localStorage.getItem('sales_show_item_discount') !== 'false';
+  });
+
+  const toggleShowCgst = (val) => {
+    setShowCgst(val);
+    localStorage.setItem('sales_show_cgst', String(val));
+  };
+  const toggleShowSgst = (val) => {
+    setShowSgst(val);
+    localStorage.setItem('sales_show_sgst', String(val));
+  };
+  const toggleShowIgst = (val) => {
+    setShowIgst(val);
+    localStorage.setItem('sales_show_igst', String(val));
+  };
+  const toggleShowGst = (val) => {
+    setShowGst(val);
+    localStorage.setItem('sales_show_gst', String(val));
+  };
+  const toggleShowItemDiscount = (val) => {
+    setShowItemDiscount(val);
+    localStorage.setItem('sales_show_item_discount', String(val));
   };
 
   // Ctrl+I opens settings dialog; F10 → sales report
@@ -1146,9 +1193,15 @@ export default function ItemSalesEntryPage() {
       const hasCompleteRow = lines.some((l) => l.item_id);
       // On the trailing empty row (no item selected) once at least one item
       // row is complete, Enter moves into the customer fields instead of
-      // creating yet another blank row.
+      // creating yet another blank row — unless auto-focus into the
+      // customer fields is disabled, in which case Enter saves the sale
+      // directly.
       if (currentLine && !currentLine.item_id && hasCompleteRow && customerNameRef.current) {
-        setTimeout(() => customerNameRef.current?.focus(), 0);
+        if (disableAutoFocusCustomer) {
+          handleSave();
+        } else {
+          setTimeout(() => customerNameRef.current?.focus(), 0);
+        }
         return;
       }
       // Last field (discount) — add new row and focus its item name
@@ -1506,14 +1559,6 @@ export default function ItemSalesEntryPage() {
               Print
             </button>
           )}
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(true)}
-            className="ml-1 rounded-lg border border-slate-300 bg-white p-2 text-slate-500 shadow-sm hover:border-trust-blue/40 hover:bg-trust-blue/10 hover:text-trust-blue hover:shadow transition-all"
-            title="Sales settings (Ctrl+I)"
-          >
-            <Cog6ToothIcon className="h-4 w-4" />
-          </button>
           {multiCounterEnabled && !isEdit && (
             <div className="ml-2 flex items-center rounded-lg border border-slate-300 bg-white p-0.5 shadow-sm" title="Switch sale counter (F2)">
               {[1, 2].map((c) => (
@@ -1624,7 +1669,6 @@ export default function ItemSalesEntryPage() {
             <thead>
               <tr className="bg-trust-blue sticky top-0 z-10">
                 <th className="px-3 py-2 text-left font-semibold text-white w-12">S.no</th>
-                <th className="px-3 py-2 text-left font-semibold text-white w-20">Item ID</th>
                 <th className="px-3 py-2 text-left font-semibold text-white min-w-[18rem]">Item Name</th>
                 <th className="px-3 py-2 text-left font-semibold text-white w-28">Unit</th>
                 <th className="px-3 py-2 text-right font-semibold text-white w-24">MRP</th>
@@ -1652,9 +1696,6 @@ export default function ItemSalesEntryPage() {
                   }}
                 >
                   <td className="px-3 py-2 text-slate-500">{idx + 1}</td>
-                  <td className="px-3 py-2 font-mono text-xs text-slate-600">
-                    {line.item_id || '—'}
-                  </td>
                   <td className="px-3 py-2">
                     <ItemNameCell
                       value={line.item_name}
@@ -1770,6 +1811,10 @@ export default function ItemSalesEntryPage() {
             <PlusIcon className="h-4 w-4" />
             Add row
           </button>
+          <div className="flex items-center gap-2 rounded-lg bg-white border border-slate-200 px-3 py-1.5 text-sm">
+            <span className="text-slate-500">Items</span>
+            <span className="font-medium text-slate-700">{totals.lineCount}</span>
+          </div>
         </div>
       </div>
 
@@ -1857,19 +1902,15 @@ export default function ItemSalesEntryPage() {
                 </div>
               </div>
             )}
-            <div className="flex items-center gap-3 mt-1">
-              <div className="flex items-center gap-2 rounded-lg bg-slate-50 border border-slate-100 px-3 py-1.5 text-sm">
-                <span className="text-slate-500">Items</span>
-                <span className="font-medium text-slate-700">{totals.lineCount}</span>
-              </div>
-            </div>
           </div>
           <div className="flex flex-col justify-between gap-2 bg-slate-50 rounded-lg px-4 py-2 border border-slate-100">
             <div className="space-y-1">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-500">Total Item Discount</span>
-                <span className="font-medium text-amber-700">{formatCurrency(totals.discountTotal)}</span>
-              </div>
+              {showItemDiscount && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-500">Total Item Discount</span>
+                  <span className="font-medium text-amber-700">{formatCurrency(totals.discountTotal)}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-500">Total Bill Discount</span>
                 <input
@@ -1882,53 +1923,63 @@ export default function ItemSalesEntryPage() {
                 />
               </div>
               {ledger?.igst_status === 'YES' ? (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">IGST</span>
-                  <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal)}</span>
-                </div>
+                showIgst && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-500">IGST</span>
+                    <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal)}</span>
+                  </div>
+                )
               ) : (
                 <>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-500">CGST</span>
-                    <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal / 2)}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-500">SGST</span>
-                    <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal / 2)}</span>
-                  </div>
+                  {showCgst && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-500">CGST</span>
+                      <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal / 2)}</span>
+                    </div>
+                  )}
+                  {showSgst && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-500">SGST</span>
+                      <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal / 2)}</span>
+                    </div>
+                  )}
                 </>
               )}
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-500">Total GST</span>
-                <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal)}</span>
-              </div>
+              {showGst && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-500">Total GST</span>
+                  <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal)}</span>
+                </div>
+              )}
             </div>
             <div className="flex items-center justify-between text-base border-t border-slate-200 pt-2 mt-1">
               <span className="font-semibold text-slate-700">Total Amount</span>
               <span className="font-bold text-lg text-debit-red">{formatCurrency(netTotal)}</span>
             </div>
             <div className="space-y-1 border-t border-slate-200 pt-2 mt-1">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-500">Cash</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={cashAmount}
-                  onChange={(e) => handleCashChange(e.target.value)}
-                  className="w-28 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm font-medium text-slate-700 focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
-                />
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-slate-500">UPI</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={upiAmount}
-                  onChange={(e) => handleUpiChange(e.target.value)}
-                  className="w-28 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm font-medium text-slate-700 focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
-                />
+              <div className="flex items-center gap-3">
+                <div className="flex-1 flex items-center justify-between gap-2 text-sm">
+                  <span className="text-slate-500">Cash</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={cashAmount}
+                    onChange={(e) => handleCashChange(e.target.value)}
+                    className="w-24 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm font-medium text-slate-700 focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
+                  />
+                </div>
+                <div className="flex-1 flex items-center justify-between gap-2 text-sm">
+                  <span className="text-slate-500">UPI</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={upiAmount}
+                    onChange={(e) => handleUpiChange(e.target.value)}
+                    className="w-24 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm font-medium text-slate-700 focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
+                  />
+                </div>
               </div>
               {!paymentBalanced && (
                 <div className="text-right text-xs font-medium text-debit-red">
@@ -2011,138 +2062,159 @@ export default function ItemSalesEntryPage() {
       </div>
 
       {/* Item Sales Settings dialog */}
-      <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} title="Item Sales Settings">
-        <div className="space-y-4 py-1">
-          {!restaurantEnabled && (
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-sm font-medium text-slate-700">Stock Lock</p>
-              <p className="text-xs text-slate-500 mt-0.5">
-                When enabled, sales are blocked if quantity exceeds available stock.
-                Disable to allow sales even when stock is zero or negative.
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={stockLock}
-              onClick={() => toggleStockLock(!stockLock)}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-trust-blue focus:ring-offset-2 ${
-                stockLock ? 'bg-trust-blue' : 'bg-slate-200'
-              }`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  stockLock ? 'translate-x-5' : 'translate-x-0'
+      <Modal open={settingsOpen} onClose={() => setSettingsOpen(false)} title="Item Sales Settings" size="xl">
+        <div className="grid grid-cols-1 md:grid-cols-2 md:divide-x md:divide-slate-100 gap-x-8 gap-y-5 py-1">
+          {/* Left column: entry behaviour */}
+          <div className="space-y-5 md:pr-2">
+            {!restaurantEnabled && (
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-slate-700">Stock Lock</p>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  When enabled, sales are blocked if quantity exceeds available stock.
+                  Disable to allow sales even when stock is zero or negative.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={stockLock}
+                onClick={() => toggleStockLock(!stockLock)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-trust-blue focus:ring-offset-2 ${
+                  stockLock ? 'bg-trust-blue' : 'bg-slate-200'
                 }`}
-              />
-            </button>
-          </div>
-          )}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                    stockLock ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+            )}
 
-          <div className="border-t border-slate-100 pt-4">
-            <p className="text-sm font-medium text-slate-700">Rate Tax Treatment</p>
-            <p className="text-xs text-slate-500 mt-0.5 mb-2">
-              Choose whether the entered rate already includes GST, or is the
-              pre-tax (taxable) value with GST added on top.
-            </p>
-            <div className="flex gap-2">
-              {[
-                { val: 'inclusive', label: 'Inclusive of tax' },
-                { val: 'taxable', label: 'Taxable rate' },
-              ].map((opt) => (
+            <div className="border-t border-slate-100 pt-4">
+              <p className="text-sm font-medium text-slate-700">Rate Tax Treatment</p>
+              <p className="text-xs text-slate-500 mt-0.5 mb-2">
+                Choose whether the entered rate already includes GST, or is the
+                pre-tax (taxable) value with GST added on top.
+              </p>
+              <div className="flex gap-2">
+                {[
+                  { val: 'inclusive', label: 'Inclusive of tax' },
+                  { val: 'taxable', label: 'Taxable rate' },
+                ].map((opt) => (
+                  <button
+                    key={opt.val}
+                    type="button"
+                    onClick={() => setRateTaxModePersist(opt.val)}
+                    className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                      rateTaxMode === opt.val
+                        ? 'bg-trust-blue text-white border-trust-blue'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 pt-4">
+              <p className="text-sm font-medium text-slate-700">Totals Summary Fields</p>
+              <p className="text-xs text-slate-500 mt-0.5 mb-2">
+                Show or hide individual lines in the totals summary. Hidden
+                lines free up space in the summary panel.
+              </p>
+              <div className="space-y-2">
+                {[
+                  { key: 'cgst', label: 'CGST', value: showCgst, toggle: toggleShowCgst },
+                  { key: 'sgst', label: 'SGST', value: showSgst, toggle: toggleShowSgst },
+                  { key: 'igst', label: 'IGST', value: showIgst, toggle: toggleShowIgst },
+                  { key: 'gst', label: 'Total GST', value: showGst, toggle: toggleShowGst },
+                  { key: 'itemDiscount', label: 'Total Item Discount', value: showItemDiscount, toggle: toggleShowItemDiscount },
+                ].map((opt) => (
+                  <div key={opt.key} className="flex items-center justify-between gap-4">
+                    <span className="text-sm text-slate-600">{opt.label}</span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={opt.value}
+                      onClick={() => opt.toggle(!opt.value)}
+                      className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-trust-blue focus:ring-offset-2 ${
+                        opt.value ? 'bg-trust-blue' : 'bg-slate-200'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          opt.value ? 'translate-x-5' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Right column: Enter-key auto-focus behaviour */}
+          <div className="space-y-5 md:pl-6">
+            <p className="text-sm font-medium text-slate-700 md:-mt-0">Enter-key Auto-focus</p>
+            {[
+              {
+                key: 'unit',
+                label: 'Disable Auto-focus Unit field',
+                hint: 'When enabled, Enter on the Item Name field skips the Unit field and focuses Rate directly. The Unit field stays usable by clicking or tabbing into it manually.',
+                value: disableAutoFocusUnit,
+                toggle: toggleDisableAutoFocusUnit,
+              },
+              {
+                key: 'rate',
+                label: 'Disable Auto-focus Rate field',
+                hint: 'When enabled, Enter navigation skips the Rate field entirely. The Rate field stays usable by clicking or tabbing into it manually.',
+                value: disableAutoFocusRate,
+                toggle: toggleDisableAutoFocusRate,
+              },
+              {
+                key: 'discount',
+                label: 'Disable Auto-focus Discount field',
+                hint: 'When enabled, Enter on the Quantity field skips the Discount field entirely. The Discount field stays usable by clicking or tabbing into it manually.',
+                value: disableAutoFocusDiscount,
+                toggle: toggleDisableAutoFocusDiscount,
+              },
+              {
+                key: 'customer',
+                label: 'Disable Auto-focus Customer fields',
+                hint: 'When enabled, Enter after the last item row saves the sale directly instead of jumping to the Customer Name field.',
+                value: disableAutoFocusCustomer,
+                toggle: toggleDisableAutoFocusCustomer,
+              },
+            ].map((opt, i) => (
+              <div
+                key={opt.key}
+                className={`flex items-center justify-between gap-4 ${i > 0 ? 'border-t border-slate-100 pt-4' : ''}`}
+              >
+                <div>
+                  <p className="text-sm font-medium text-slate-700">{opt.label}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">{opt.hint}</p>
+                </div>
                 <button
-                  key={opt.val}
                   type="button"
-                  onClick={() => setRateTaxModePersist(opt.val)}
-                  className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                    rateTaxMode === opt.val
-                      ? 'bg-trust-blue text-white border-trust-blue'
-                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  role="switch"
+                  aria-checked={opt.value}
+                  onClick={() => opt.toggle(!opt.value)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-trust-blue focus:ring-offset-2 ${
+                    opt.value ? 'bg-trust-blue' : 'bg-slate-200'
                   }`}
                 >
-                  {opt.label}
+                  <span
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      opt.value ? 'translate-x-5' : 'translate-x-0'
+                    }`}
+                  />
                 </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between gap-4 border-t border-slate-100 pt-4">
-            <div>
-              <p className="text-sm font-medium text-slate-700">Disable Auto-focus Unit field</p>
-              <p className="text-xs text-slate-500 mt-0.5">
-                When enabled, Enter on the Item Name field skips the Unit
-                field and focuses Rate directly. The Unit field stays usable
-                by clicking or tabbing into it manually.
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={disableAutoFocusUnit}
-              onClick={() => toggleDisableAutoFocusUnit(!disableAutoFocusUnit)}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-trust-blue focus:ring-offset-2 ${
-                disableAutoFocusUnit ? 'bg-trust-blue' : 'bg-slate-200'
-              }`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  disableAutoFocusUnit ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between gap-4 border-t border-slate-100 pt-4">
-            <div>
-              <p className="text-sm font-medium text-slate-700">Disable Auto-focus Rate field</p>
-              <p className="text-xs text-slate-500 mt-0.5">
-                When enabled, Enter navigation skips the Rate field entirely.
-                The Rate field stays usable by clicking or tabbing into it
-                manually.
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={disableAutoFocusRate}
-              onClick={() => toggleDisableAutoFocusRate(!disableAutoFocusRate)}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-trust-blue focus:ring-offset-2 ${
-                disableAutoFocusRate ? 'bg-trust-blue' : 'bg-slate-200'
-              }`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  disableAutoFocusRate ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between gap-4 border-t border-slate-100 pt-4">
-            <div>
-              <p className="text-sm font-medium text-slate-700">Disable Auto-focus Discount field</p>
-              <p className="text-xs text-slate-500 mt-0.5">
-                When enabled, Enter on the Quantity field skips the Discount
-                field entirely. The Discount field stays usable by clicking
-                or tabbing into it manually.
-              </p>
-            </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={disableAutoFocusDiscount}
-              onClick={() => toggleDisableAutoFocusDiscount(!disableAutoFocusDiscount)}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-trust-blue focus:ring-offset-2 ${
-                disableAutoFocusDiscount ? 'bg-trust-blue' : 'bg-slate-200'
-              }`}
-            >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  disableAutoFocusDiscount ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
-            </button>
+              </div>
+            ))}
           </div>
         </div>
       </Modal>

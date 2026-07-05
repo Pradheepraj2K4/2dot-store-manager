@@ -8,7 +8,8 @@ import EmptyState from '../ui/EmptyState';
 import toast from 'react-hot-toast';
 import {
   PresentationChartLineIcon,
-  ArrowDownTrayIcon,
+  TableCellsIcon,
+  DocumentArrowDownIcon,
   MagnifyingGlassIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
@@ -114,28 +115,28 @@ export default function BillProfitReportPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleExportExcel} className="btn-secondary gap-2">
-            <ArrowDownTrayIcon className="h-4 w-4" />Excel
+          <button onClick={handleExportExcel} className="btn-excel gap-2">
+            <TableCellsIcon className="h-4 w-4" />Excel
           </button>
-          <button onClick={handleExportPDF} className="btn-secondary gap-2">
-            <ArrowDownTrayIcon className="h-4 w-4" />PDF
+          <button onClick={handleExportPDF} className="btn-pdf gap-2">
+            <DocumentArrowDownIcon className="h-4 w-4" />PDF
           </button>
         </div>
       </div>
 
       {/* Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-        <div className="card text-center py-4 bg-white border-slate-200">
-          <p className="text-xs font-medium text-slate-500">Sale Value</p>
-          <p className="text-xl font-bold text-slate-800 mt-1">{formatCurrency(totals.sale)}</p>
+        <div className="card text-center py-4 border-0 bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md">
+          <p className="text-xs font-medium text-blue-100">Sale Value</p>
+          <p className="text-xl font-bold text-white mt-1">{formatCurrency(totals.sale)}</p>
         </div>
-        <div className="card text-center py-4 bg-white border-slate-200">
-          <p className="text-xs font-medium text-slate-500">Cost</p>
-          <p className="text-xl font-bold text-amber-600 mt-1">{formatCurrency(totals.cost)}</p>
+        <div className="card text-center py-4 border-0 bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-md">
+          <p className="text-xs font-medium text-amber-50">Cost</p>
+          <p className="text-xl font-bold text-white mt-1">{formatCurrency(totals.cost)}</p>
         </div>
-        <div className={`card text-center py-4 bg-white ${totals.profit >= 0 ? 'border-green-200' : 'border-red-200'}`}>
-          <p className="text-xs font-medium text-slate-500">Profit</p>
-          <p className={`text-xl font-bold mt-1 ${totals.profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatCurrency(totals.profit)}</p>
+        <div className={`card text-center py-4 border-0 text-white shadow-md bg-gradient-to-br ${totals.profit >= 0 ? 'from-emerald-500 to-green-600' : 'from-rose-500 to-red-600'}`}>
+          <p className={`text-xs font-medium ${totals.profit >= 0 ? 'text-emerald-100' : 'text-rose-100'}`}>Profit</p>
+          <p className="text-xl font-bold text-white mt-1">{formatCurrency(totals.profit)}</p>
         </div>
       </div>
 

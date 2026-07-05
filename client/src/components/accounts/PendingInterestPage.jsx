@@ -9,7 +9,7 @@ import { exportToExcel } from '../../utils/exportUtils';
 import {
   ClockIcon,
   MagnifyingGlassIcon,
-  ArrowDownTrayIcon,
+  TableCellsIcon,
 } from '@heroicons/react/24/outline';
 
 export default function PendingInterestPage() {
@@ -90,8 +90,8 @@ export default function PendingInterestPage() {
             Ledgers with pending due interest ({filtered.length} ledgers)
           </p>
         </div>
-        <button onClick={handleExportExcel} className="btn-secondary gap-2 shrink-0">
-          <ArrowDownTrayIcon className="h-4 w-4" />Excel
+        <button onClick={handleExportExcel} className="btn-excel gap-2 shrink-0">
+          <TableCellsIcon className="h-4 w-4" />Excel
         </button>
       </div>
 

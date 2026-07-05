@@ -7,7 +7,7 @@ import Modal from '../ui/Modal';
 import toast from 'react-hot-toast';
 import { exportToExcel } from '../../utils/exportUtils';
 import { EditExpenseModal } from './ExpensePage';
-import { DocumentChartBarIcon, ArrowPathIcon, TrashIcon, ArrowDownTrayIcon, PencilIcon } from '@heroicons/react/24/outline';
+import { DocumentChartBarIcon, ArrowPathIcon, TrashIcon, TableCellsIcon, PencilIcon } from '@heroicons/react/24/outline';
 
 function firstDayOfCurrentMonth() {
   const d = new Date();
@@ -114,8 +114,8 @@ export default function ExpenseReportsPage() {
           <h1 className="page-title">Expense Reports</h1>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleExportExcel} className="btn-secondary gap-2">
-            <ArrowDownTrayIcon className="h-4 w-4" />Excel
+          <button onClick={handleExportExcel} className="btn-excel gap-2">
+            <TableCellsIcon className="h-4 w-4" />Excel
           </button>
           <button onClick={fetchData} className="btn-secondary gap-2">
             <ArrowPathIcon className="h-4 w-4" />

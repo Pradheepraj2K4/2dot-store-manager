@@ -183,14 +183,15 @@ class SaleRepository {
     `).all(...params);
   }
 
-  getFoodSalesReport({ fromDate, toDate, category, itemId } = {}) {
+  getFoodSalesReport({ fromDate, toDate, category, itemId, waiterName } = {}) {
     const db = getDb();
     const conds = [];
     const params = [];
-    if (fromDate) { conds.push('s.date >= ?'); params.push(fromDate); }
-    if (toDate)   { conds.push('s.date <= ?'); params.push(toDate); }
-    if (category) { conds.push('LOWER(i.category) = ?'); params.push(String(category).toLowerCase()); }
-    if (itemId)   { conds.push('si.item_id = ?'); params.push(parseInt(itemId)); }
+    if (fromDate)   { conds.push('s.date >= ?'); params.push(fromDate); }
+    if (toDate)     { conds.push('s.date <= ?'); params.push(toDate); }
+    if (category)   { conds.push('LOWER(i.category) = ?'); params.push(String(category).toLowerCase()); }
+    if (itemId)     { conds.push('si.item_id = ?'); params.push(parseInt(itemId)); }
+    if (waiterName) { conds.push('s.waiter_name = ?'); params.push(waiterName); }
     const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
     return db.prepare(`
       SELECT

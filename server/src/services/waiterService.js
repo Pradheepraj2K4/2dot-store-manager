@@ -33,6 +33,12 @@ class WaiterService {
     }
     return waiterRepository.delete(id);
   }
+
+  setDefault(id, isDefault = true) {
+    if (id) this.getById(id);
+    // Passing isDefault=false (or the current default id again) clears it.
+    return waiterRepository.setDefault(isDefault ? id : null);
+  }
 }
 
 module.exports = new WaiterService();

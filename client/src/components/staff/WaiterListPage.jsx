@@ -8,7 +8,9 @@ import {
   UserGroupIcon,
   CheckIcon,
   XMarkIcon,
+  StarIcon,
 } from '@heroicons/react/24/outline';
+import { StarIcon as StarIconSolid } from '@heroicons/react/24/solid';
 import { waiterApi } from '../../api';
 import { formatDate } from '../../utils/helpers';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -77,6 +79,17 @@ export default function WaiterListPage() {
     }
   };
 
+  const handleToggleDefault = async (w) => {
+    const makeDefault = !w.is_default;
+    try {
+      await waiterApi.setDefault(w.id, makeDefault);
+      toast.success(makeDefault ? `${w.name} set as default waiter` : 'Default waiter cleared');
+      fetchWaiters();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
   const filtered = waiters.filter((w) =>
     !search || w.name.toLowerCase().includes(search.toLowerCase())
   );
@@ -132,6 +145,7 @@ export default function WaiterListPage() {
                 <tr className="border-b border-slate-200">
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600 w-16">#</th>
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Name</th>
+                  <th className="px-4 py-2.5 text-center font-semibold text-slate-600 w-20">Default</th>
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600 w-40">Added</th>
                   <th className="px-4 py-2.5 w-28"></th>
                 </tr>
@@ -156,6 +170,17 @@ export default function WaiterListPage() {
                       ) : (
                         <span className="font-medium text-slate-800">{w.name}</span>
                       )}
+                    </td>
+                    <td className="px-4 py-2.5 text-center">
+                      <button
+                        onClick={() => handleToggleDefault(w)}
+                        title={w.is_default ? 'Default waiter — click to clear' : 'Set as default waiter'}
+                        className={`p-1.5 rounded transition-colors ${w.is_default ? 'text-amber-500 hover:bg-amber-50' : 'text-slate-300 hover:text-amber-400 hover:bg-slate-100'}`}
+                      >
+                        {w.is_default
+                          ? <StarIconSolid className="h-4 w-4" />
+                          : <StarIcon className="h-4 w-4" />}
+                      </button>
                     </td>
                     <td className="px-4 py-2.5 text-slate-500 text-xs">{formatDate(w.created_at)}</td>
                     <td className="px-4 py-2.5">

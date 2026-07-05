@@ -6,7 +6,8 @@ import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import {
-  ArrowDownTrayIcon,
+  TableCellsIcon,
+  DocumentArrowDownIcon,
   CalendarDaysIcon,
   MagnifyingGlassIcon,
   BanknotesIcon,
@@ -203,17 +204,17 @@ export default function ReportsPage() {
       {/* ── Summary Cards ────────────────────────────────────────────────── */}
       {initDone && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 shrink-0">
-          <div className="card text-center py-3 border-red-200">
-            <p className="text-xs text-red-600">Payments</p>
-            <p className="text-lg font-bold text-red-600">{formatCurrency(totals.payment)}</p>
+          <div className="card text-center py-3 border-0 shadow-md bg-gradient-to-br from-rose-500 to-red-600 text-white">
+            <p className="text-xs text-rose-100">Payments</p>
+            <p className="text-lg font-bold text-white">{formatCurrency(totals.payment)}</p>
           </div>
-          <div className="card text-center py-3 border-green-200">
-            <p className="text-xs text-green-600">Receipts</p>
-            <p className="text-lg font-bold text-green-600">{formatCurrency(totals.receipt)}</p>
+          <div className="card text-center py-3 border-0 shadow-md bg-gradient-to-br from-emerald-500 to-green-600 text-white">
+            <p className="text-xs text-emerald-100">Receipts</p>
+            <p className="text-lg font-bold text-white">{formatCurrency(totals.receipt)}</p>
           </div>
-          <div className="card text-center py-3">
-            <p className="text-xs text-slate-500">Total</p>
-            <p className="text-lg font-bold text-slate-800">{formatCurrency(totals.total)}</p>
+          <div className="card text-center py-3 border-0 shadow-md bg-gradient-to-br from-blue-500 to-indigo-600 text-white">
+            <p className="text-xs text-blue-100">Total</p>
+            <p className="text-lg font-bold text-white">{formatCurrency(totals.total)}</p>
           </div>
         </div>
       )}
@@ -456,11 +457,11 @@ export default function ReportsPage() {
 
           {/* ── Export ────────────────────────────────────────────────────── */}
           <div className="flex gap-2 ml-auto">
-            <button onClick={handleExportExcel} className="btn-secondary gap-2">
-              <ArrowDownTrayIcon className="h-4 w-4" />Excel
+            <button onClick={handleExportExcel} className="btn-excel gap-2">
+              <TableCellsIcon className="h-4 w-4" />Excel
             </button>
-            <button onClick={handleExportPDF} className="btn-secondary gap-2">
-              <ArrowDownTrayIcon className="h-4 w-4" />PDF
+            <button onClick={handleExportPDF} className="btn-pdf gap-2">
+              <DocumentArrowDownIcon className="h-4 w-4" />PDF
             </button>
           </div>
         </div>

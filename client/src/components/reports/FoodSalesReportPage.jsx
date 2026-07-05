@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { saleApi, itemApi } from '../../api';
+import { saleApi, itemApi, waiterApi } from '../../api';
 import { formatCurrency } from '../../utils/helpers';
 import { exportToExcel, exportToPDF } from '../../utils/exportUtils';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -7,7 +7,8 @@ import EmptyState from '../ui/EmptyState';
 import toast from 'react-hot-toast';
 import {
   ClipboardDocumentListIcon,
-  ArrowDownTrayIcon,
+  TableCellsIcon,
+  DocumentArrowDownIcon,
   PrinterIcon,
 } from '@heroicons/react/24/outline';
 
@@ -31,14 +32,17 @@ export default function FoodSalesReportPage() {
   const [toDate, setToDate] = useState(todayISO());
   const [category, setCategory] = useState('');
   const [itemId, setItemId] = useState('');
+  const [waiterName, setWaiterName] = useState('');
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState([]);
   const [items, setItems] = useState([]);
+  const [waiters, setWaiters] = useState([]);
 
   useEffect(() => {
     itemApi.getCategories().then((r) => setCategories(r.data || [])).catch(() => {});
     itemApi.getAll().then((r) => setItems(r.data || [])).catch(() => {});
+    waiterApi.getAll({ status: 'active' }).then((r) => setWaiters(r.data || [])).catch(() => {});
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -47,6 +51,7 @@ export default function FoodSalesReportPage() {
       const params = { fromDate, toDate };
       if (category) params.category = category;
       if (itemId) params.itemId = itemId;
+      if (waiterName) params.waiterName = waiterName;
       const res = await saleApi.getFoodSalesReport(params);
       setRows(res.data || []);
     } catch (err) {
@@ -54,7 +59,7 @@ export default function FoodSalesReportPage() {
     } finally {
       setLoading(false);
     }
-  }, [fromDate, toDate, category, itemId]);
+  }, [fromDate, toDate, category, itemId, waiterName]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -116,7 +121,7 @@ export default function FoodSalesReportPage() {
         </head>
         <body>
           <h1>Food Sales Report</h1>
-          <p class="meta">${fmtDate(fromDate)} to ${fmtDate(toDate)}${category ? ` &middot; Category: ${category}` : ''}</p>
+          <p class="meta">${fmtDate(fromDate)} to ${fmtDate(toDate)}${category ? ` &middot; Category: ${category}` : ''}${waiterName ? ` &middot; Waiter: ${waiterName}` : ''}</p>
           <table>
             <thead>
               <tr>
@@ -159,18 +164,15 @@ export default function FoodSalesReportPage() {
             <ClipboardDocumentListIcon className="h-6 w-6 text-trust-blue" />
             Food Sales Report
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Item-wise food sales ({rows.length}) — quantity, value and discount
-          </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleExportExcel} className="btn-secondary gap-2">
-            <ArrowDownTrayIcon className="h-4 w-4" />Excel
+          <button onClick={handleExportExcel} className="btn-excel gap-2">
+            <TableCellsIcon className="h-4 w-4" />Excel
           </button>
-          <button onClick={handleExportPDF} className="btn-secondary gap-2">
-            <ArrowDownTrayIcon className="h-4 w-4" />PDF
+          <button onClick={handleExportPDF} className="btn-pdf gap-2">
+            <DocumentArrowDownIcon className="h-4 w-4" />PDF
           </button>
-          <button onClick={handlePrint} className="btn-secondary gap-2">
+          <button onClick={handlePrint} className="btn-print gap-2">
             <PrinterIcon className="h-4 w-4" />Print
           </button>
         </div>
@@ -178,17 +180,17 @@ export default function FoodSalesReportPage() {
 
       {/* Summary */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="card text-center py-4 bg-white border-slate-200">
-          <p className="text-xs font-medium text-slate-500">Qty Sold</p>
-          <p className="text-xl font-bold text-slate-800 mt-1">{totals.qty}</p>
+        <div className="card text-center py-4 border-0 bg-gradient-to-br from-blue-500 to-indigo-600 text-white shadow-md">
+          <p className="text-xs font-medium text-blue-100">Qty Sold</p>
+          <p className="text-xl font-bold text-white mt-1">{totals.qty}</p>
         </div>
-        <div className="card text-center py-4 bg-white border-slate-200">
-          <p className="text-xs font-medium text-slate-500">Total Sales</p>
-          <p className="text-xl font-bold text-green-600 mt-1">{formatCurrency(totals.sales)}</p>
+        <div className="card text-center py-4 border-0 bg-gradient-to-br from-emerald-500 to-green-600 text-white shadow-md">
+          <p className="text-xs font-medium text-emerald-100">Total Sales</p>
+          <p className="text-xl font-bold text-white mt-1">{formatCurrency(totals.sales)}</p>
         </div>
-        <div className="card text-center py-4 bg-white border-slate-200">
-          <p className="text-xs font-medium text-slate-500">Discount</p>
-          <p className="text-xl font-bold text-amber-600 mt-1">{formatCurrency(totals.discount)}</p>
+        <div className="card text-center py-4 border-0 bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-md">
+          <p className="text-xs font-medium text-amber-50">Discount</p>
+          <p className="text-xl font-bold text-white mt-1">{formatCurrency(totals.discount)}</p>
         </div>
       </div>
 
@@ -217,6 +219,15 @@ export default function FoodSalesReportPage() {
             <option value="">All items</option>
             {items.map((it) => (
               <option key={it.id} value={it.id}>{it.name}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-500 mb-1">Waiter</label>
+          <select value={waiterName} onChange={(e) => setWaiterName(e.target.value)} className="input-field">
+            <option value="">All waiters</option>
+            {waiters.map((w) => (
+              <option key={w.id} value={w.name}>{w.name}</option>
             ))}
           </select>
         </div>

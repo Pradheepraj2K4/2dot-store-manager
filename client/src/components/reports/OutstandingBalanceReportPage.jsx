@@ -8,7 +8,8 @@ import EmptyState from '../ui/EmptyState';
 import toast from 'react-hot-toast';
 import {
   CurrencyDollarIcon,
-  ArrowDownTrayIcon,
+  TableCellsIcon,
+  DocumentArrowDownIcon,
   MagnifyingGlassIcon,
 } from '@heroicons/react/24/outline';
 
@@ -50,8 +51,10 @@ export default function OutstandingBalanceReportPage() {
 
   const allCustomers = behaviourFilter === 'customer' || (behaviourFilter === 'all' && filtered.length > 0 && filtered.every((l) => l.behaviour === 'customer'));
   const allSuppliers = behaviourFilter === 'supplier' || (behaviourFilter === 'all' && filtered.length > 0 && filtered.every((l) => l.behaviour === 'supplier'));
-  const summaryColorClass = allCustomers ? 'text-green-600' : allSuppliers ? 'text-red-600' : totalOutstanding >= 0 ? 'text-green-600' : 'text-red-600';
-  const summaryBorderClass = allCustomers ? 'border-green-200' : allSuppliers ? 'border-red-200' : totalOutstanding >= 0 ? 'border-green-200' : 'border-red-200';
+  const isPositive = allCustomers ? true : allSuppliers ? false : totalOutstanding >= 0;
+  const summaryGradientClass = isPositive ? 'from-emerald-500 to-green-600' : 'from-rose-500 to-red-600';
+  const summaryLabelClass = isPositive ? 'text-emerald-100' : 'text-rose-100';
+  const summaryColorClass = isPositive ? 'text-green-600' : 'text-red-600';
 
   const handleExportExcel = () => {
     const columns = [
@@ -92,19 +95,19 @@ export default function OutstandingBalanceReportPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={handleExportExcel} className="btn-secondary gap-2">
-            <ArrowDownTrayIcon className="h-4 w-4" />Excel
+          <button onClick={handleExportExcel} className="btn-excel gap-2">
+            <TableCellsIcon className="h-4 w-4" />Excel
           </button>
-          <button onClick={handleExportPDF} className="btn-secondary gap-2">
-            <ArrowDownTrayIcon className="h-4 w-4" />PDF
+          <button onClick={handleExportPDF} className="btn-pdf gap-2">
+            <DocumentArrowDownIcon className="h-4 w-4" />PDF
           </button>
         </div>
       </div>
 
       {/* Summary */}
-      <div className={`card text-center py-4 ${summaryBorderClass} bg-white`}>
-        <p className={`text-xs font-medium ${summaryColorClass}`}>Total Outstanding</p>
-        <p className={`text-2xl font-bold ${summaryColorClass} mt-1`}>{formatCurrency(Math.abs(totalOutstanding))}</p>
+      <div className={`card text-center py-4 border-0 shadow-md text-white bg-gradient-to-br ${summaryGradientClass}`}>
+        <p className={`text-xs font-medium ${summaryLabelClass}`}>Total Outstanding</p>
+        <p className="text-2xl font-bold text-white mt-1">{formatCurrency(Math.abs(totalOutstanding))}</p>
       </div>
 
       {/* Filters */}

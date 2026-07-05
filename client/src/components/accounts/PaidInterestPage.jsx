@@ -5,7 +5,7 @@ import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
 import toast from 'react-hot-toast';
 import { exportToExcel } from '../../utils/exportUtils';
-import { CheckCircleIcon, MagnifyingGlassIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { CheckCircleIcon, MagnifyingGlassIcon, TableCellsIcon } from '@heroicons/react/24/outline';
 
 function firstOfMonthISO() {
   const now = new Date();
@@ -78,8 +78,8 @@ export default function PaidInterestPage() {
             All interest entries that have been marked as paid
           </p>
         </div>
-        <button onClick={handleExportExcel} className="btn-secondary gap-2 shrink-0">
-          <ArrowDownTrayIcon className="h-4 w-4" />Excel
+        <button onClick={handleExportExcel} className="btn-excel gap-2 shrink-0">
+          <TableCellsIcon className="h-4 w-4" />Excel
         </button>
       </div>
 

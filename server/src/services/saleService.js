@@ -327,9 +327,9 @@ class SaleService {
    * price, total sales value and total discount per item over a date range,
    * optionally filtered by category and/or a specific item.
    */
-  getFoodSalesReport({ fromDate, toDate, category, itemId } = {}) {
+  getFoodSalesReport({ fromDate, toDate, category, itemId, waiterName } = {}) {
     const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
-    const rows = saleRepository.getFoodSalesReport({ fromDate, toDate, category, itemId });
+    const rows = saleRepository.getFoodSalesReport({ fromDate, toDate, category, itemId, waiterName });
     return rows.map((r) => ({
       item_id: r.item_id,
       item_name: r.item_name,

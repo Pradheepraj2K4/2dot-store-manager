@@ -14,8 +14,25 @@ class WaiterRepository {
     return db.prepare(`
       SELECT * FROM waiters
       ${where}
-      ORDER BY name ASC
+      ORDER BY is_default DESC, name ASC
     `).all(...params);
+  }
+
+  getDefault() {
+    const db = getDb();
+    return db.prepare('SELECT * FROM waiters WHERE is_default = 1 LIMIT 1').get();
+  }
+
+  setDefault(id) {
+    const db = getDb();
+    const tx = db.transaction((waiterId) => {
+      db.prepare('UPDATE waiters SET is_default = 0 WHERE is_default = 1').run();
+      if (waiterId) {
+        db.prepare("UPDATE waiters SET is_default = 1, updated_at = datetime('now', 'localtime') WHERE id = ?").run(waiterId);
+      }
+    });
+    tx(id);
+    return id ? this.getById(id) : null;
   }
 
   getById(id) {

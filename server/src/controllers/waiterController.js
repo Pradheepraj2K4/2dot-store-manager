@@ -46,6 +46,16 @@ class WaiterController {
       next(err);
     }
   }
+
+  setDefault(req, res, next) {
+    try {
+      const isDefault = req.body?.isDefault !== false;
+      const waiter = waiterService.setDefault(parseInt(req.params.id), isDefault);
+      res.json({ success: true, data: waiter });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
 
 module.exports = new WaiterController();

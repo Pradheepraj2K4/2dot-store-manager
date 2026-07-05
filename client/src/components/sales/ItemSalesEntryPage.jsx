@@ -584,6 +584,9 @@ export default function ItemSalesEntryPage() {
   const [disableAutoFocusUnit, setDisableAutoFocusUnit] = useState(() => {
     return localStorage.getItem('sales_disable_autofocus_unit') === 'true';
   });
+  const [disableAutoFocusRate, setDisableAutoFocusRate] = useState(() => {
+    return localStorage.getItem('sales_disable_autofocus_rate') === 'true';
+  });
   const [disableAutoFocusDiscount, setDisableAutoFocusDiscount] = useState(() => {
     return localStorage.getItem('sales_disable_autofocus_discount') === 'true';
   });
@@ -591,6 +594,10 @@ export default function ItemSalesEntryPage() {
   const toggleDisableAutoFocusUnit = (val) => {
     setDisableAutoFocusUnit(val);
     localStorage.setItem('sales_disable_autofocus_unit', String(val));
+  };
+  const toggleDisableAutoFocusRate = (val) => {
+    setDisableAutoFocusRate(val);
+    localStorage.setItem('sales_disable_autofocus_rate', String(val));
   };
   const toggleDisableAutoFocusDiscount = (val) => {
     setDisableAutoFocusDiscount(val);
@@ -620,6 +627,7 @@ export default function ItemSalesEntryPage() {
   const [printEnabled, setPrintEnabled] = useState(false);
   const [previewModal, setPreviewModal] = useState({ open: false, html: '', sale: null });
   const previewIframeRef = useRef(null);
+  const printButtonRef = useRef(null);
   const navigateAfterPreviewRef = useRef(false);
 
   // Load store profile + receipt config + print toggle on mount
@@ -694,12 +702,21 @@ export default function ItemSalesEntryPage() {
         setRestaurantEnabled(enabled);
         if (enabled) {
           waiterApi.getAll({ status: 'active' })
-            .then((res) => setWaiters(res.data || []))
+            .then((res) => {
+              const list = res.data || [];
+              setWaiters(list);
+              // Pre-select the default waiter for a brand-new bill, without
+              // clobbering an existing selection (edit mode or restored draft).
+              if (!isEdit) {
+                const def = list.find((w) => w.is_default);
+                if (def) setWaiterId((prev) => prev || String(def.id));
+              }
+            })
             .catch(() => {});
         }
       })
       .catch(() => {});
-  }, []);
+  }, [isEdit]);
 
   // Load the multi-counter flag. When disabled, always fall back to counter 1.
   useEffect(() => {
@@ -858,6 +875,26 @@ export default function ItemSalesEntryPage() {
     focusCell(0, 'itemName');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // When every item row is empty and nothing is focused, typing a letter
+  // jumps into the first item-name field seeded with that character.
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      if (!/^[a-zA-Z]$/.test(e.key)) return;
+      if (previewModal.open) return;
+      const ae = document.activeElement;
+      if (ae && ae !== document.body) return;
+      const allEmpty = lines.every((l) => !l.item_id && !(l.item_name && l.item_name.trim()));
+      if (!allEmpty) return;
+      e.preventDefault();
+      updateLine(0, { item_name: e.key, item_id: null, imeis: [] });
+      focusCell(0, 'itemName');
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lines, previewModal.open]);
 
   // When returning from the ledger-creation page (opened via the '+' button),
   // auto-select the freshly created ledger.
@@ -1080,6 +1117,7 @@ export default function ItemSalesEntryPage() {
   // Whether Enter-key navigation should skip over a given field entirely.
   const isFieldAutoFocusDisabled = (field) =>
     (field === 'unit' && disableAutoFocusUnit) ||
+    (field === 'rate' && disableAutoFocusRate) ||
     (field === 'discount' && disableAutoFocusDiscount);
 
   const handleCellBack = (rowIdx, field) => {
@@ -1327,7 +1365,12 @@ export default function ItemSalesEntryPage() {
       }
       if (!isEdit) {
         localStorage.removeItem(draftKeyFor(activeCounter));
+        // Restore the default CASH ledger so the walk-in customer fields stay
+        // mounted; otherwise Enter navigation on the empty row has no customer
+        // fields to jump to and loops back to the item name cell.
+        draftLedgerRestored.current = false;
         setLedger(null);
+        ledgerApi.getCash().then((r) => { if (r.data) setLedger(r.data); }).catch(() => {});
         setDate(todayISO());
         setTime(nowHHMM());
         setNotes('');
@@ -1370,6 +1413,15 @@ export default function ItemSalesEntryPage() {
     setPreviewModal({ open: false, html: '', sale: null });
     if (shouldNavigate) navigate('/item-sales');
   };
+
+  // When the receipt preview opens, focus the Print button so a subsequent
+  // Enter press triggers printing directly.
+  useEffect(() => {
+    if (previewModal.open) {
+      const t = setTimeout(() => printButtonRef.current?.focus(), 50);
+      return () => clearTimeout(t);
+    }
+  }, [previewModal.open]);
 
   const handlePrintCurrent = async () => {
     if (!isEdit) return;
@@ -1793,6 +1845,12 @@ export default function ItemSalesEntryPage() {
                     value={customerPlace}
                     onChange={(e) => setCustomerPlace(e.target.value)}
                     onFocus={pruneEmptyLines}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleSave();
+                      }
+                    }}
                     className="input-field"
                     placeholder="Place / location"
                   />
@@ -2037,6 +2095,32 @@ export default function ItemSalesEntryPage() {
 
           <div className="flex items-center justify-between gap-4 border-t border-slate-100 pt-4">
             <div>
+              <p className="text-sm font-medium text-slate-700">Disable Auto-focus Rate field</p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                When enabled, Enter navigation skips the Rate field entirely.
+                The Rate field stays usable by clicking or tabbing into it
+                manually.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={disableAutoFocusRate}
+              onClick={() => toggleDisableAutoFocusRate(!disableAutoFocusRate)}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors focus:outline-none focus:ring-2 focus:ring-trust-blue focus:ring-offset-2 ${
+                disableAutoFocusRate ? 'bg-trust-blue' : 'bg-slate-200'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  disableAutoFocusRate ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-4 border-t border-slate-100 pt-4">
+            <div>
               <p className="text-sm font-medium text-slate-700">Disable Auto-focus Discount field</p>
               <p className="text-xs text-slate-500 mt-0.5">
                 When enabled, Enter on the Quantity field skips the Discount
@@ -2109,6 +2193,7 @@ export default function ItemSalesEntryPage() {
           <div className="flex justify-end gap-2">
             <button type="button" onClick={closePreview} className="btn-secondary">Close</button>
             <button
+              ref={printButtonRef}
               type="button"
               onClick={() => previewIframeRef.current?.contentWindow?.print()}
               className="btn-primary inline-flex items-center gap-1.5"

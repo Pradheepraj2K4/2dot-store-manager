@@ -233,7 +233,7 @@ export default function DashboardPage() {
                 </button>
               </div>
               {data.salesSummary.recent?.length ? (
-                <div className="-mr-1 pr-1 overflow-y-auto flex-1">
+                <div className="-mr-1 pr-1 overflow-y-auto overflow-x-hidden flex-1">
                   {data.salesSummary.recent.map((s) => (
                     <div
                       key={s.id}

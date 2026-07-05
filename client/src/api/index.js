@@ -246,6 +246,7 @@ export const waiterApi = {
   getById: (id) => api.get(`/waiters/${id}`),
   create: (data) => api.post('/waiters', data),
   update: (id, data) => api.put(`/waiters/${id}`, data),
+  setDefault: (id, isDefault = true) => api.put(`/waiters/${id}/default`, { isDefault }),
   delete: (id) => api.delete(`/waiters/${id}`),
   isEnabled: () => api.get('/settings/restaurant_module_enabled'),
 };

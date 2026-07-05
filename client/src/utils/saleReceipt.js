@@ -297,6 +297,8 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docTyp
 <body>
 <div class="page">
 
+  ${logoDataUrl ? `<div class="logo-wrap"><img src="${logoDataUrl}" alt="Logo"/></div>` : ''}
+
   <!-- Header -->
   <div class="header">
     <div class="store-name">${escapeHtml(store.store_name || 'Store')}</div>

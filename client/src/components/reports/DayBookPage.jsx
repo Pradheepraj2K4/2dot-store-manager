@@ -5,7 +5,7 @@ import { exportToExcel } from '../../utils/exportUtils';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import EmptyState from '../ui/EmptyState';
 import toast from 'react-hot-toast';
-import { QueueListIcon, ArrowPathIcon, ArrowDownTrayIcon } from '@heroicons/react/24/outline';
+import { QueueListIcon, ArrowPathIcon, TableCellsIcon } from '@heroicons/react/24/outline';
 
 const TYPE_OPTIONS = [
   { value: 'all',              label: 'All Entries' },
@@ -186,8 +186,8 @@ export default function DayBookPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <h1 className="page-title">Day Book</h1>
         <div className="flex gap-2">
-          <button onClick={handleExportExcel} className="btn-secondary gap-2">
-            <ArrowDownTrayIcon className="h-4 w-4" />Excel
+          <button onClick={handleExportExcel} className="btn-excel gap-2">
+            <TableCellsIcon className="h-4 w-4" />Excel
           </button>
           <button onClick={fetchData} className="btn-secondary gap-2">
             <ArrowPathIcon className="h-4 w-4" />

@@ -8,7 +8,8 @@ import EmptyState from '../ui/EmptyState';
 import toast from 'react-hot-toast';
 import {
   DocumentTextIcon,
-  ArrowDownTrayIcon,
+  TableCellsIcon,
+  DocumentArrowDownIcon,
 } from '@heroicons/react/24/outline';
 
 export default function StatementOfAccountPage() {
@@ -120,11 +121,11 @@ export default function StatementOfAccountPage() {
               </div>
             </div>
             <div className="flex gap-2 mt-4">
-              <button onClick={handleExportExcel} className="btn-secondary gap-2 text-xs">
-                <ArrowDownTrayIcon className="h-3.5 w-3.5" />Excel
+              <button onClick={handleExportExcel} className="btn-excel gap-2 text-xs">
+                <TableCellsIcon className="h-3.5 w-3.5" />Excel
               </button>
-              <button onClick={handleExportPDF} className="btn-secondary gap-2 text-xs">
-                <ArrowDownTrayIcon className="h-3.5 w-3.5" />PDF
+              <button onClick={handleExportPDF} className="btn-pdf gap-2 text-xs">
+                <DocumentArrowDownIcon className="h-3.5 w-3.5" />PDF
               </button>
             </div>
           </div>

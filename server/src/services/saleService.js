@@ -129,6 +129,8 @@ class SaleService {
       if (Math.abs(cash_amount + upi_amount - net_total) > 0.01) {
         throw new AppError('Cash and UPI amounts must add up to the bill total', 400);
       }
+      // Physical cash handed over (>= cash portion). 0 = not separately recorded.
+      const tendered_amount = Math.round((parseFloat(data.tendered_amount) || 0) * 100) / 100;
       // Implicitly retain the buyer: reuse an existing customer (matched by
       // mobile) or auto-create one when a valid mobile is supplied.
       const customer_id = customerService.resolveForSale({
@@ -154,6 +156,7 @@ class SaleService {
         customer_id,
         cash_amount,
         upi_amount,
+        tendered_amount,
         waiter_id: data.waiter_id ? parseInt(data.waiter_id) : null,
         waiter_name: data.waiter_name || '',
         service_type: data.service_type || '',
@@ -210,6 +213,7 @@ class SaleService {
       if (Math.abs(cash_amount + upi_amount - net_total) > 0.01) {
         throw new AppError('Cash and UPI amounts must add up to the bill total', 400);
       }
+      const tendered_amount = Math.round((parseFloat(data.tendered_amount) || 0) * 100) / 100;
       const oldDelta = applyLedgerDelta(ledger.behaviour, existing.total_amount);
       const newDelta = applyLedgerDelta(ledger.behaviour, net_total);
       ledgerRepository.updateBalance(ledger.id, ledger.current_balance - oldDelta + newDelta);
@@ -243,6 +247,7 @@ class SaleService {
         customer_id,
         cash_amount,
         upi_amount,
+        tendered_amount,
         waiter_id: data.waiter_id ? parseInt(data.waiter_id) : null,
         waiter_name: data.waiter_name || '',
         service_type: data.service_type || '',

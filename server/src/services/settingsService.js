@@ -32,7 +32,19 @@ class SettingsService {
       // Derive the logo path from the actual file on disk so a stale/empty
       // `logo_path` setting never hides an uploaded logo.
       logo_path: this.resolveLogoPath(),
+      // Thermal receipt logo height (mm) — configured via receipt_config so
+      // every receipt builder that receives the store profile honours it.
+      thermal_logo_height: this.resolveThermalLogoHeight(),
     };
+  }
+
+  // Reads the thermal logo height (mm) from receipt_config, clamped to a sane
+  // 6–40mm range. Falls back to 12mm when unset or invalid.
+  resolveThermalLogoHeight() {
+    const cfg = settingsRepository.get('receipt_config');
+    const raw = cfg && typeof cfg === 'object' ? Number(cfg.thermalLogoHeight) : NaN;
+    if (!Number.isFinite(raw) || raw <= 0) return 12;
+    return Math.min(40, Math.max(6, raw));
   }
 
   // Returns the public logo URL when a logo file exists on disk, else ''.

@@ -1,7 +1,8 @@
 const { getDb } = require('../db/database');
 
 const PUBLIC_COLUMNS = `
-  id, username, can_create, can_modify, can_delete, can_manage_settings, status, created_at
+  id, username, can_create, can_modify, can_delete, can_manage_settings,
+  can_edit_rate, can_edit_bill_discount, status, created_at
 `;
 
 function toBool(v) {
@@ -30,29 +31,31 @@ class UserRepository {
     return db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   }
 
-  create({ username, password, can_create, can_modify, can_delete, can_manage_settings }) {
+  create({ username, password, can_create, can_modify, can_delete, can_manage_settings, can_edit_rate, can_edit_bill_discount }) {
     const db = getDb();
     const info = db.prepare(`
-      INSERT INTO users (username, password, can_create, can_modify, can_delete, can_manage_settings)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO users (username, password, can_create, can_modify, can_delete, can_manage_settings, can_edit_rate, can_edit_bill_discount)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       username.trim(),
       password,
       toBool(can_create),
       toBool(can_modify),
       toBool(can_delete),
-      toBool(can_manage_settings)
+      toBool(can_manage_settings),
+      toBool(can_edit_rate),
+      toBool(can_edit_bill_discount)
     );
     return this.getById(info.lastInsertRowid);
   }
 
-  update(id, { username, password, can_create, can_modify, can_delete, can_manage_settings, status }) {
+  update(id, { username, password, can_create, can_modify, can_delete, can_manage_settings, can_edit_rate, can_edit_bill_discount, status }) {
     const db = getDb();
     const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(id);
     if (!existing) return null;
     db.prepare(`
       UPDATE users
-      SET username = ?, password = ?, can_create = ?, can_modify = ?, can_delete = ?, can_manage_settings = ?, status = ?
+      SET username = ?, password = ?, can_create = ?, can_modify = ?, can_delete = ?, can_manage_settings = ?, can_edit_rate = ?, can_edit_bill_discount = ?, status = ?
       WHERE id = ?
     `).run(
       (username ?? existing.username).trim(),
@@ -62,6 +65,8 @@ class UserRepository {
       toBool(can_modify),
       toBool(can_delete),
       toBool(can_manage_settings),
+      toBool(can_edit_rate),
+      toBool(can_edit_bill_discount),
       status || existing.status,
       id
     );

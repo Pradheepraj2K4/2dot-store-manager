@@ -50,7 +50,7 @@ const baseNavigation = [
     name: "Inventory Transactions",
     icon: ClipboardDocumentListIcon,
     children: [
-      { name: "Sales Entry", href: "/item-sales/new", icon: ShoppingBagIcon },
+      { name: "Billing", href: "/item-sales/new", icon: ShoppingBagIcon },
       { name: "Purchase Entry", href: "/item-purchases/new", icon: ArrowDownCircleIcon },
       { name: "Estimation", href: "/estimations", icon: CalculatorIcon },
       { name: "Sales Return Entry", href: "/sales-returns", icon: ArrowUturnLeftIcon },

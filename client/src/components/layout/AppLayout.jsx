@@ -98,7 +98,7 @@ export default function AppLayout({ children }) {
         </div>
       </div>
 
-      <main className={`flex-1 flex flex-col h-screen overflow-y-auto p-4 pt-16 md:p-6 md:pt-6 lg:p-8 transition-[margin] duration-300 ${sidebarCollapsed ? 'md:ml-0' : 'md:ml-64'}`}>
+      <main className={`flex-1 flex flex-col h-screen overflow-y-auto px-4 pt-16 pb-4 md:px-6 md:pt-3 md:pb-6 lg:px-8 lg:pt-4 lg:pb-8 transition-[margin] duration-300 ${sidebarCollapsed ? 'md:ml-0' : 'md:ml-64'}`}>
         {children}
       </main>
       <GlobalFinder open={finderOpen} onClose={() => setFinderOpen(false)} />

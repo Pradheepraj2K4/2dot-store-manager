@@ -11,6 +11,7 @@ import {
 import { itemApi, saleApi, settingsApi, ledgerApi, waiterApi } from '../../api';
 import { ITEM_UNITS, DEFAULT_ITEM_UNIT } from '../../utils/itemConstants';
 import { formatCurrency, todayISO } from '../../utils/helpers';
+import { hasPermission } from '../../utils/auth';
 import { buildSaleReceiptHtml } from '../../utils/saleReceipt';
 import { fetchLogoDataUrl } from '../../utils/interestReceipt';
 import LedgerAutocomplete from '../ui/LedgerAutocomplete';
@@ -24,11 +25,12 @@ const FIELD_ORDER = ['itemName', 'unit', 'rate', 'qty', 'discount'];
 // localStorage key for the in-progress (new) sale entry, so partially filled
 // data survives navigating to another menu and back.
 const SALE_DRAFT_KEY = 'item_sale_entry_draft';
-// When the multi-counter dev setting is on, two independent sale drafts are
-// kept side by side. Counter 1 reuses the legacy key (so existing drafts carry
-// over); counter 2 gets its own slot.
+// When the multi-counter dev setting is on, up to four independent sale drafts
+// are kept side by side. Counter 1 reuses the legacy key (so existing drafts
+// carry over); counters 2-4 get their own slots.
 const ACTIVE_COUNTER_KEY = 'item_sale_active_counter';
-const draftKeyFor = (counter) => (counter === 2 ? `${SALE_DRAFT_KEY}_2` : SALE_DRAFT_KEY);
+const COUNTER_COUNT = 4;
+const draftKeyFor = (counter) => (counter === 1 ? SALE_DRAFT_KEY : `${SALE_DRAFT_KEY}_${counter}`);
 
 function nowHHMM() {
   const d = new Date();
@@ -158,9 +160,23 @@ function ItemNameCell({ value, items, onSelect, onChange, registerRef, onKeyEnte
       setHighlight((h) => (h <= 0 ? filtered.length - 1 : h - 1));
     } else if (e.key === 'Enter') {
       e.preventDefault();
+      let chosen = null;
       if (open && highlight >= 0 && filtered[highlight]) {
-        onSelect(filtered[highlight]);
+        chosen = filtered[highlight];
+      } else {
+        // No row explicitly highlighted: resolve what the user typed. Prefer an
+        // exact item-code match, then an exact name match, else the top result
+        // so typing a code and hitting Enter selects the item and moves on.
+        const q = (value || '').trim().toLowerCase();
+        if (q) {
+          chosen =
+            filtered.find((it) => (it.item_code || '').toLowerCase() === q) ||
+            filtered.find((it) => it.name.toLowerCase() === q) ||
+            filtered[0] ||
+            null;
+        }
       }
+      if (chosen) onSelect(chosen);
       setOpen(false);
       onKeyEnter();
     } else if (e.key === 'ArrowLeft' && !value) {
@@ -520,6 +536,9 @@ export default function ItemSalesEntryPage() {
   // they always add up to the bill's net total (see the netTotal effect below).
   const [cashAmount, setCashAmount] = useState('');
   const [upiAmount, setUpiAmount] = useState('');
+  // Physical cash the customer hands over. The change to return is derived as
+  // (tendered − cash portion). Blank = tender not separately recorded.
+  const [tenderedAmount, setTenderedAmount] = useState('');
   const [lines, setLines] = useState([emptyLine()]);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
@@ -529,13 +548,13 @@ export default function ItemSalesEntryPage() {
   const [restaurantEnabled, setRestaurantEnabled] = useState(false);
   const [waiters, setWaiters] = useState([]);
   const [waiterId, setWaiterId] = useState('');
-  const [serviceType, setServiceType] = useState(''); // '', 'ac', 'non_ac'
+  const [serviceType, setServiceType] = useState('non_ac'); // '', 'ac', 'non_ac'
   // Multi-counter: keep two independent in-progress sales and switch between
   // them mid-entry. Enabled via the developer settings toggle.
   const [multiCounterEnabled, setMultiCounterEnabled] = useState(false);
   const [activeCounter, setActiveCounter] = useState(() => {
     const v = parseInt(localStorage.getItem(ACTIVE_COUNTER_KEY) || '1', 10);
-    return v === 2 ? 2 : 1;
+    return v >= 1 && v <= COUNTER_COUNT ? v : 1;
   });
   // Cache of available (in-stock) IMEIs per item id, fetched lazily.
   const [availableImeis, setAvailableImeis] = useState({});
@@ -546,6 +565,11 @@ export default function ItemSalesEntryPage() {
   // CASH walk-in sales capture the buyer's name/mobile inline since they are
   // all billed against the shared system CASH ledger.
   const isCashLedger = ledger?.name === 'CASH';
+
+  // Field-level edit permissions. Admin (and the dev override) always pass;
+  // created users need the matching toggle enabled to edit these fields.
+  const canEditRate = useMemo(() => hasPermission('edit_rate'), []);
+  const canEditBillDiscount = useMemo(() => hasPermission('edit_bill_discount'), []);
 
   // ── Row focus tracking for cost-rate tag ────────────────────────
   const [focusedRow, setFocusedRow] = useState(null);
@@ -714,6 +738,9 @@ export default function ItemSalesEntryPage() {
   const customerNameRef = useRef(null);
   const customerMobileRef = useRef(null);
   const customerPlaceRef = useRef(null);
+  const cashInputRef = useRef(null);
+  const upiInputRef = useRef(null);
+  const tenderedInputRef = useRef(null);
 
   // Draft persistence: track when the saved draft has been restored (so the
   // auto-save effect doesn't clobber it) and whether it supplied a ledger (so
@@ -869,8 +896,9 @@ export default function ItemSalesEntryPage() {
     setBillDiscount('0');
     setCashAmount('');
     setUpiAmount('');
+    setTenderedAmount('');
     setWaiterId('');
-    setServiceType('');
+    setServiceType('non_ac');
     setLines([emptyLine()]);
     setShowImeiErrors(false);
     let restored = false;
@@ -884,13 +912,13 @@ export default function ItemSalesEntryPage() {
     toast.success(`Switched to Counter ${target}`);
   };
 
-  // F2 toggles between the two sale counters (multi-counter mode only).
+  // F2 cycles through the sale counters (multi-counter mode only).
   useEffect(() => {
     if (!multiCounterEnabled || isEdit) return;
     const handler = (e) => {
       if (e.key === 'F2') {
         e.preventDefault();
-        switchCounter(activeCounter === 1 ? 2 : 1);
+        switchCounter((activeCounter % COUNTER_COUNT) + 1);
       }
     };
     window.addEventListener('keydown', handler);
@@ -1001,6 +1029,7 @@ export default function ItemSalesEntryPage() {
         setBillDiscount(sale.bill_discount != null ? String(sale.bill_discount) : '0');
         setCashAmount(sale.cash_amount != null ? String(sale.cash_amount) : '');
         setUpiAmount(sale.upi_amount ? String(sale.upi_amount) : '');
+        setTenderedAmount(sale.tendered_amount ? String(sale.tendered_amount) : '');
         setWaiterId(sale.waiter_id != null ? String(sale.waiter_id) : '');
         setServiceType(sale.service_type || '');
         setLedger({ id: sale.ledger_id, name: sale.ledger_name, behaviour: 'customer' });
@@ -1164,7 +1193,7 @@ export default function ItemSalesEntryPage() {
   // Whether Enter-key navigation should skip over a given field entirely.
   const isFieldAutoFocusDisabled = (field) =>
     (field === 'unit' && disableAutoFocusUnit) ||
-    (field === 'rate' && disableAutoFocusRate) ||
+    (field === 'rate' && (disableAutoFocusRate || !canEditRate)) ||
     (field === 'discount' && disableAutoFocusDiscount);
 
   const handleCellBack = (rowIdx, field) => {
@@ -1178,6 +1207,15 @@ export default function ItemSalesEntryPage() {
       while (lastIdx >= 0 && isFieldAutoFocusDisabled(FIELD_ORDER[lastIdx])) lastIdx--;
       focusCell(rowIdx - 1, FIELD_ORDER[lastIdx]);
     }
+  };
+
+  const focusCashField = () => {
+    // Drop the trailing empty item rows before moving to payment entry.
+    pruneEmptyLines();
+    setTimeout(() => {
+      cashInputRef.current?.focus();
+      cashInputRef.current?.select();
+    }, 0);
   };
 
   const handleCellEnter = (rowIdx, field) => {
@@ -1194,11 +1232,11 @@ export default function ItemSalesEntryPage() {
       // On the trailing empty row (no item selected) once at least one item
       // row is complete, Enter moves into the customer fields instead of
       // creating yet another blank row — unless auto-focus into the
-      // customer fields is disabled, in which case Enter saves the sale
-      // directly.
+      // customer fields is disabled, in which case Enter jumps straight to
+      // the Cash field instead of saving the sale.
       if (currentLine && !currentLine.item_id && hasCompleteRow && customerNameRef.current) {
         if (disableAutoFocusCustomer) {
-          handleSave();
+          focusCashField();
         } else {
           setTimeout(() => customerNameRef.current?.focus(), 0);
         }
@@ -1275,6 +1313,9 @@ export default function ItemSalesEntryPage() {
 
   const paymentBalanced =
     Math.abs(((parseFloat(cashAmount) || 0) + (parseFloat(upiAmount) || 0)) - netTotal) <= 0.01;
+
+  // Change to hand back = cash tendered minus the cash portion of the bill.
+  const changeDue = Math.max(0, (parseFloat(tenderedAmount) || 0) - (parseFloat(cashAmount) || 0));
 
   // Derives stock + cost info for the currently focused item row.
   const focusedItemInfo = useMemo(() => {
@@ -1388,6 +1429,7 @@ export default function ItemSalesEntryPage() {
         bill_discount: parseFloat(billDiscount) || 0,
         cash_amount: parseFloat(cashAmount) || 0,
         upi_amount: parseFloat(upiAmount) || 0,
+        tendered_amount: parseFloat(tenderedAmount) || 0,
         waiter_id: restaurantEnabled && waiterId ? parseInt(waiterId) : null,
         waiter_name: restaurantEnabled && waiterId
           ? (waiters.find((w) => String(w.id) === String(waiterId))?.name || '')
@@ -1434,8 +1476,9 @@ export default function ItemSalesEntryPage() {
         setBillDiscount('0');
         setCashAmount('');
         setUpiAmount('');
+        setTenderedAmount('');
         setWaiterId('');
-        setServiceType('');
+        setServiceType('non_ac');
         setLines([emptyLine()]);
         saleApi.getNextNumber()
           .then((r) => setSaleNumber(r.data?.sale_number || ''))
@@ -1510,8 +1553,9 @@ export default function ItemSalesEntryPage() {
     setBillDiscount('0');
     setCashAmount('');
     setUpiAmount('');
+    setTenderedAmount('');
     setWaiterId('');
-    setServiceType('');
+    setServiceType('non_ac');
     setLines([emptyLine()]);
     setShowImeiErrors(false);
     ledgerApi.getCash().then((r) => { if (r.data) setLedger(r.data); }).catch(() => {});
@@ -1561,18 +1605,26 @@ export default function ItemSalesEntryPage() {
           )}
           {multiCounterEnabled && !isEdit && (
             <div className="ml-2 flex items-center rounded-lg border border-slate-300 bg-white p-0.5 shadow-sm" title="Switch sale counter (F2)">
-              {[1, 2].map((c) => (
+              {[1, 2, 3, 4].map((c) => (
                 <button
                   key={c}
                   type="button"
                   onClick={() => switchCounter(c)}
-                  className={`rounded-md px-3 py-1 text-sm font-semibold transition-colors ${
+                  className={`flex items-center rounded-md px-3 py-1 text-sm font-semibold transition-all duration-300 ease-out ${
                     activeCounter === c
                       ? 'bg-trust-blue text-white shadow'
                       : 'text-slate-500 hover:bg-slate-100'
                   }`}
                 >
-                  Counter {c}
+                  C
+                  <span
+                    className={`inline-block overflow-hidden whitespace-nowrap transition-all duration-300 ease-out ${
+                      activeCounter === c ? 'max-w-[4rem] opacity-100' : 'max-w-0 opacity-0'
+                    }`}
+                  >
+                    {'ounter\u00A0'}
+                  </span>
+                  {c}
                 </button>
               ))}
               <kbd className="ml-1 mr-1 hidden rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500 sm:inline-block" title="Press F2 to switch">
@@ -1614,7 +1666,7 @@ export default function ItemSalesEntryPage() {
               className="input-field"
             />
           </div>
-          <div className="w-28">
+          <div className="w-24">
             <label className="text-xs text-slate-500">Time</label>
             <input
               type="time"
@@ -1734,7 +1786,9 @@ export default function ItemSalesEntryPage() {
                         if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'rate'); }
                         else if (e.key === 'ArrowLeft' && !e.target.value) { e.preventDefault(); handleCellBack(idx, 'rate'); }
                       }}
-                      className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
+                      disabled={!canEditRate}
+                      title={!canEditRate ? 'You are not permitted to edit the item rate' : undefined}
+                      className={`w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue ${!canEditRate ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}`}
                       placeholder="0.00"
                     />
                   </td>
@@ -1919,7 +1973,9 @@ export default function ItemSalesEntryPage() {
                   step="0.01"
                   value={billDiscount}
                   onChange={(e) => setBillDiscount(e.target.value)}
-                  className="w-28 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm text-amber-700 font-medium focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
+                  disabled={!canEditBillDiscount}
+                  title={!canEditBillDiscount ? 'You are not permitted to edit the bill discount' : undefined}
+                  className={`w-28 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm text-amber-700 font-medium focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue ${!canEditBillDiscount ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}`}
                 />
               </div>
               {ledger?.igst_status === 'YES' ? (
@@ -1966,6 +2022,14 @@ export default function ItemSalesEntryPage() {
                     step="0.01"
                     value={cashAmount}
                     onChange={(e) => handleCashChange(e.target.value)}
+                    ref={cashInputRef}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        upiInputRef.current?.focus();
+                        upiInputRef.current?.select();
+                      }
+                    }}
                     className="w-24 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm font-medium text-slate-700 focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
                   />
                 </div>
@@ -1977,8 +2041,43 @@ export default function ItemSalesEntryPage() {
                     step="0.01"
                     value={upiAmount}
                     onChange={(e) => handleUpiChange(e.target.value)}
+                    ref={upiInputRef}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        tenderedInputRef.current?.focus();
+                        tenderedInputRef.current?.select();
+                      }
+                    }}
                     className="w-24 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm font-medium text-slate-700 focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
                   />
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 flex items-center justify-between gap-2 text-sm">
+                  <span className="text-slate-500">Tendered</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={tenderedAmount}
+                    onChange={(e) => setTenderedAmount(e.target.value)}
+                    ref={tenderedInputRef}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        e.currentTarget.blur();
+                        handleSave();
+                      }
+                    }}
+                    className="w-24 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm font-medium text-slate-700 focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
+                  />
+                </div>
+                <div className="flex-1 flex items-center justify-between gap-2 text-sm">
+                  <span className="text-slate-500">Return</span>
+                  <span className={`font-semibold ${changeDue > 0 ? 'text-credit-green' : 'text-slate-400'}`}>
+                    {formatCurrency(changeDue)}
+                  </span>
                 </div>
               </div>
               {!paymentBalanced && (

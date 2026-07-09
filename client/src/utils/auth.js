@@ -9,7 +9,7 @@ const CURRENT_USER_KEY = 'inventory_current_user';
 export const ADMIN_USERNAME = 'Admin';
 
 // Permission keys (must match the user table columns: can_<key>)
-export const PERMISSIONS = ['create', 'modify', 'delete', 'manage_settings'];
+export const PERMISSIONS = ['create', 'modify', 'delete', 'manage_settings', 'edit_rate', 'edit_bill_discount'];
 
 /**
  * Generate the default admin password based on current date
@@ -219,6 +219,8 @@ export async function loginUser(username, password) {
         modify: Boolean(u.can_modify),
         delete: Boolean(u.can_delete),
         manage_settings: Boolean(u.can_manage_settings),
+        edit_rate: Boolean(u.can_edit_rate),
+        edit_bill_discount: Boolean(u.can_edit_bill_discount),
       },
     });
     return { ok: true };

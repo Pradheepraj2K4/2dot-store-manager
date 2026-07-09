@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { settingsApi, ledgerTypeApi, interestSchemeApi } from '../../api';
 import { isDevAuthenticated, devLogin, devLogout, getDevPassword } from '../../utils/auth';
 import { getReceiptLayout, saveReceiptLayout, DEFAULT_RECEIPT_LAYOUT } from '../../utils/receiptLayout';
+import { buildSaleReceiptHtml } from '../../utils/saleReceipt';
+import { fetchLogoDataUrl } from '../../utils/interestReceipt';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import {
@@ -111,6 +113,11 @@ export default function DeveloperSettingsPage() {
   const [receiptConfig, setReceiptConfig] = useState({});
   const [defaultPrintFormat, setDefaultPrintFormat] = useState('thermal');
   const [savingPrintFormat, setSavingPrintFormat] = useState(false);
+  // Thermal receipt logo size (mm) — stored inside receipt_config.thermalLogoHeight
+  const [thermalLogoHeight, setThermalLogoHeight] = useState(12);
+  const [savingLogoHeight, setSavingLogoHeight] = useState(false);
+  // Logo as a data URL for the live thermal preview (embeds cleanly in srcDoc)
+  const [previewLogoDataUrl, setPreviewLogoDataUrl] = useState(null);
 
   // Data tab state
   const [clearingData, setClearingData] = useState(false);
@@ -167,6 +174,7 @@ export default function DeveloperSettingsPage() {
       });
       if (data.logo_path) {
         setLogoPreview(`/api/settings/logo-file?t=${Date.now()}`);
+        fetchLogoDataUrl(`/api/settings/logo-file`).then(setPreviewLogoDataUrl).catch(() => {});
       }
       // Load interest module setting
       setInterestModuleEnabled(data.interest_module_enabled === true || data.interest_module_enabled === 'true');
@@ -194,6 +202,8 @@ export default function DeveloperSettingsPage() {
       const cfg = data.receipt_config && typeof data.receipt_config === 'object' ? data.receipt_config : {};
       setReceiptConfig(cfg);
       setDefaultPrintFormat(['thermal', 'a5', 'a4'].includes(cfg.format) ? cfg.format : 'thermal');
+      const lh = Number(cfg.thermalLogoHeight);
+      setThermalLogoHeight(Number.isFinite(lh) && lh > 0 ? Math.min(40, Math.max(6, lh)) : 12);
       // Load backup settings
       try {
         const bRes = await settingsApi.getBackupStatus();
@@ -359,6 +369,7 @@ export default function DeveloperSettingsPage() {
         const base64 = reader.result;
         await settingsApi.uploadLogo(base64);
         setLogoPreview(`/api/settings/logo-file?t=${Date.now()}`);
+        setPreviewLogoDataUrl(base64);
         setProfile((p) => ({ ...p, logo_path: 'uploaded' }));
         toast.success('Logo uploaded');
       } catch (err) {
@@ -374,6 +385,7 @@ export default function DeveloperSettingsPage() {
     try {
       await settingsApi.deleteLogo();
       setLogoPreview(null);
+      setPreviewLogoDataUrl(null);
       setProfile((p) => ({ ...p, logo_path: '' }));
       if (logoInputRef.current) logoInputRef.current.value = '';
       toast.success('Logo removed');
@@ -381,6 +393,50 @@ export default function DeveloperSettingsPage() {
       toast.error('Failed to remove logo');
     }
   };
+
+  // Persist the thermal logo height (mm) into receipt_config. Called when the
+  // slider is released so we don't spam the API on every drag tick.
+  const saveThermalLogoHeight = async (value) => {
+    const clamped = Math.min(40, Math.max(6, Number(value) || 12));
+    if ((receiptConfig.thermalLogoHeight || 12) === clamped) return;
+    setSavingLogoHeight(true);
+    try {
+      const newCfg = { ...receiptConfig, thermalLogoHeight: clamped };
+      await settingsApi.update('receipt_config', newCfg);
+      setReceiptConfig(newCfg);
+      toast.success(`Thermal logo size set to ${clamped}mm`);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSavingLogoHeight(false);
+    }
+  };
+
+  // Sample data that mirrors a real thermal bill so the live preview reflects
+  // the true receipt appearance while the slider is adjusted.
+  const buildLogoPreviewHtml = (heightMm) =>
+    buildSaleReceiptHtml({
+      sale: {
+        sale_number: 'PREVIEW-001',
+        date: new Date().toISOString().split('T')[0],
+        time: '12:30',
+        customer_name: 'Walk-in Customer',
+        total_amount: 250,
+        total_discount: 0,
+        bill_discount: 0,
+        cash_amount: 250,
+        upi_amount: 0,
+        tendered_amount: 300,
+        items: [
+          { item_name: 'Sample Item A', quantity: 2, rate: 100, amount: 200 },
+          { item_name: 'Sample Item B', quantity: 1, rate: 50, amount: 50 },
+        ],
+      },
+      store: profile,
+      logoDataUrl: previewLogoDataUrl,
+      format: 'thermal',
+      logoHeightMm: heightMm,
+    });
 
   // --- Layout Editor ---
   const sortedElements = [...layout.elements].sort((a, b) => a.order - b.order);
@@ -1077,6 +1133,80 @@ export default function DeveloperSettingsPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+
+              {/* Thermal Logo Size */}
+              <div className="p-4 rounded-lg border border-slate-200 bg-white mb-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-800">Thermal Logo Size</h3>
+                  <span className="text-xs font-semibold text-trust-blue tabular-nums">
+                    {thermalLogoHeight}mm
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 mt-0.5 mb-3">
+                  Adjust how large the shop logo prints on the thermal (80mm) bill. Drag the slider
+                  and watch the live preview update.
+                </p>
+
+                {(previewLogoDataUrl || logoPreview) ? (
+                  <div className="grid gap-4 sm:grid-cols-[1fr_auto] items-start">
+                    {/* Slider */}
+                    <div>
+                      <input
+                        type="range"
+                        min="6"
+                        max="40"
+                        step="1"
+                        value={thermalLogoHeight}
+                        disabled={savingLogoHeight}
+                        onChange={(e) => setThermalLogoHeight(Number(e.target.value))}
+                        onMouseUp={(e) => saveThermalLogoHeight(e.target.value)}
+                        onTouchEnd={(e) => saveThermalLogoHeight(e.target.value)}
+                        onKeyUp={(e) => saveThermalLogoHeight(e.target.value)}
+                        className="w-full accent-trust-blue cursor-pointer"
+                      />
+                      <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                        <span>Small · 6mm</span>
+                        <span>Large · 40mm</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-3">
+                        <button
+                          type="button"
+                          disabled={savingLogoHeight}
+                          onClick={() => { setThermalLogoHeight(12); saveThermalLogoHeight(12); }}
+                          className="btn-secondary text-xs gap-1 disabled:opacity-60"
+                        >
+                          <ArrowPathIcon className="h-3.5 w-3.5" />
+                          Reset to 12mm
+                        </button>
+                        {savingLogoHeight && <span className="text-xs text-slate-400">Saving…</span>}
+                      </div>
+                    </div>
+
+                    {/* Live thermal preview */}
+                    <div className="justify-self-center">
+                      <div className="text-[10px] font-medium text-slate-400 mb-1 text-center uppercase tracking-wide">
+                        Live Preview
+                      </div>
+                      <div className="rounded-lg border border-slate-300 bg-slate-100 p-2 shadow-inner">
+                        <iframe
+                          title="Thermal logo preview"
+                          srcDoc={buildLogoPreviewHtml(thermalLogoHeight)}
+                          className="block bg-white rounded"
+                          style={{ width: '280px', height: '300px', border: 'none' }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center">
+                    <PhotoIcon className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                    <p className="text-xs text-slate-500">
+                      Upload a shop logo in the <span className="font-medium">Store Profile</span> tab
+                      to adjust its size on the thermal bill.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4">

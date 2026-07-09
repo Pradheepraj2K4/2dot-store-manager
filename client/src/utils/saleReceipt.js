@@ -125,19 +125,20 @@ export function buildSaleReceiptHtml({
   logoDataUrl = null,
   format = 'thermal',
   docType = 'sale',
+  logoHeightMm = null, // optional override for the thermal logo height (mm)
 }) {
   const ps = PAGE_SIZES[format] || PAGE_SIZES.thermal;
   const isThermal = format === 'thermal';
   const labels = DOC_LABELS[docType] || DOC_LABELS.sale;
 
-  if (isThermal) return buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docType });
+  if (isThermal) return buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docType, logoHeightMm });
   return buildPaper({ sale, store, logoDataUrl, ps, format, labels });
 }
 
 // ───────────────────────────────────────────────────────────────────────────
 // Thermal (80mm) — POS-style monospaced receipt
 // ───────────────────────────────────────────────────────────────────────────
-function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docType }) {
+function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docType, logoHeightMm = null }) {
   const items = Array.isArray(sale.items) ? sale.items : [];
   const totalQty          = items.reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0);
   const totalItemDiscount = parseFloat(sale.total_discount) || 0;
@@ -145,6 +146,14 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docTyp
   const totalAmount       = parseFloat(sale.total_amount) || 0;
   const cashAmt           = parseFloat(sale.cash_amount) || 0;
   const upiAmt            = parseFloat(sale.upi_amount) || 0;
+  const tenderedAmt       = parseFloat(sale.tendered_amount) || 0;
+  const changeAmt         = Math.max(0, tenderedAmt - cashAmt);
+
+  // Thermal logo height (mm): explicit override → store profile setting → 12mm.
+  const resolvedLogoHeight =
+    (typeof logoHeightMm === 'number' && logoHeightMm > 0)
+      ? logoHeightMm
+      : (parseFloat(store?.thermal_logo_height) || 12);
 
   // Gross before any discount = Σ(rate × qty). Reconciles as:
   //   grossBeforeDisc − (itemDiscount + billDiscount) = totalAmount
@@ -210,7 +219,7 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docTyp
     .page { width: 100%; padding: 1mm 2mm; }
 
     .logo-wrap { text-align: center; margin-bottom: 1.5mm; }
-    .logo-wrap img { max-height: 12mm; max-width: 100%; object-fit: contain; filter: grayscale(100%) contrast(1.15); }
+    .logo-wrap img { max-height: ${resolvedLogoHeight}mm; max-width: 100%; object-fit: contain; filter: grayscale(100%) contrast(1.15); }
 
     /* ── Centered store header ── */
     .header { text-align: center; }
@@ -358,7 +367,8 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docTyp
   <div class="pay">
     ${cashAmt > 0 ? `<div class="trow"><span class="tl">Cash :</span><span class="tr">Rs ${num(cashAmt, 2)}</span></div>` : ''}
     ${upiAmt > 0 ? `<div class="trow"><span class="tl">UPI :</span><span class="tr">Rs ${num(upiAmt, 2)}</span></div>` : ''}
-    ${cashAmt > 0 ? `<div class="trow"><span class="tl">Cash tendered :</span><span class="tr">Rs ${num(cashAmt, 2)}</span></div>` : ''}
+    ${tenderedAmt > 0 ? `<div class="trow"><span class="tl">Cash tendered :</span><span class="tr">Rs ${num(tenderedAmt, 2)}</span></div>` : ''}
+    ${changeAmt > 0 ? `<div class="trow"><span class="tl">Change / Return :</span><span class="tr">Rs ${num(changeAmt, 2)}</span></div>` : ''}
   </div>
 
   <div class="words">${escapeHtml(amountInWords(totalAmount))}</div>
@@ -406,6 +416,8 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels }) {
   const totalAmount       = parseFloat(sale.total_amount) || 0;
   const cashAmt           = parseFloat(sale.cash_amount) || 0;
   const upiAmt            = parseFloat(sale.upi_amount) || 0;
+  const tenderedAmt       = parseFloat(sale.tendered_amount) || 0;
+  const changeAmt         = Math.max(0, tenderedAmt - cashAmt);
 
   // Subtotal before tax = sum of (rate * qty * (1 - disc/100)) per line
   const subtotal = items.reduce((s, l) => {
@@ -729,6 +741,8 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels }) {
             <tr class="grand"><td>Grand Total</td><td class="r">${money(totalAmount)}</td></tr>
             ${cashAmt > 0 ? `<tr><td>Cash</td><td class="r">${money(cashAmt)}</td></tr>` : ''}
             ${upiAmt > 0 ? `<tr><td>UPI</td><td class="r">${money(upiAmt)}</td></tr>` : ''}
+            ${tenderedAmt > 0 ? `<tr><td>Cash Tendered</td><td class="r">${money(tenderedAmt)}</td></tr>` : ''}
+            ${changeAmt > 0 ? `<tr><td>Change / Return</td><td class="r">${money(changeAmt)}</td></tr>` : ''}
           </tbody>
         </table>
       </div>

@@ -17,6 +17,8 @@ const PERMISSION_DEFS = [
   { key: 'can_modify', label: 'Modify', hint: 'Edit existing records' },
   { key: 'can_delete', label: 'Delete', hint: 'Remove records' },
   { key: 'can_manage_settings', label: 'Manage Settings & Users', hint: 'Access settings and user management' },
+  { key: 'can_edit_rate', label: 'Edit Item Rate', hint: 'Change the item rate on the Sales Entry screen' },
+  { key: 'can_edit_bill_discount', label: 'Edit Bill Discount', hint: 'Change the bill discount on the Sales Entry screen' },
 ];
 
 const emptyForm = () => ({
@@ -26,6 +28,8 @@ const emptyForm = () => ({
   can_modify: false,
   can_delete: false,
   can_manage_settings: false,
+  can_edit_rate: false,
+  can_edit_bill_discount: false,
 });
 
 function Toggle({ checked, onChange, label, hint }) {
@@ -105,6 +109,8 @@ export default function UsersSettings() {
       can_modify: !!user.can_modify,
       can_delete: !!user.can_delete,
       can_manage_settings: !!user.can_manage_settings,
+      can_edit_rate: !!user.can_edit_rate,
+      can_edit_bill_discount: !!user.can_edit_bill_discount,
     });
     setEditShowPassword(false);
     setEditModal({ open: true, user });

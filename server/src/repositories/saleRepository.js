@@ -11,11 +11,11 @@ class SaleRepository {
     return String(row.next);
   }
 
-  create({ sale_number, ledger_id, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, cash_amount, upi_amount, waiter_id, waiter_name, service_type, items }) {
+  create({ sale_number, ledger_id, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, cash_amount, upi_amount, tendered_amount, waiter_id, waiter_name, service_type, items }) {
     const db = getDb();
     const info = db.prepare(`
-      INSERT INTO sales (sale_number, ledger_id, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, cash_amount, upi_amount, waiter_id, waiter_name, service_type)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO sales (sale_number, ledger_id, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, cash_amount, upi_amount, tendered_amount, waiter_id, waiter_name, service_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       sale_number,
       ledger_id,
@@ -33,6 +33,7 @@ class SaleRepository {
       customer_id || null,
       cash_amount || 0,
       upi_amount || 0,
+      tendered_amount || 0,
       waiter_id || null,
       waiter_name || '',
       service_type || ''
@@ -288,11 +289,11 @@ class SaleRepository {
     return db.prepare('DELETE FROM sales WHERE id = ?').run(id);
   }
 
-  update(id, { date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, cash_amount, upi_amount, waiter_id, waiter_name, service_type, items }) {
+  update(id, { date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, cash_amount, upi_amount, tendered_amount, waiter_id, waiter_name, service_type, items }) {
     const db = getDb();
     db.prepare(`
       UPDATE sales
-      SET date = ?, time = ?, total_amount = ?, total_discount = ?, bill_discount = ?, total_gst = ?, item_count = ?, notes = ?, customer_name = ?, customer_mobile = ?, customer_place = ?, customer_id = ?, cash_amount = ?, upi_amount = ?, waiter_id = ?, waiter_name = ?, service_type = ?
+      SET date = ?, time = ?, total_amount = ?, total_discount = ?, bill_discount = ?, total_gst = ?, item_count = ?, notes = ?, customer_name = ?, customer_mobile = ?, customer_place = ?, customer_id = ?, cash_amount = ?, upi_amount = ?, tendered_amount = ?, waiter_id = ?, waiter_name = ?, service_type = ?
       WHERE id = ?
     `).run(
       date,
@@ -309,6 +310,7 @@ class SaleRepository {
       customer_id || null,
       cash_amount || 0,
       upi_amount || 0,
+      tendered_amount || 0,
       waiter_id || null,
       waiter_name || '',
       service_type || '',

@@ -14,6 +14,40 @@ const POLL_INTERVAL_MS = 300;
 let serverProcess = null;
 let mainWindow = null;
 
+// ── Remote / local mode resolution ─────────────────────────────────────────────
+
+// Hardcoded remote URL. Set this to a value (e.g.
+// 'accounts-nawabbiriyani.2dotloanmanager.in') to load that hosted app instead
+// of starting the bundled local server. Leave it empty ('') to run fully local.
+//
+// A more flexible approach (not used here to keep things simple) would be to
+// resolve this at runtime instead of hardcoding — e.g. read an APP_URL
+// environment variable, or a "remoteUrl" field from a config.json placed in the
+// app's user-data folder (%APPDATA%/2Dot Billz/config.json on Windows). That
+// lets each install point at a different tenant without rebuilding.
+const REMOTE_URL = 'accounts-nawabbiriyani.2dotloanmanager.in';
+
+/**
+ * Resolves the URL to load and whether the bundled server is needed.
+ *
+ * When REMOTE_URL is set, the local server is NOT started and the hosted app is
+ * loaded instead. Otherwise the app falls back to the bundled local server.
+ *
+ * @returns {{ url: string, useLocalServer: boolean }}
+ */
+function resolveAppUrl() {
+  const trimmed = (REMOTE_URL || '').trim();
+  if (trimmed) {
+    // Allow bare hosts like "accounts-nawabbiriyani.2dotloanmanager.in"
+    const url = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+    console.log(`[electron] Using remote URL: ${url}`);
+    return { url, useLocalServer: false };
+  }
+
+  // Fall back to the bundled local server
+  return { url: SERVER_URL, useLocalServer: true };
+}
+
 // ── Server management ─────────────────────────────────────────────────────────
 
 /**
@@ -110,13 +144,14 @@ function waitForServer() {
 
 // ── Window ────────────────────────────────────────────────────────────────────
 
-function createWindow() {
+function createWindow(url, useLocalServer) {
   mainWindow = new BrowserWindow({
     width: 1366,
     height: 860,
     minWidth: 960,
     minHeight: 640,
-    title: '2Dot Billz',
+    // Append "(online)" when loading the hosted app instead of the local server
+    title: useLocalServer ? '2Dot Billz' : '2Dot Billz (online)',
     // Uses default Electron icon; swap in a real .ico via electron-builder config
     webPreferences: {
       contextIsolation: true,
@@ -127,6 +162,15 @@ function createWindow() {
 
   // Remove default menu bar (optional — delete this line to keep it)
   Menu.setApplicationMenu(null);
+
+  // In remote mode, keep the "(online)" suffix even when the loaded page sets
+  // its own <title> (Electron otherwise mirrors the page title onto the window).
+  if (!useLocalServer) {
+    mainWindow.on('page-title-updated', (event, title) => {
+      event.preventDefault();
+      mainWindow.setTitle(`${title} (online)`);
+    });
+  }
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -143,18 +187,27 @@ function createWindow() {
     mainWindow = null;
   });
 
-  mainWindow.loadURL(SERVER_URL);
+  mainWindow.loadURL(url);
 }
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
 app.whenReady().then(async () => {
+  const { url, useLocalServer } = resolveAppUrl();
+
+  // Remote mode: load the configured URL directly, no bundled server.
+  if (!useLocalServer) {
+    console.log(`[electron] Remote mode — skipping local server, opening ${url}`);
+    createWindow(url, useLocalServer);
+    return;
+  }
+
   startServer();
 
   try {
     await waitForServer();
     console.log('[electron] Server is ready — opening window');
-    createWindow();
+    createWindow(url, useLocalServer);
   } catch (err) {
     dialog.showErrorBox(
       '2Dot Billz — Startup Error',
@@ -172,7 +225,10 @@ app.on('window-all-closed', () => {
 
 // macOS: re-create window when dock icon is clicked and no windows are open
 app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) createWindow();
+  if (BrowserWindow.getAllWindows().length === 0) {
+    const { url, useLocalServer } = resolveAppUrl();
+    createWindow(url, useLocalServer);
+  }
 });
 
 // Always kill the server when Electron exits

@@ -543,6 +543,8 @@ export default function ItemSalesEntryPage() {
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [imeiEnabled, setImeiEnabled] = useState(false);
+  // Cash tender field: when disabled the "Tendered"/"Return" inputs are hidden.
+  const [cashTenderEnabled, setCashTenderEnabled] = useState(true);
   // Restaurant module: when enabled the bill can be tagged A/C or Non-A/C and
   // assigned to a waiter, and item lines resolve to the matching fixed rate.
   const [restaurantEnabled, setRestaurantEnabled] = useState(false);
@@ -763,6 +765,16 @@ export default function ItemSalesEntryPage() {
       .then((r) => {
         const v = r.data?.value;
         setImeiEnabled(v === true || v === 'true');
+      })
+      .catch(() => {});
+  }, []);
+
+  // Load the cash-tender toggle once on mount (default enabled).
+  useEffect(() => {
+    settingsApi.get('cash_tender_enabled')
+      .then((r) => {
+        const v = r.data?.value;
+        setCashTenderEnabled(v !== false && v !== 'false');
       })
       .catch(() => {});
   }, []);
@@ -2045,41 +2057,48 @@ export default function ItemSalesEntryPage() {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
-                        tenderedInputRef.current?.focus();
-                        tenderedInputRef.current?.select();
+                        if (cashTenderEnabled) {
+                          tenderedInputRef.current?.focus();
+                          tenderedInputRef.current?.select();
+                        } else {
+                          e.currentTarget.blur();
+                          handleSave();
+                        }
                       }
                     }}
                     className="w-24 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm font-medium text-slate-700 focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
                   />
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 flex items-center justify-between gap-2 text-sm">
-                  <span className="text-slate-500">Tendered</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={tenderedAmount}
-                    onChange={(e) => setTenderedAmount(e.target.value)}
-                    ref={tenderedInputRef}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        e.currentTarget.blur();
-                        handleSave();
-                      }
-                    }}
-                    className="w-24 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm font-medium text-slate-700 focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
-                  />
+              {cashTenderEnabled && (
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 flex items-center justify-between gap-2 text-sm">
+                    <span className="text-slate-500">Tendered</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={tenderedAmount}
+                      onChange={(e) => setTenderedAmount(e.target.value)}
+                      ref={tenderedInputRef}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          e.currentTarget.blur();
+                          handleSave();
+                        }
+                      }}
+                      className="w-24 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm font-medium text-slate-700 focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
+                    />
+                  </div>
+                  <div className="flex-1 flex items-center justify-between gap-2 text-sm">
+                    <span className="text-slate-500">Return</span>
+                    <span className={`font-semibold ${changeDue > 0 ? 'text-credit-green' : 'text-slate-400'}`}>
+                      {formatCurrency(changeDue)}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex-1 flex items-center justify-between gap-2 text-sm">
-                  <span className="text-slate-500">Return</span>
-                  <span className={`font-semibold ${changeDue > 0 ? 'text-credit-green' : 'text-slate-400'}`}>
-                    {formatCurrency(changeDue)}
-                  </span>
-                </div>
-              </div>
+              )}
               {!paymentBalanced && (
                 <div className="text-right text-xs font-medium text-debit-red">
                   Cash + UPI must equal {formatCurrency(netTotal)}

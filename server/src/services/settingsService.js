@@ -29,12 +29,18 @@ class SettingsService {
       gst_tax_id: settingsRepository.get('gst_tax_id'),
       phone: settingsRepository.get('phone'),
       email: settingsRepository.get('email'),
+      // UPI id used to render a payment QR code on the thermal bill.
+      upi_id: settingsRepository.get('upi_id'),
       // Derive the logo path from the actual file on disk so a stale/empty
       // `logo_path` setting never hides an uploaded logo.
       logo_path: this.resolveLogoPath(),
       // Thermal receipt logo height (mm) — configured via receipt_config so
       // every receipt builder that receives the store profile honours it.
       thermal_logo_height: this.resolveThermalLogoHeight(),
+      // Thermal UPI QR size (mm) — configured via receipt_config.
+      thermal_upi_qr_size: this.resolveThermalUpiQrSize(),
+      // Thermal paper/roll width (mm) — configured via receipt_config.
+      thermal_width: this.resolveThermalWidth(),
     };
   }
 
@@ -45,6 +51,24 @@ class SettingsService {
     const raw = cfg && typeof cfg === 'object' ? Number(cfg.thermalLogoHeight) : NaN;
     if (!Number.isFinite(raw) || raw <= 0) return 12;
     return Math.min(40, Math.max(6, raw));
+  }
+
+  // Reads the thermal UPI QR size (mm) from receipt_config, clamped to a sane
+  // 15–50mm range. Falls back to 28mm when unset or invalid.
+  resolveThermalUpiQrSize() {
+    const cfg = settingsRepository.get('receipt_config');
+    const raw = cfg && typeof cfg === 'object' ? Number(cfg.thermalUpiQrSize) : NaN;
+    if (!Number.isFinite(raw) || raw <= 0) return 28;
+    return Math.min(50, Math.max(15, raw));
+  }
+
+  // Reads the thermal paper/roll width (mm) from receipt_config, clamped to a
+  // sane 50–80mm range. Falls back to 80mm when unset or invalid.
+  resolveThermalWidth() {
+    const cfg = settingsRepository.get('receipt_config');
+    const raw = cfg && typeof cfg === 'object' ? Number(cfg.thermalWidth) : NaN;
+    if (!Number.isFinite(raw) || raw <= 0) return 80;
+    return Math.min(80, Math.max(50, raw));
   }
 
   // Returns the public logo URL when a logo file exists on disk, else ''.

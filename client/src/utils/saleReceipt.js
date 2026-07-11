@@ -9,6 +9,31 @@
  *              Bill-To block, ruled items table and totals panel
  */
 
+import qrcode from 'qrcode-generator';
+
+// Builds a UPI payment QR code as a data URL for the given VPA (UPI id).
+// Returns null when no valid UPI id is supplied. Fully synchronous so it can
+// be embedded directly in the receipt HTML string.
+function buildUpiQrDataUrl(upiId, { payeeName = '', amount = 0 } = {}) {
+  const vpa = String(upiId || '').trim();
+  if (!vpa) return null;
+  try {
+    const params = [`pa=${encodeURIComponent(vpa)}`];
+    if (payeeName) params.push(`pn=${encodeURIComponent(payeeName)}`);
+    const amt = parseFloat(amount);
+    if (Number.isFinite(amt) && amt > 0) params.push(`am=${amt.toFixed(2)}`);
+    params.push('cu=INR');
+    const upiUri = `upi://pay?${params.join('&')}`;
+    const qr = qrcode(0, 'M');
+    qr.addData(upiUri);
+    qr.make();
+    // cellSize/margin in module units; the CSS width scales it to the desired mm.
+    return qr.createDataURL(4, 0);
+  } catch (_) {
+    return null;
+  }
+}
+
 function fmt(date) {
   if (!date) return '—';
   const [y, m, d] = date.split('-');
@@ -126,19 +151,21 @@ export function buildSaleReceiptHtml({
   format = 'thermal',
   docType = 'sale',
   logoHeightMm = null, // optional override for the thermal logo height (mm)
+  upiQrSizeMm = null, // optional override for the thermal UPI QR size (mm)
+  widthMm = null, // optional override for the thermal paper width (mm)
 }) {
   const ps = PAGE_SIZES[format] || PAGE_SIZES.thermal;
   const isThermal = format === 'thermal';
   const labels = DOC_LABELS[docType] || DOC_LABELS.sale;
 
-  if (isThermal) return buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docType, logoHeightMm });
+  if (isThermal) return buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docType, logoHeightMm, upiQrSizeMm, widthMm });
   return buildPaper({ sale, store, logoDataUrl, ps, format, labels });
 }
 
 // ───────────────────────────────────────────────────────────────────────────
 // Thermal (80mm) — POS-style monospaced receipt
 // ───────────────────────────────────────────────────────────────────────────
-function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docType, logoHeightMm = null }) {
+function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docType, logoHeightMm = null, upiQrSizeMm = null, widthMm = null }) {
   const items = Array.isArray(sale.items) ? sale.items : [];
   const totalQty          = items.reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0);
   const totalItemDiscount = parseFloat(sale.total_discount) || 0;
@@ -154,6 +181,29 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docTyp
     (typeof logoHeightMm === 'number' && logoHeightMm > 0)
       ? logoHeightMm
       : (parseFloat(store?.thermal_logo_height) || 12);
+
+  // Thermal UPI QR size (mm): explicit override → store profile setting → 28mm.
+  const resolvedUpiQrSize =
+    (typeof upiQrSizeMm === 'number' && upiQrSizeMm > 0)
+      ? upiQrSizeMm
+      : (parseFloat(store?.thermal_upi_qr_size) || 28);
+
+  // Build the UPI payment QR (embeds the bill amount) when a UPI id is set.
+  const upiQrDataUrl = buildUpiQrDataUrl(store?.upi_id, {
+    payeeName: store?.store_name || '',
+    amount: totalAmount,
+  });
+
+  // Thermal paper width (mm): explicit override → store profile setting → 80mm.
+  // Clamped to a sane 50–80mm range (58mm and 80mm are the common roll sizes).
+  const rawWidth =
+    (typeof widthMm === 'number' && widthMm > 0)
+      ? widthMm
+      : (parseFloat(store?.thermal_width) || 80);
+  const paperWidth = Math.min(80, Math.max(50, rawWidth));
+  // Body width accounts for the 2mm left/right @page margins.
+  const thermalPageSize = `${paperWidth}mm auto`;
+  const thermalBodyWidth = `${paperWidth - 4}mm`;
 
   // Gross before any discount = Σ(rate × qty). Reconciles as:
   //   grossBeforeDisc − (itemDiscount + billDiscount) = totalAmount
@@ -202,14 +252,14 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docTyp
   <meta charset="UTF-8" />
   <title>${labels.docWord} ${sale.sale_number || ''}</title>
   <style>
-    @page { size: ${ps.cssSize}; margin: 3mm 2mm; }
+    @page { size: ${thermalPageSize}; margin: 3mm 2mm; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body, body * { color: #000 !important; background: transparent !important; border-color: #000 !important; }
     body {
       font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
       font-size: 9pt;
       line-height: 1.4;
-      width: ${ps.width};
+      width: ${thermalBodyWidth};
       filter: grayscale(100%);
       -webkit-filter: grayscale(100%);
       -webkit-print-color-adjust: exact;
@@ -220,6 +270,12 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docTyp
 
     .logo-wrap { text-align: center; margin-bottom: 1.5mm; }
     .logo-wrap img { max-height: ${resolvedLogoHeight}mm; max-width: 100%; object-fit: contain; filter: grayscale(100%) contrast(1.15); }
+
+    /* ── UPI payment QR ── */
+    .upi-qr { text-align: center; margin-top: 2mm; }
+    .upi-qr img { width: ${resolvedUpiQrSize}mm; height: ${resolvedUpiQrSize}mm; image-rendering: pixelated; }
+    .upi-qr .upi-label { font-size: 8pt; font-weight: 700; margin-top: 0.8mm; letter-spacing: 0.3px; }
+    .upi-qr .upi-vpa { font-size: 7.5pt; margin-top: 0.2mm; word-break: break-all; }
 
     /* ── Centered store header ── */
     .header { text-align: center; }
@@ -374,6 +430,14 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docTyp
   <div class="words">${escapeHtml(amountInWords(totalAmount))}</div>
 
   ${sale.notes ? `<div class="notes"><span class="lbl">Notes:</span> ${escapeHtml(sale.notes)}</div>` : ''}
+
+  ${upiQrDataUrl ? `
+  <div class="rule-dash"></div>
+  <div class="upi-qr">
+    <img src="${upiQrDataUrl}" alt="UPI QR"/>
+    <div class="upi-label">Scan &amp; Pay via UPI</div>
+    <div class="upi-vpa">${escapeHtml(store.upi_id)}</div>
+  </div>` : ''}
 
   <div class="footer">
     <div class="eoe">E &amp; O E</div>

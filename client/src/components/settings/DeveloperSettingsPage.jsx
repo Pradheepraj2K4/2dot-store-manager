@@ -23,6 +23,7 @@ import {
   CircleStackIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
+  QrCodeIcon,
 } from '@heroicons/react/24/outline';
 
 // Compact toggle row for the Feature Modules section. Persists the setting and
@@ -71,6 +72,7 @@ export default function DeveloperSettingsPage() {
     gst_tax_id: '',
     phone: '',
     email: '',
+    upi_id: '',
     logo_path: '',
   });
 
@@ -103,6 +105,8 @@ export default function DeveloperSettingsPage() {
   const [accountTransactionEnabled, setAccountTransactionEnabled] = useState(true);
   // GST fields state
   const [gstFieldsEnabled, setGstFieldsEnabled] = useState(false);
+  // Cash tender field state (default enabled)
+  const [cashTenderEnabled, setCashTenderEnabled] = useState(true);
   // IMEI tracking state
   const [imeiTrackingEnabled, setImeiTrackingEnabled] = useState(false);
   // Print receipt settings
@@ -116,6 +120,12 @@ export default function DeveloperSettingsPage() {
   // Thermal receipt logo size (mm) — stored inside receipt_config.thermalLogoHeight
   const [thermalLogoHeight, setThermalLogoHeight] = useState(12);
   const [savingLogoHeight, setSavingLogoHeight] = useState(false);
+  // Thermal receipt UPI QR size (mm) — stored inside receipt_config.thermalUpiQrSize
+  const [thermalUpiQrSize, setThermalUpiQrSize] = useState(28);
+  const [savingUpiQrSize, setSavingUpiQrSize] = useState(false);
+  // Thermal paper/roll width (mm) — stored inside receipt_config.thermalWidth
+  const [thermalWidth, setThermalWidth] = useState(80);
+  const [savingThermalWidth, setSavingThermalWidth] = useState(false);
   // Logo as a data URL for the live thermal preview (embeds cleanly in srcDoc)
   const [previewLogoDataUrl, setPreviewLogoDataUrl] = useState(null);
 
@@ -170,6 +180,7 @@ export default function DeveloperSettingsPage() {
         gst_tax_id: data.gst_tax_id || '',
         phone: data.phone || '',
         email: data.email || '',
+        upi_id: data.upi_id || '',
         logo_path: data.logo_path || '',
       });
       if (data.logo_path) {
@@ -192,6 +203,8 @@ export default function DeveloperSettingsPage() {
       setMultiCounterEnabled(data.multi_counter_enabled === true || data.multi_counter_enabled === 'true');
       // Load GST fields setting
       setGstFieldsEnabled(data.gst_fields_enabled === true || data.gst_fields_enabled === 'true');
+      // Load cash tender setting (default enabled — missing key counts as on)
+      setCashTenderEnabled(data.cash_tender_enabled !== false && data.cash_tender_enabled !== 'false');
       // Load IMEI tracking setting
       setImeiTrackingEnabled(data.imei_tracking_enabled === true || data.imei_tracking_enabled === 'true');
       // Load print receipt settings
@@ -204,6 +217,10 @@ export default function DeveloperSettingsPage() {
       setDefaultPrintFormat(['thermal', 'a5', 'a4'].includes(cfg.format) ? cfg.format : 'thermal');
       const lh = Number(cfg.thermalLogoHeight);
       setThermalLogoHeight(Number.isFinite(lh) && lh > 0 ? Math.min(40, Math.max(6, lh)) : 12);
+      const qs = Number(cfg.thermalUpiQrSize);
+      setThermalUpiQrSize(Number.isFinite(qs) && qs > 0 ? Math.min(50, Math.max(15, qs)) : 28);
+      const tw = Number(cfg.thermalWidth);
+      setThermalWidth(Number.isFinite(tw) && tw > 0 ? Math.min(80, Math.max(50, tw)) : 80);
       // Load backup settings
       try {
         const bRes = await settingsApi.getBackupStatus();
@@ -412,9 +429,45 @@ export default function DeveloperSettingsPage() {
     }
   };
 
+  // Persist the thermal UPI QR size (mm) into receipt_config. Called when the
+  // slider is released so we don't spam the API on every drag tick.
+  const saveThermalUpiQrSize = async (value) => {
+    const clamped = Math.min(50, Math.max(15, Number(value) || 28));
+    if ((receiptConfig.thermalUpiQrSize || 28) === clamped) return;
+    setSavingUpiQrSize(true);
+    try {
+      const newCfg = { ...receiptConfig, thermalUpiQrSize: clamped };
+      await settingsApi.update('receipt_config', newCfg);
+      setReceiptConfig(newCfg);
+      toast.success(`UPI QR size set to ${clamped}mm`);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSavingUpiQrSize(false);
+    }
+  };
+
+  // Persist the thermal paper/roll width (mm) into receipt_config. Called when
+  // the slider is released so we don't spam the API on every drag tick.
+  const saveThermalWidth = async (value) => {
+    const clamped = Math.min(80, Math.max(50, Number(value) || 80));
+    if ((receiptConfig.thermalWidth || 80) === clamped) return;
+    setSavingThermalWidth(true);
+    try {
+      const newCfg = { ...receiptConfig, thermalWidth: clamped };
+      await settingsApi.update('receipt_config', newCfg);
+      setReceiptConfig(newCfg);
+      toast.success(`Thermal width set to ${clamped}mm`);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSavingThermalWidth(false);
+    }
+  };
+
   // Sample data that mirrors a real thermal bill so the live preview reflects
   // the true receipt appearance while the slider is adjusted.
-  const buildLogoPreviewHtml = (heightMm) =>
+  const buildLogoPreviewHtml = (heightMm, qrSizeMm = thermalUpiQrSize) =>
     buildSaleReceiptHtml({
       sale: {
         sale_number: 'PREVIEW-001',
@@ -436,6 +489,8 @@ export default function DeveloperSettingsPage() {
       logoDataUrl: previewLogoDataUrl,
       format: 'thermal',
       logoHeightMm: heightMm,
+      upiQrSizeMm: qrSizeMm,
+      widthMm: thermalWidth,
     });
 
   // --- Layout Editor ---
@@ -740,6 +795,20 @@ export default function DeveloperSettingsPage() {
                   placeholder="GST number"
                 />
               </div>
+              <div>
+                <label className="label">UPI ID</label>
+                <input
+                  type="text"
+                  value={profile.upi_id}
+                  onChange={(e) => setProfile((p) => ({ ...p, upi_id: e.target.value }))}
+                  className="input-field"
+                  placeholder="yourname@bank"
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  When set, a UPI payment QR code is printed at the bottom of the thermal bill.
+                  Adjust its size in the <span className="font-medium">Receipt</span> tab.
+                </p>
+              </div>
               <div className="flex justify-end pt-2">
                 <button onClick={handleSaveProfile} disabled={saving} className="btn-primary">
                   {saving ? 'Saving...' : 'Save Profile'}
@@ -1003,6 +1072,13 @@ export default function DeveloperSettingsPage() {
                     onChange={setGstFieldsEnabled}
                     toastLabel="GST fields"
                   />
+                  <ModuleToggle
+                    label="Cash Tender Field"
+                    settingKey="cash_tender_enabled"
+                    checked={cashTenderEnabled}
+                    onChange={setCashTenderEnabled}
+                    toastLabel="Cash tender field"
+                  />
                 </div>
               </div>
 
@@ -1135,78 +1211,189 @@ export default function DeveloperSettingsPage() {
                 </div>
               </div>
 
-              {/* Thermal Logo Size */}
+              {/* Thermal Bill Appearance — controls + shared live preview side by side */}
               <div className="p-4 rounded-lg border border-slate-200 bg-white mb-6">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-slate-800">Thermal Logo Size</h3>
-                  <span className="text-xs font-semibold text-trust-blue tabular-nums">
-                    {thermalLogoHeight}mm
-                  </span>
-                </div>
-                <p className="text-xs text-slate-500 mt-0.5 mb-3">
-                  Adjust how large the shop logo prints on the thermal (80mm) bill. Drag the slider
-                  and watch the live preview update.
-                </p>
-
-                {(previewLogoDataUrl || logoPreview) ? (
-                  <div className="grid gap-4 sm:grid-cols-[1fr_auto] items-start">
-                    {/* Slider */}
+                <div className="grid gap-5 lg:grid-cols-[1fr_auto] items-start">
+                  {/* Controls column */}
+                  <div className="space-y-6">
+                    {/* Thermal Paper Width */}
                     <div>
-                      <input
-                        type="range"
-                        min="6"
-                        max="40"
-                        step="1"
-                        value={thermalLogoHeight}
-                        disabled={savingLogoHeight}
-                        onChange={(e) => setThermalLogoHeight(Number(e.target.value))}
-                        onMouseUp={(e) => saveThermalLogoHeight(e.target.value)}
-                        onTouchEnd={(e) => saveThermalLogoHeight(e.target.value)}
-                        onKeyUp={(e) => saveThermalLogoHeight(e.target.value)}
-                        className="w-full accent-trust-blue cursor-pointer"
-                      />
-                      <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-                        <span>Small · 6mm</span>
-                        <span>Large · 40mm</span>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-slate-800">Thermal Paper Width</h3>
+                        <span className="text-xs font-semibold text-trust-blue tabular-nums">
+                          {thermalWidth}mm
+                        </span>
                       </div>
-                      <div className="flex items-center gap-2 mt-3">
-                        <button
-                          type="button"
-                          disabled={savingLogoHeight}
-                          onClick={() => { setThermalLogoHeight(12); saveThermalLogoHeight(12); }}
-                          className="btn-secondary text-xs gap-1 disabled:opacity-60"
-                        >
-                          <ArrowPathIcon className="h-3.5 w-3.5" />
-                          Reset to 12mm
-                        </button>
-                        {savingLogoHeight && <span className="text-xs text-slate-400">Saving…</span>}
+                      <p className="text-xs text-slate-500 mt-0.5 mb-3">
+                        Match this to your thermal printer's roll. 58mm and 80mm are the common sizes.
+                      </p>
+                      <div>
+                        <input
+                          type="range"
+                          min="50"
+                          max="80"
+                          step="1"
+                          value={thermalWidth}
+                          disabled={savingThermalWidth}
+                          onChange={(e) => setThermalWidth(Number(e.target.value))}
+                          onMouseUp={(e) => saveThermalWidth(e.target.value)}
+                          onTouchEnd={(e) => saveThermalWidth(e.target.value)}
+                          onKeyUp={(e) => saveThermalWidth(e.target.value)}
+                          className="w-full accent-trust-blue cursor-pointer"
+                        />
+                        <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                          <span>58mm</span>
+                          <span>80mm</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-3">
+                          <button
+                            type="button"
+                            disabled={savingThermalWidth}
+                            onClick={() => { setThermalWidth(58); saveThermalWidth(58); }}
+                            className="btn-secondary text-xs disabled:opacity-60"
+                          >
+                            58mm
+                          </button>
+                          <button
+                            type="button"
+                            disabled={savingThermalWidth}
+                            onClick={() => { setThermalWidth(80); saveThermalWidth(80); }}
+                            className="btn-secondary text-xs disabled:opacity-60"
+                          >
+                            80mm
+                          </button>
+                          {savingThermalWidth && <span className="text-xs text-slate-400">Saving…</span>}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Live thermal preview */}
-                    <div className="justify-self-center">
-                      <div className="text-[10px] font-medium text-slate-400 mb-1 text-center uppercase tracking-wide">
-                        Live Preview
+                    {/* Thermal Logo Size */}
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-slate-800">Thermal Logo Size</h3>
+                        <span className="text-xs font-semibold text-trust-blue tabular-nums">
+                          {thermalLogoHeight}mm
+                        </span>
                       </div>
-                      <div className="rounded-lg border border-slate-300 bg-slate-100 p-2 shadow-inner">
-                        <iframe
-                          title="Thermal logo preview"
-                          srcDoc={buildLogoPreviewHtml(thermalLogoHeight)}
-                          className="block bg-white rounded"
-                          style={{ width: '280px', height: '300px', border: 'none' }}
-                        />
+                      <p className="text-xs text-slate-500 mt-0.5 mb-3">
+                        Adjust how large the shop logo prints on the thermal (80mm) bill.
+                      </p>
+
+                      {(previewLogoDataUrl || logoPreview) ? (
+                        <div>
+                          <input
+                            type="range"
+                            min="6"
+                            max="40"
+                            step="1"
+                            value={thermalLogoHeight}
+                            disabled={savingLogoHeight}
+                            onChange={(e) => setThermalLogoHeight(Number(e.target.value))}
+                            onMouseUp={(e) => saveThermalLogoHeight(e.target.value)}
+                            onTouchEnd={(e) => saveThermalLogoHeight(e.target.value)}
+                            onKeyUp={(e) => saveThermalLogoHeight(e.target.value)}
+                            className="w-full accent-trust-blue cursor-pointer"
+                          />
+                          <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                            <span>Small · 6mm</span>
+                            <span>Large · 40mm</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-3">
+                            <button
+                              type="button"
+                              disabled={savingLogoHeight}
+                              onClick={() => { setThermalLogoHeight(12); saveThermalLogoHeight(12); }}
+                              className="btn-secondary text-xs gap-1 disabled:opacity-60"
+                            >
+                              <ArrowPathIcon className="h-3.5 w-3.5" />
+                              Reset to 12mm
+                            </button>
+                            {savingLogoHeight && <span className="text-xs text-slate-400">Saving…</span>}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center">
+                          <PhotoIcon className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                          <p className="text-xs text-slate-500">
+                            Upload a shop logo in the <span className="font-medium">Store Profile</span> tab
+                            to adjust its size on the thermal bill.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Thermal UPI QR Size */}
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-slate-800">UPI QR Code Size</h3>
+                        <span className="text-xs font-semibold text-trust-blue tabular-nums">
+                          {thermalUpiQrSize}mm
+                        </span>
                       </div>
+                      <p className="text-xs text-slate-500 mt-0.5 mb-3">
+                        Adjust how large the UPI payment QR code prints at the bottom of the thermal (80mm) bill.
+                      </p>
+
+                      {profile.upi_id && profile.upi_id.trim() ? (
+                        <div>
+                          <input
+                            type="range"
+                            min="15"
+                            max="50"
+                            step="1"
+                            value={thermalUpiQrSize}
+                            disabled={savingUpiQrSize}
+                            onChange={(e) => setThermalUpiQrSize(Number(e.target.value))}
+                            onMouseUp={(e) => saveThermalUpiQrSize(e.target.value)}
+                            onTouchEnd={(e) => saveThermalUpiQrSize(e.target.value)}
+                            onKeyUp={(e) => saveThermalUpiQrSize(e.target.value)}
+                            className="w-full accent-trust-blue cursor-pointer"
+                          />
+                          <div className="flex justify-between text-[10px] text-slate-400 mt-1">
+                            <span>Small · 15mm</span>
+                            <span>Large · 50mm</span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-3">
+                            <button
+                              type="button"
+                              disabled={savingUpiQrSize}
+                              onClick={() => { setThermalUpiQrSize(28); saveThermalUpiQrSize(28); }}
+                              className="btn-secondary text-xs gap-1 disabled:opacity-60"
+                            >
+                              <ArrowPathIcon className="h-3.5 w-3.5" />
+                              Reset to 28mm
+                            </button>
+                            {savingUpiQrSize && <span className="text-xs text-slate-400">Saving…</span>}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center">
+                          <QrCodeIcon className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                          <p className="text-xs text-slate-500">
+                            Enter a <span className="font-medium">UPI ID</span> in the{' '}
+                            <span className="font-medium">Store Profile</span> tab to print a payment QR
+                            code and adjust its size on the thermal bill.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center">
-                    <PhotoIcon className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                    <p className="text-xs text-slate-500">
-                      Upload a shop logo in the <span className="font-medium">Store Profile</span> tab
-                      to adjust its size on the thermal bill.
-                    </p>
+
+                  {/* Shared live thermal preview */}
+                  <div className="justify-self-center">
+                    <div className="text-[10px] font-medium text-slate-400 mb-1 text-center uppercase tracking-wide">
+                      Live Preview
+                    </div>
+                    <div className="rounded-lg border border-slate-300 bg-slate-100 p-2 shadow-inner">
+                      <iframe
+                        title="Thermal receipt preview"
+                        srcDoc={buildLogoPreviewHtml(thermalLogoHeight, thermalUpiQrSize)}
+                        className="block bg-white rounded"
+                        style={{ width: '280px', height: '360px', border: 'none' }}
+                      />
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
 
               <div className="space-y-4">

@@ -61,6 +61,7 @@ export default function PurchaseReportPage() {
   const [store, setStore] = useState({});
   const [logoDataUrl, setLogoDataUrl] = useState(null);
   const [receiptFormat, setReceiptFormat] = useState('thermal');
+  const [receiptConfig, setReceiptConfig] = useState(null);
   const [previewModal, setPreviewModal] = useState({ open: false, html: '', purchase: null });
 
   useEffect(() => {
@@ -71,7 +72,9 @@ export default function PurchaseReportPage() {
       ]);
       const profile = profileRes.data || {};
       setStore(profile);
-      const fmt = (configRes.data && configRes.data.format) || 'thermal';
+      const cfg = configRes.data && typeof configRes.data === 'object' ? configRes.data : {};
+      setReceiptConfig(cfg);
+      const fmt = cfg.format || 'thermal';
       setReceiptFormat(['a4', 'a5', 'thermal'].includes(fmt) ? fmt : 'thermal');
       if (profile.logo_path) {
         const dl = await fetchLogoDataUrl(profile.logo_path);
@@ -88,6 +91,7 @@ export default function PurchaseReportPage() {
         store,
         logoDataUrl,
         format: receiptFormat,
+        config: receiptConfig,
       });
       setPreviewModal({ open: true, html, purchase: res.data });
     } catch (err) {
@@ -507,6 +511,7 @@ export default function PurchaseReportPage() {
                 store,
                 logoDataUrl,
                 format: f,
+                config: receiptConfig,
               });
               setPreviewModal((prev) => ({ ...prev, html }));
             }

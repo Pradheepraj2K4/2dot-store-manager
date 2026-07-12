@@ -74,6 +74,7 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
   const [receiptFormat, setReceiptFormat] = useState('a5');
   const [previewModal, setPreviewModal] = useState({ open: false, html: '' });
   const [printReceiptsEnabled, setPrintReceiptsEnabled] = useState(false);
+  const [receiptConfig, setReceiptConfig] = useState(null);
   const iframeRef = useRef(null);
   const pendingRefreshRef = useRef(false);
 
@@ -90,7 +91,9 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
       ]);
       const profile = profileRes.data || {};
       setStore(profile);
-      setReceiptFormat((configRes.data && configRes.data.format) || 'a5');
+      const cfg = configRes.data && typeof configRes.data === 'object' ? configRes.data : {};
+      setReceiptConfig(cfg);
+      setReceiptFormat(cfg.format || 'a5');
       const pv = printRes.data?.value;
       setPrintReceiptsEnabled(pv === true || pv === 'true');
       if (profile.logo_path) {
@@ -133,7 +136,7 @@ function InterestSection({ ledgerId, ledger, onRefresh }) {
   };
 
   const handlePrint = (entry) => {
-    const html = buildInterestReceiptHtml({ entry, ledgerName: ledger.name, store, logoDataUrl, format: receiptFormat });
+    const html = buildInterestReceiptHtml({ entry, ledgerName: ledger.name, store, logoDataUrl, format: receiptFormat, config: receiptConfig });
     setPreviewModal({ open: true, html });
   };
 
@@ -665,6 +668,7 @@ export default function LedgerPage() {
   const [receiptFormat, setReceiptFormat] = useState('a5');
   const [txnPreviewModal, setTxnPreviewModal] = useState({ open: false, html: '' });
   const [printReceiptsPaymentEnabled, setPrintReceiptsPaymentEnabled] = useState(false);
+  const [receiptConfig, setReceiptConfig] = useState(null);
   const txnIframeRef = useRef(null);
   const txnPendingRefreshRef = useRef(false);
 
@@ -713,7 +717,9 @@ export default function LedgerPage() {
       ]);
       const profile = profileRes.data || {};
       setStore(profile);
-      setReceiptFormat((configRes.data && configRes.data.format) || 'a5');
+      const cfg = configRes.data && typeof configRes.data === 'object' ? configRes.data : {};
+      setReceiptConfig(cfg);
+      setReceiptFormat(cfg.format || 'a5');
       const pv = printRes.data?.value;
       setPrintReceiptsPaymentEnabled(pv === true || pv === 'true');
       if (profile.logo_path) {
@@ -730,6 +736,7 @@ export default function LedgerPage() {
       store,
       logoDataUrl,
       format: receiptFormat,
+      config: receiptConfig,
     });
     if (needsRefresh) txnPendingRefreshRef.current = true;
     setTxnPreviewModal({ open: true, html });

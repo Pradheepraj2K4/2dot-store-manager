@@ -5,6 +5,8 @@
  * Paper size is driven by `format`: 'a5' | 'a4' | 'thermal'
  */
 
+import { mergeReceiptConfig } from './receiptConfig';
+
 function fmt(date) {
   if (!date) return '—';
   const [y, m, d] = date.split('-');
@@ -22,10 +24,14 @@ const PAGE_SIZES = {
   thermal: { cssSize: '80mm auto', width: '76mm'  },
 };
 
-export function buildTransactionReceiptHtml({ txn, ledgerName, store = {}, logoDataUrl = null, format = 'a5' }) {
+export function buildTransactionReceiptHtml({ txn, ledgerName, store = {}, logoDataUrl = null, format = 'a5', config = null }) {
   const ps = PAGE_SIZES[format] || PAGE_SIZES.a5;
   const isThermal = format === 'thermal';
   const isPayment = txn.entry_type === 'payment';
+  const cfgP = mergeReceiptConfig(config).paper;
+  const fontFamily = cfgP.fontFamily || "'Segoe UI', system-ui, -apple-system, sans-serif";
+  const thanksText = cfgP.thanksText || 'Thank you for your business!';
+  const signatureLabel = cfgP.signatureLabel || 'Authorized Signature';
 
   const primaryColor   = isPayment ? '#DC2626' : '#16A34A';
   const amountBg       = isPayment ? '#fff5f5'  : '#f0fff4';
@@ -50,7 +56,7 @@ export function buildTransactionReceiptHtml({ txn, ledgerName, store = {}, logoD
     @page { size: ${ps.cssSize}; margin: ${isThermal ? '4mm 3mm' : '12mm'}; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-family: ${fontFamily};
       font-size: ${bodyFontSize};
       color: #1a1a1a;
       width: ${ps.width};
@@ -206,13 +212,13 @@ export function buildTransactionReceiptHtml({ txn, ledgerName, store = {}, logoD
   </div>
 
   <!-- Footer -->
-  <div class="footer">Thank you for your business!</div>
+  <div class="footer">${thanksText}</div>
 
   <!-- Signature -->
   <div class="signature">
     <div class="sig-inner">
       <div class="sig-line"></div>
-      <div class="sig-text">Authorized Signature</div>
+      <div class="sig-text">${signatureLabel}</div>
     </div>
   </div>
 

@@ -85,6 +85,7 @@ export default function PaymentEntryPage() {
   const [store, setStore] = useState({});
   const [logoDataUrl, setLogoDataUrl] = useState(null);
   const [receiptFormat, setReceiptFormat] = useState('a5');
+  const [receiptConfig, setReceiptConfig] = useState(null);
   const [printEnabled, setPrintEnabled] = useState(false);
   const [previewModal, setPreviewModal] = useState({ open: false, html: '' });
   const iframeRef = useRef(null);
@@ -144,7 +145,9 @@ export default function PaymentEntryPage() {
       ]);
       const profile = profileRes.data || {};
       setStore(profile);
-      setReceiptFormat((configRes.data && configRes.data.format) || 'a5');
+      const cfg = configRes.data && typeof configRes.data === 'object' ? configRes.data : {};
+      setReceiptConfig(cfg);
+      setReceiptFormat(cfg.format || 'a5');
       const pv = printRes.data?.value;
       setPrintEnabled(pv === true || pv === 'true');
       if (profile.logo_path) {
@@ -257,6 +260,7 @@ export default function PaymentEntryPage() {
           store,
           logoDataUrl,
           format: receiptFormat,
+          config: receiptConfig,
         });
         pendingRefreshRef.current = true;
         setPreviewModal({ open: true, html });
@@ -346,6 +350,7 @@ export default function PaymentEntryPage() {
       store,
       logoDataUrl,
       format: receiptFormat,
+      config: receiptConfig,
     });
     setPreviewModal({ open: true, html });
   };

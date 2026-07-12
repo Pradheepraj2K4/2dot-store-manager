@@ -698,6 +698,7 @@ export default function ItemSalesEntryPage() {
   const [store, setStore] = useState({});
   const [logoDataUrl, setLogoDataUrl] = useState(null);
   const [receiptFormat, setReceiptFormat] = useState('thermal');
+  const [receiptConfig, setReceiptConfig] = useState(null);
   const [printEnabled, setPrintEnabled] = useState(false);
   const [previewModal, setPreviewModal] = useState({ open: false, html: '', sale: null });
   const previewIframeRef = useRef(null);
@@ -714,7 +715,9 @@ export default function ItemSalesEntryPage() {
       ]);
       const profile = profileRes.data || {};
       setStore(profile);
-      const fmt = (configRes.data && configRes.data.format) || 'thermal';
+      const cfg = configRes.data && typeof configRes.data === 'object' ? configRes.data : {};
+      setReceiptConfig(cfg);
+      const fmt = cfg.format || 'thermal';
       setReceiptFormat(['a4', 'a5', 'thermal'].includes(fmt) ? fmt : 'thermal');
       const pv = printRes.data?.value;
       setPrintEnabled(pv === true || pv === 'true');
@@ -1516,6 +1519,7 @@ export default function ItemSalesEntryPage() {
       store,
       logoDataUrl,
       format: receiptFormat,
+      config: receiptConfig,
     });
     navigateAfterPreviewRef.current = navigateAfter;
     setPreviewModal({ open: true, html, sale });
@@ -2381,6 +2385,7 @@ export default function ItemSalesEntryPage() {
                       store,
                       logoDataUrl,
                       format: f,
+                      config: receiptConfig,
                     });
                     setPreviewModal((prev) => ({ ...prev, html }));
                   }

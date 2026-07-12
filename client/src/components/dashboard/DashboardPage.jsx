@@ -278,7 +278,7 @@ export default function DashboardPage() {
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-2">
             {/* Left: A/C and Non-A/C stacked */}
-            <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
+            <div className="grid grid-cols-2 gap-2 content-start">
               {/* A/C sales */}
               <div className="card flex flex-col justify-between">
                 <div className="flex items-center justify-between">
@@ -296,7 +296,7 @@ export default function DashboardPage() {
               <div className="card flex flex-col justify-between">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Non-A/C Sales</span>
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-50 text-amber-500">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-50 text-sky-500">
                     <FireIcon className="h-4 w-4" />
                   </div>
                 </div>
@@ -322,7 +322,7 @@ export default function DashboardPage() {
               <div className="card flex flex-col justify-between">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Take-away Sales</span>
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50 text-violet-500">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-500">
                     <ShoppingBagIcon className="h-4 w-4" />
                   </div>
                 </div>

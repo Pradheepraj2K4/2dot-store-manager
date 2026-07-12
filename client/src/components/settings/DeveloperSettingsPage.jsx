@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { settingsApi, ledgerTypeApi, interestSchemeApi } from '../../api';
 import { isDevAuthenticated, devLogin, devLogout, getDevPassword } from '../../utils/auth';
-import { getReceiptLayout, saveReceiptLayout, DEFAULT_RECEIPT_LAYOUT } from '../../utils/receiptLayout';
+import { mergeReceiptConfig, cacheReceiptConfig, THERMAL_SECTION_LABELS, PAPER_COLUMN_LABELS } from '../../utils/receiptConfig';
 import { buildSaleReceiptHtml } from '../../utils/saleReceipt';
 import { fetchLogoDataUrl } from '../../utils/interestReceipt';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -24,6 +24,8 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
   QrCodeIcon,
+  ArrowsPointingOutIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline';
 
 // Compact toggle row for the Feature Modules section. Persists the setting and
@@ -79,12 +81,18 @@ export default function DeveloperSettingsPage() {
   // Logo state
   const [logoPreview, setLogoPreview] = useState(null);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoDragActive, setLogoDragActive] = useState(false);
   const logoInputRef = useRef(null);
 
   // Receipt layout state
-  const [layout, setLayout] = useState(getReceiptLayout());
-  const [dragItem, setDragItem] = useState(null);
-  const [dragOverItem, setDragOverItem] = useState(null);
+  // Receipt design editor state (structured thermal + free-hand A4/A5)
+  const [thermalCfg, setThermalCfg] = useState(() => mergeReceiptConfig(null).thermal);
+  const [paperCfg, setPaperCfg] = useState(() => mergeReceiptConfig(null).paper);
+  const [paperPreviewFormat, setPaperPreviewFormat] = useState('a4');
+  const [savingReceiptDesign, setSavingReceiptDesign] = useState(false);
+  const [activeBlock, setActiveBlock] = useState('logo');
+  const [fullscreenPreview, setFullscreenPreview] = useState(false);
+  const paperCanvasRef = useRef(null);
 
   // Active section tab
   const [activeTab, setActiveTab] = useState('profile');
@@ -214,6 +222,10 @@ export default function DeveloperSettingsPage() {
       // Load default print format from receipt_config
       const cfg = data.receipt_config && typeof data.receipt_config === 'object' ? data.receipt_config : {};
       setReceiptConfig(cfg);
+      const mergedCfg = mergeReceiptConfig(cfg);
+      setThermalCfg(mergedCfg.thermal);
+      setPaperCfg(mergedCfg.paper);
+      cacheReceiptConfig(mergedCfg);
       setDefaultPrintFormat(['thermal', 'a5', 'a4'].includes(cfg.format) ? cfg.format : 'thermal');
       const lh = Number(cfg.thermalLogoHeight);
       setThermalLogoHeight(Number.isFinite(lh) && lh > 0 ? Math.min(72, Math.max(6, lh)) : 12);
@@ -372,9 +384,12 @@ export default function DeveloperSettingsPage() {
   };
 
   // --- Logo Upload ---
-  const handleLogoSelect = async (e) => {
-    const file = e.target.files?.[0];
+  const processLogoFile = async (file) => {
     if (!file) return;
+    if (!/^image\/(png|jpeg|gif|webp|svg\+xml)$/.test(file.type)) {
+      toast.error('Please choose a PNG, JPEG, GIF, WebP or SVG image');
+      return;
+    }
     if (file.size > 2 * 1024 * 1024) {
       toast.error('Logo must be under 2MB');
       return;
@@ -396,6 +411,20 @@ export default function DeveloperSettingsPage() {
       }
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleLogoSelect = async (e) => {
+    const file = e.target.files?.[0];
+    await processLogoFile(file);
+    if (logoInputRef.current) logoInputRef.current.value = '';
+  };
+
+  const handleLogoDrop = async (e) => {
+    e.preventDefault();
+    setLogoDragActive(false);
+    if (uploadingLogo) return;
+    const file = e.dataTransfer.files?.[0];
+    await processLogoFile(file);
   };
 
   const handleDeleteLogo = async () => {
@@ -465,97 +494,118 @@ export default function DeveloperSettingsPage() {
     }
   };
 
-  // Sample data that mirrors a real thermal bill so the live preview reflects
-  // the true receipt appearance while the slider is adjusted.
-  const buildLogoPreviewHtml = (heightMm, qrSizeMm = thermalUpiQrSize) =>
+  // --- Receipt design editor (thermal structured + paper free-hand) ---
+
+  // Persist the current thermal + paper design into the server receipt_config,
+  // preserving the flat hardware knobs (width / logo / qr / format).
+  const persistReceiptDesign = async (nextThermal, nextPaper) => {
+    setSavingReceiptDesign(true);
+    try {
+      const next = { ...receiptConfig, thermal: nextThermal, paper: nextPaper };
+      await settingsApi.update('receipt_config', next);
+      setReceiptConfig(next);
+      cacheReceiptConfig(mergeReceiptConfig(next));
+      toast.success('Receipt design saved');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSavingReceiptDesign(false);
+    }
+  };
+
+  const saveReceiptDesign = () => persistReceiptDesign(thermalCfg, paperCfg);
+
+  const resetThermalDesign = () => {
+    const d = mergeReceiptConfig(null).thermal;
+    setThermalCfg(d);
+    persistReceiptDesign(d, paperCfg);
+  };
+
+  const resetPaperDesign = () => {
+    const d = mergeReceiptConfig(null).paper;
+    setPaperCfg(d);
+    persistReceiptDesign(thermalCfg, d);
+  };
+
+  // Thermal: toggle / reorder sections + style knobs
+  const toggleThermalSection = (id) => {
+    setThermalCfg((prev) => ({
+      ...prev,
+      sections: prev.sections.map((s) => (s.id === id ? { ...s, enabled: !(s.enabled !== false) } : s)),
+    }));
+  };
+  const moveThermalSection = (idx, dir) => {
+    setThermalCfg((prev) => {
+      const arr = [...prev.sections];
+      const t = idx + dir;
+      if (t < 0 || t >= arr.length) return prev;
+      [arr[idx], arr[t]] = [arr[t], arr[idx]];
+      return { ...prev, sections: arr };
+    });
+  };
+  const setThermalStyle = (key, value) => setThermalCfg((prev) => ({ ...prev, [key]: value }));
+
+  // Paper: style knobs, column toggles, free-hand block editing
+  const setPaperStyle = (key, value) => setPaperCfg((prev) => ({ ...prev, [key]: value }));
+  const togglePaperColumn = (id) =>
+    setPaperCfg((prev) => ({ ...prev, columns: { ...prev.columns, [id]: !(prev.columns?.[id] !== false) } }));
+  const setBlockField = (block, key, value) =>
+    setPaperCfg((prev) => ({ ...prev, blocks: { ...prev.blocks, [block]: { ...prev.blocks[block], [key]: value } } }));
+
+  // Drag a header block around the free-hand A4 canvas. Coordinates are stored
+  // in millimetres on a 210mm-wide (A4) canvas.
+  const onBlockPointerDown = (e, blockId) => {
+    e.preventDefault();
+    setActiveBlock(blockId);
+    const canvas = paperCanvasRef.current;
+    if (!canvas) return;
+    const pxPerMm = canvas.getBoundingClientRect().width / 210;
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const origX = paperCfg.blocks[blockId].x;
+    const origY = paperCfg.blocks[blockId].y;
+    const maxY = Math.max(2, (paperCfg.headerHeight || 40) - 2);
+    const move = (ev) => {
+      const nx = Math.max(0, Math.min(200, Math.round(origX + (ev.clientX - startX) / pxPerMm)));
+      const ny = Math.max(0, Math.min(maxY, Math.round(origY + (ev.clientY - startY) / pxPerMm)));
+      setPaperCfg((prev) => ({ ...prev, blocks: { ...prev.blocks, [blockId]: { ...prev.blocks[blockId], x: nx, y: ny } } }));
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
+  // Live design preview — a sample sale rendered through the current config.
+  const buildDesignPreviewHtml = (format) =>
     buildSaleReceiptHtml({
       sale: {
         sale_number: 'PREVIEW-001',
         date: new Date().toISOString().split('T')[0],
         time: '12:30',
         customer_name: 'Walk-in Customer',
-        total_amount: 250,
-        total_discount: 0,
+        total_amount: 472.5,
+        total_discount: 15,
         bill_discount: 0,
-        cash_amount: 250,
+        cash_amount: 472.5,
         upi_amount: 0,
-        tendered_amount: 300,
+        tendered_amount: 500,
         items: [
-          { item_name: 'Sample Item A', quantity: 2, rate: 100, amount: 200 },
-          { item_name: 'Sample Item B', quantity: 1, rate: 50, amount: 50 },
+          { item_name: 'Masala Dosa', unit: 'Nos', quantity: 2, rate: 90, discount_percent: 0, gst_percent: 5, gst_amount: 9, amount: 189 },
+          { item_name: 'Filter Coffee', unit: 'Nos', quantity: 3, rate: 40, discount_percent: 0, gst_percent: 5, gst_amount: 6, amount: 126 },
+          { item_name: 'Paneer Roll', unit: 'Nos', quantity: 1, rate: 175, discount_percent: 10, gst_percent: 12, gst_amount: 15.75, amount: 157.5 },
         ],
       },
       store: profile,
       logoDataUrl: previewLogoDataUrl,
-      format: 'thermal',
-      logoHeightMm: heightMm,
-      upiQrSizeMm: qrSizeMm,
+      format,
+      config: { ...receiptConfig, thermal: thermalCfg, paper: paperCfg },
+      logoHeightMm: thermalLogoHeight,
+      upiQrSizeMm: thermalUpiQrSize,
       widthMm: thermalWidth,
     });
-
-  // --- Layout Editor ---
-  const sortedElements = [...layout.elements].sort((a, b) => a.order - b.order);
-
-  const handleDragStart = (idx) => {
-    setDragItem(idx);
-  };
-
-  const handleDragEnter = (idx) => {
-    setDragOverItem(idx);
-  };
-
-  const handleDragEnd = () => {
-    if (dragItem === null || dragOverItem === null || dragItem === dragOverItem) {
-      setDragItem(null);
-      setDragOverItem(null);
-      return;
-    }
-    const items = [...sortedElements];
-    const draggedItem = items[dragItem];
-    items.splice(dragItem, 1);
-    items.splice(dragOverItem, 0, draggedItem);
-    const reordered = items.map((el, i) => ({ ...el, order: i }));
-    setLayout((prev) => ({ ...prev, elements: reordered }));
-    setDragItem(null);
-    setDragOverItem(null);
-  };
-
-  const moveElement = (idx, direction) => {
-    const items = [...sortedElements];
-    const targetIdx = idx + direction;
-    if (targetIdx < 0 || targetIdx >= items.length) return;
-    [items[idx], items[targetIdx]] = [items[targetIdx], items[idx]];
-    const reordered = items.map((el, i) => ({ ...el, order: i }));
-    setLayout((prev) => ({ ...prev, elements: reordered }));
-  };
-
-  const toggleElement = (id) => {
-    setLayout((prev) => ({
-      ...prev,
-      elements: prev.elements.map((el) =>
-        el.id === id ? { ...el, enabled: !el.enabled } : el
-      ),
-    }));
-  };
-
-  const handleSaveLayout = () => {
-    saveReceiptLayout(layout);
-    toast.success('Receipt layout saved');
-  };
-
-  const handleResetLayout = () => {
-    const defaultLayout = JSON.parse(JSON.stringify(DEFAULT_RECEIPT_LAYOUT));
-    setLayout(defaultLayout);
-    saveReceiptLayout(defaultLayout);
-    toast.success('Receipt layout reset to defaults');
-  };
-
-  const handleStyleChange = (key, value) => {
-    setLayout((prev) => ({
-      ...prev,
-      style: { ...prev.style, [key]: value },
-    }));
-  };
 
   // --- Auth Gate ---
   if (!authenticated) {
@@ -646,14 +696,14 @@ export default function DeveloperSettingsPage() {
   const tabs = [
     { id: 'profile',        label: 'Store Profile'     },
     { id: 'ledgerTypes',    label: 'Ledger Types'      },
-    { id: 'interestSchemes',label: 'Interest Schemes'  },
+    ...(interestModuleEnabled ? [{ id: 'interestSchemes', label: 'Interest Schemes' }] : []),
     { id: 'modules',        label: 'Modules'           },
     { id: 'receipt',        label: 'Receipt'           },
     { id: 'data',           label: 'Data'              },
   ];
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-6xl">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -697,7 +747,15 @@ export default function DeveloperSettingsPage() {
           {/* Logo Upload */}
           <div className="card">
             <h2 className="text-base font-semibold text-slate-900 mb-4">Shop Logo</h2>
-            <div className="flex items-start gap-6">
+            <div
+              onDragOver={(e) => { e.preventDefault(); if (!uploadingLogo) setLogoDragActive(true); }}
+              onDragEnter={(e) => { e.preventDefault(); if (!uploadingLogo) setLogoDragActive(true); }}
+              onDragLeave={(e) => { e.preventDefault(); if (e.currentTarget.contains(e.relatedTarget)) return; setLogoDragActive(false); }}
+              onDrop={handleLogoDrop}
+              className={`flex items-start gap-6 rounded-xl border-2 border-dashed p-4 transition-colors ${
+                logoDragActive ? 'border-trust-blue bg-blue-50' : 'border-transparent'
+              }`}
+            >
               <div className="w-28 h-28 rounded-xl border-2 border-dashed border-slate-300 flex items-center justify-center bg-slate-50 overflow-hidden flex-shrink-0">
                 {logoPreview ? (
                   <img src={logoPreview} alt="Logo" className="w-full h-full object-contain p-2" />
@@ -706,7 +764,11 @@ export default function DeveloperSettingsPage() {
                 )}
               </div>
               <div className="space-y-3 flex-1">
-                <p className="text-xs text-slate-500">Upload your shop logo (PNG, JPEG, SVG). Max 2MB. Will appear on printed receipts.</p>
+                <p className="text-xs text-slate-500">
+                  {logoDragActive
+                    ? 'Drop the image to upload'
+                    : 'Drag & drop an image here, or use the button. PNG, JPEG, SVG. Max 2MB. Will appear on printed receipts.'}
+                </p>
                 <div className="flex gap-2">
                   <label className="btn-primary text-sm cursor-pointer">
                     {uploadingLogo ? 'Uploading...' : 'Upload Logo'}
@@ -1142,8 +1204,8 @@ export default function DeveloperSettingsPage() {
           <div className="flex gap-1 bg-slate-100 rounded-lg p-1">
             {[
               { id: 'print', label: 'Print Settings' },
-              { id: 'layout', label: 'Layout' },
-              { id: 'style', label: 'Style' },
+              { id: 'thermal', label: 'Thermal Design' },
+              { id: 'paper', label: 'A4 / A5 Design' },
             ].map((st) => (
               <button
                 key={st.id}
@@ -1208,191 +1270,6 @@ export default function DeveloperSettingsPage() {
                       {opt.label}
                     </button>
                   ))}
-                </div>
-              </div>
-
-              {/* Thermal Bill Appearance — controls + shared live preview side by side */}
-              <div className="p-4 rounded-lg border border-slate-200 bg-white mb-6">
-                <div className="grid gap-5 lg:grid-cols-[1fr_auto] items-start">
-                  {/* Controls column */}
-                  <div className="space-y-6">
-                    {/* Thermal Paper Width */}
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-semibold text-slate-800">Thermal Paper Width</h3>
-                        <span className="text-xs font-semibold text-trust-blue tabular-nums">
-                          {thermalWidth}mm
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5 mb-3">
-                        Match this to your thermal printer's roll. 58mm and 80mm are the common sizes.
-                      </p>
-                      <div>
-                        <input
-                          type="range"
-                          min="50"
-                          max="80"
-                          step="1"
-                          value={thermalWidth}
-                          disabled={savingThermalWidth}
-                          onChange={(e) => setThermalWidth(Number(e.target.value))}
-                          onMouseUp={(e) => saveThermalWidth(e.target.value)}
-                          onTouchEnd={(e) => saveThermalWidth(e.target.value)}
-                          onKeyUp={(e) => saveThermalWidth(e.target.value)}
-                          className="w-full accent-trust-blue cursor-pointer"
-                        />
-                        <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-                          <span>58mm</span>
-                          <span>80mm</span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-3">
-                          <button
-                            type="button"
-                            disabled={savingThermalWidth}
-                            onClick={() => { setThermalWidth(58); saveThermalWidth(58); }}
-                            className="btn-secondary text-xs disabled:opacity-60"
-                          >
-                            58mm
-                          </button>
-                          <button
-                            type="button"
-                            disabled={savingThermalWidth}
-                            onClick={() => { setThermalWidth(80); saveThermalWidth(80); }}
-                            className="btn-secondary text-xs disabled:opacity-60"
-                          >
-                            80mm
-                          </button>
-                          {savingThermalWidth && <span className="text-xs text-slate-400">Saving…</span>}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Thermal Logo Size */}
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-semibold text-slate-800">Thermal Logo Size</h3>
-                        <span className="text-xs font-semibold text-trust-blue tabular-nums">
-                          {thermalLogoHeight}mm
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5 mb-3">
-                        Adjust how large the shop logo prints on the thermal (80mm) bill.
-                      </p>
-
-                      {(previewLogoDataUrl || logoPreview) ? (
-                        <div>
-                          <input
-                            type="range"
-                            min="6"
-                            max="72"
-                            step="1"
-                            value={thermalLogoHeight}
-                            disabled={savingLogoHeight}
-                            onChange={(e) => setThermalLogoHeight(Number(e.target.value))}
-                            onMouseUp={(e) => saveThermalLogoHeight(e.target.value)}
-                            onTouchEnd={(e) => saveThermalLogoHeight(e.target.value)}
-                            onKeyUp={(e) => saveThermalLogoHeight(e.target.value)}
-                            className="w-full accent-trust-blue cursor-pointer"
-                          />
-                          <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-                            <span>Small · 6mm</span>
-                            <span>Large · 72mm</span>
-                          </div>
-                          <div className="flex items-center gap-2 mt-3">
-                            <button
-                              type="button"
-                              disabled={savingLogoHeight}
-                              onClick={() => { setThermalLogoHeight(12); saveThermalLogoHeight(12); }}
-                              className="btn-secondary text-xs gap-1 disabled:opacity-60"
-                            >
-                              <ArrowPathIcon className="h-3.5 w-3.5" />
-                              Reset to 12mm
-                            </button>
-                            {savingLogoHeight && <span className="text-xs text-slate-400">Saving…</span>}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center">
-                          <PhotoIcon className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                          <p className="text-xs text-slate-500">
-                            Upload a shop logo in the <span className="font-medium">Store Profile</span> tab
-                            to adjust its size on the thermal bill.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Thermal UPI QR Size */}
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-semibold text-slate-800">UPI QR Code Size</h3>
-                        <span className="text-xs font-semibold text-trust-blue tabular-nums">
-                          {thermalUpiQrSize}mm
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500 mt-0.5 mb-3">
-                        Adjust how large the UPI payment QR code prints at the bottom of the thermal (80mm) bill.
-                      </p>
-
-                      {profile.upi_id && profile.upi_id.trim() ? (
-                        <div>
-                          <input
-                            type="range"
-                            min="15"
-                            max="50"
-                            step="1"
-                            value={thermalUpiQrSize}
-                            disabled={savingUpiQrSize}
-                            onChange={(e) => setThermalUpiQrSize(Number(e.target.value))}
-                            onMouseUp={(e) => saveThermalUpiQrSize(e.target.value)}
-                            onTouchEnd={(e) => saveThermalUpiQrSize(e.target.value)}
-                            onKeyUp={(e) => saveThermalUpiQrSize(e.target.value)}
-                            className="w-full accent-trust-blue cursor-pointer"
-                          />
-                          <div className="flex justify-between text-[10px] text-slate-400 mt-1">
-                            <span>Small · 15mm</span>
-                            <span>Large · 50mm</span>
-                          </div>
-                          <div className="flex items-center gap-2 mt-3">
-                            <button
-                              type="button"
-                              disabled={savingUpiQrSize}
-                              onClick={() => { setThermalUpiQrSize(28); saveThermalUpiQrSize(28); }}
-                              className="btn-secondary text-xs gap-1 disabled:opacity-60"
-                            >
-                              <ArrowPathIcon className="h-3.5 w-3.5" />
-                              Reset to 28mm
-                            </button>
-                            {savingUpiQrSize && <span className="text-xs text-slate-400">Saving…</span>}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center">
-                          <QrCodeIcon className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                          <p className="text-xs text-slate-500">
-                            Enter a <span className="font-medium">UPI ID</span> in the{' '}
-                            <span className="font-medium">Store Profile</span> tab to print a payment QR
-                            code and adjust its size on the thermal bill.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Shared live thermal preview */}
-                  <div className="justify-self-center">
-                    <div className="text-[10px] font-medium text-slate-400 mb-1 text-center uppercase tracking-wide">
-                      Live Preview
-                    </div>
-                    <div className="rounded-lg border border-slate-300 bg-slate-100 p-2 shadow-inner">
-                      <iframe
-                        title="Thermal receipt preview"
-                        srcDoc={buildLogoPreviewHtml(thermalLogoHeight, thermalUpiQrSize)}
-                        className="block bg-white rounded"
-                        style={{ width: '280px', height: '360px', border: 'none' }}
-                      />
-                    </div>
-                  </div>
                 </div>
               </div>
 
@@ -1487,240 +1364,409 @@ export default function DeveloperSettingsPage() {
             </div>
           )}
 
-          {/* Layout */}
-          {receiptSubTab === 'layout' && (
+          {/* Thermal Design */}
+          {receiptSubTab === 'thermal' && (
             <div className="card">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-1">
                 <div>
-                  <h2 className="text-base font-semibold text-slate-900">Receipt Layout</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Drag to reorder, toggle to show/hide elements</p>
+                  <h2 className="text-base font-semibold text-slate-900">Thermal Receipt Design</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">Toggle and reorder sections, tune the text style. 80mm POS roll.</p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={handleResetLayout} className="btn-secondary text-xs gap-1">
+                  <button onClick={resetThermalDesign} disabled={savingReceiptDesign} className="btn-secondary text-xs gap-1 disabled:opacity-60">
                     <ArrowPathIcon className="h-3.5 w-3.5" />
                     Reset
                   </button>
-                  <button onClick={handleSaveLayout} className="btn-primary text-xs">
-                    Save Layout
+                  <button onClick={saveReceiptDesign} disabled={savingReceiptDesign} className="btn-primary text-xs disabled:opacity-60">
+                    {savingReceiptDesign ? 'Saving…' : 'Save Design'}
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-1">
-                {sortedElements.map((el, idx) => (
-                  <div
-                    key={el.id}
-                    draggable
-                    onDragStart={() => handleDragStart(idx)}
-                    onDragEnter={() => handleDragEnter(idx)}
-                    onDragEnd={handleDragEnd}
-                    onDragOver={(e) => e.preventDefault()}
-                    className={`flex items-center gap-3 p-3 rounded-lg border transition-all cursor-grab active:cursor-grabbing ${
-                      dragOverItem === idx
-                        ? 'border-trust-blue bg-blue-50'
-                        : el.enabled
-                        ? 'border-slate-200 bg-white hover:border-slate-300'
-                        : 'border-slate-100 bg-slate-50'
-                    }`}
-                  >
-                    {/* Drag handle */}
-                    <div className="flex flex-col gap-0.5 text-slate-300">
-                      <div className="w-4 flex flex-col gap-[2px]">
-                        <span className="block w-full h-[2px] bg-current rounded"></span>
-                        <span className="block w-full h-[2px] bg-current rounded"></span>
-                        <span className="block w-full h-[2px] bg-current rounded"></span>
-                      </div>
-                    </div>
-
-                    {/* Toggle */}
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={el.enabled}
-                        onChange={() => toggleElement(el.id)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-8 h-4 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
-                    </label>
-
-                    {/* Label */}
-                    <span className={`flex-1 text-sm ${el.enabled ? 'text-slate-800 font-medium' : 'text-slate-400'}`}>
-                      {el.label}
-                    </span>
-
-                    {/* Type badge */}
-                    {el.type === 'divider' && (
-                      <span className="text-[10px] bg-slate-100 text-slate-400 px-2 py-0.5 rounded-full">DIVIDER</span>
-                    )}
-
-                    {/* Move buttons */}
-                    <div className="flex gap-1">
-                      <button
-                        onClick={() => moveElement(idx, -1)}
-                        disabled={idx === 0}
-                        className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 text-slate-400"
-                      >
-                        <ArrowUpIcon className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => moveElement(idx, 1)}
-                        disabled={idx === sortedElements.length - 1}
-                        className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 text-slate-400"
-                      >
-                        <ArrowDownIcon className="h-3.5 w-3.5" />
-                      </button>
+              <div className="grid gap-5 lg:grid-cols-[1fr_auto] items-start mt-4">
+                <div className="space-y-5">
+                  {/* Sections */}
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-800 mb-2">Sections</h3>
+                    <div className="space-y-1">
+                      {thermalCfg.sections.map((s, idx) => (
+                        <div
+                          key={s.id}
+                          className={`flex items-center gap-3 p-2.5 rounded-lg border ${
+                            s.enabled !== false ? 'border-slate-200 bg-white' : 'border-slate-100 bg-slate-50'
+                          }`}
+                        >
+                          <label className="relative inline-flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={s.enabled !== false}
+                              onChange={() => toggleThermalSection(s.id)}
+                              className="sr-only peer"
+                            />
+                            <div className="w-8 h-4 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:after:translate-x-4"></div>
+                          </label>
+                          <span className={`flex-1 text-sm ${s.enabled !== false ? 'text-slate-800 font-medium' : 'text-slate-400'}`}>
+                            {THERMAL_SECTION_LABELS[s.id] || s.id}
+                          </span>
+                          <div className="flex gap-1">
+                            <button onClick={() => moveThermalSection(idx, -1)} disabled={idx === 0} className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 text-slate-400">
+                              <ArrowUpIcon className="h-3.5 w-3.5" />
+                            </button>
+                            <button onClick={() => moveThermalSection(idx, 1)} disabled={idx === thermalCfg.sections.length - 1} className="p-1 rounded hover:bg-slate-100 disabled:opacity-30 text-slate-400">
+                              <ArrowDownIcon className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                ))}
+
+                  {/* Style knobs */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Store Name Size ({thermalCfg.storeNameSize}pt)</label>
+                      <input type="range" min="9" max="24" step="1" value={thermalCfg.storeNameSize} onChange={(e) => setThermalStyle('storeNameSize', Number(e.target.value))} className="w-full accent-trust-blue" />
+                    </div>
+                    <div>
+                      <label className="label">Body Text Size ({thermalCfg.baseSize}pt)</label>
+                      <input type="range" min="7" max="13" step="0.5" value={thermalCfg.baseSize} onChange={(e) => setThermalStyle('baseSize', Number(e.target.value))} className="w-full accent-trust-blue" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Receipt Title</label>
+                      <input type="text" value={thermalCfg.titleText} onChange={(e) => setThermalStyle('titleText', e.target.value)} className="input-field" placeholder="Retail Invoice" />
+                    </div>
+                    <div>
+                      <label className="label">Footer Text</label>
+                      <input type="text" value={thermalCfg.footerText} onChange={(e) => setThermalStyle('footerText', e.target.value)} className="input-field" placeholder="Thank you · Visit again" />
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={thermalCfg.showDividers !== false} onChange={(e) => setThermalStyle('showDividers', e.target.checked)} className="h-4 w-4 rounded text-trust-blue focus:ring-trust-blue" />
+                    <span className="text-sm text-slate-700">Show dashed dividers between sections</span>
+                  </label>
+
+                  {/* Printer Hardware — roll width, logo & QR sizing */}
+                  <div className="pt-5 border-t border-slate-200 space-y-4">
+                    <h3 className="text-sm font-semibold text-slate-800">Printer Hardware</h3>
+
+                    {/* Thermal Paper Width */}
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <label className="label mb-0">Paper Width ({thermalWidth}mm)</label>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            disabled={savingThermalWidth}
+                            onClick={() => { setThermalWidth(58); saveThermalWidth(58); }}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${thermalWidth === 58 ? 'bg-trust-blue text-white border-trust-blue' : 'bg-white text-slate-500 border-slate-200'} disabled:opacity-60`}
+                          >
+                            58
+                          </button>
+                          <button
+                            type="button"
+                            disabled={savingThermalWidth}
+                            onClick={() => { setThermalWidth(80); saveThermalWidth(80); }}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${thermalWidth === 80 ? 'bg-trust-blue text-white border-trust-blue' : 'bg-white text-slate-500 border-slate-200'} disabled:opacity-60`}
+                          >
+                            80
+                          </button>
+                        </div>
+                      </div>
+                      <input
+                        type="range"
+                        min="50"
+                        max="80"
+                        step="1"
+                        value={thermalWidth}
+                        disabled={savingThermalWidth}
+                        onChange={(e) => setThermalWidth(Number(e.target.value))}
+                        onMouseUp={(e) => saveThermalWidth(e.target.value)}
+                        onTouchEnd={(e) => saveThermalWidth(e.target.value)}
+                        onKeyUp={(e) => saveThermalWidth(e.target.value)}
+                        className="w-full accent-trust-blue cursor-pointer"
+                      />
+                    </div>
+
+                    {/* Thermal Logo Size */}
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <label className="label mb-0">Logo Size ({thermalLogoHeight}mm)</label>
+                        {(previewLogoDataUrl || logoPreview) && (
+                          <button
+                            type="button"
+                            disabled={savingLogoHeight}
+                            onClick={() => { setThermalLogoHeight(12); saveThermalLogoHeight(12); }}
+                            className="text-[10px] text-slate-400 hover:text-trust-blue disabled:opacity-60"
+                          >
+                            Reset to 12mm
+                          </button>
+                        )}
+                      </div>
+                      {(previewLogoDataUrl || logoPreview) ? (
+                        <input
+                          type="range"
+                          min="6"
+                          max="72"
+                          step="1"
+                          value={thermalLogoHeight}
+                          disabled={savingLogoHeight}
+                          onChange={(e) => setThermalLogoHeight(Number(e.target.value))}
+                          onMouseUp={(e) => saveThermalLogoHeight(e.target.value)}
+                          onTouchEnd={(e) => saveThermalLogoHeight(e.target.value)}
+                          onKeyUp={(e) => saveThermalLogoHeight(e.target.value)}
+                          className="w-full accent-trust-blue cursor-pointer"
+                        />
+                      ) : (
+                        <p className="text-[11px] text-slate-400">Upload a logo in Store Profile to size it.</p>
+                      )}
+                    </div>
+
+                    {/* Thermal UPI QR Size */}
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <label className="label mb-0">UPI QR Size ({thermalUpiQrSize}mm)</label>
+                        {profile.upi_id && profile.upi_id.trim() && (
+                          <button
+                            type="button"
+                            disabled={savingUpiQrSize}
+                            onClick={() => { setThermalUpiQrSize(28); saveThermalUpiQrSize(28); }}
+                            className="text-[10px] text-slate-400 hover:text-trust-blue disabled:opacity-60"
+                          >
+                            Reset to 28mm
+                          </button>
+                        )}
+                      </div>
+                      {profile.upi_id && profile.upi_id.trim() ? (
+                        <input
+                          type="range"
+                          min="15"
+                          max="50"
+                          step="1"
+                          value={thermalUpiQrSize}
+                          disabled={savingUpiQrSize}
+                          onChange={(e) => setThermalUpiQrSize(Number(e.target.value))}
+                          onMouseUp={(e) => saveThermalUpiQrSize(e.target.value)}
+                          onTouchEnd={(e) => saveThermalUpiQrSize(e.target.value)}
+                          onKeyUp={(e) => saveThermalUpiQrSize(e.target.value)}
+                          className="w-full accent-trust-blue cursor-pointer"
+                        />
+                      ) : (
+                        <p className="text-[11px] text-slate-400">Add a UPI ID in Store Profile to print a QR code.</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Live preview */}
+                <div className="justify-self-center self-start sticky top-4">
+                  <div className="text-[10px] font-medium text-slate-400 mb-1 text-center uppercase tracking-wide">Live Preview</div>
+                  <div className="rounded-lg border border-slate-300 bg-slate-100 p-2 shadow-inner">
+                    <iframe title="Thermal design preview" srcDoc={buildDesignPreviewHtml('thermal')} className="block bg-white rounded" style={{ width: '340px', height: '460px', border: 'none' }} />
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
-          {/* Style */}
-          {receiptSubTab === 'style' && (
+          {/* A4 / A5 Design */}
+          {receiptSubTab === 'paper' && (
             <div className="card">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base font-semibold text-slate-900">Receipt Style</h2>
-                <button onClick={handleSaveLayout} className="btn-primary text-xs">
-                  Save Style
-                </button>
+              <div className="flex items-center justify-between mb-1">
+                <div>
+                  <h2 className="text-base font-semibold text-slate-900">A4 / A5 Invoice Design</h2>
+                  <p className="text-xs text-slate-500 mt-0.5">Drag the header blocks anywhere, then style the invoice body.</p>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={resetPaperDesign} disabled={savingReceiptDesign} className="btn-secondary text-xs gap-1 disabled:opacity-60">
+                    <ArrowPathIcon className="h-3.5 w-3.5" />
+                    Reset
+                  </button>
+                  <button onClick={saveReceiptDesign} disabled={savingReceiptDesign} className="btn-primary text-xs disabled:opacity-60">
+                    {savingReceiptDesign ? 'Saving…' : 'Save Design'}
+                  </button>
+                </div>
               </div>
 
-              <div className="space-y-4">
-                {/* Format */}
-                <div>
-                  <label className="label">Receipt Format</label>
-                  <div className="flex gap-4">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="format"
-                        value="a4"
-                        checked={layout.style.format === 'a4'}
-                        onChange={() => handleStyleChange('format', 'a4')}
-                        className="h-4 w-4 text-trust-blue focus:ring-trust-blue"
-                      />
-                      <span className="text-sm text-slate-700">A4 Paper</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="format"
-                        value="thermal"
-                        checked={layout.style.format === 'thermal'}
-                        onChange={() => handleStyleChange('format', 'thermal')}
-                        className="h-4 w-4 text-trust-blue focus:ring-trust-blue"
-                      />
-                      <span className="text-sm text-slate-700">Thermal (80mm)</span>
-                    </label>
-                  </div>
+              {/* Free-hand header canvas */}
+              <div className="mt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-sm font-semibold text-slate-800">Header Layout (free-hand)</h3>
+                  <span className="text-xs text-slate-400">A4 · 210mm wide</span>
                 </div>
+                <div
+                  ref={paperCanvasRef}
+                  className="relative w-full bg-white border border-slate-300 rounded-lg overflow-hidden select-none"
+                  style={{ aspectRatio: `210 / ${paperCfg.headerHeight || 40}` }}
+                >
+                  {['logo', 'store', 'meta'].map((id) => {
+                    const b = paperCfg.blocks[id];
+                    if (!b || b.enabled === false) return null;
+                    return (
+                      <div
+                        key={id}
+                        onPointerDown={(e) => onBlockPointerDown(e, id)}
+                        className={`absolute cursor-move rounded border px-1.5 py-1 text-[10px] font-semibold truncate ${
+                          activeBlock === id ? 'border-trust-blue bg-blue-50 text-trust-blue z-10' : 'border-slate-300 bg-slate-50 text-slate-500'
+                        }`}
+                        style={{ left: `${(b.x / 210) * 100}%`, top: `${(b.y / (paperCfg.headerHeight || 40)) * 100}%`, width: `${(b.w / 210) * 100}%` }}
+                      >
+                        {id === 'logo' ? 'Logo' : id === 'store' ? 'Store Info' : 'Invoice Meta'}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  {['logo', 'store', 'meta'].map((id) => (
+                    <button
+                      key={id}
+                      onClick={() => setActiveBlock(id)}
+                      className={`px-2.5 py-1 rounded-md text-xs font-medium border ${
+                        activeBlock === id ? 'bg-trust-blue text-white border-trust-blue' : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                      }`}
+                    >
+                      {id === 'logo' ? 'Logo' : id === 'store' ? 'Store Info' : 'Invoice Meta'}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-                {/* Colors */}
-                <div>
-                  <label className="label">Primary Color</label>
+              {/* Active block controls */}
+              <div className="mt-3 p-3 rounded-lg border border-slate-200 bg-slate-50">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
+                  <div>
+                    <label className="label">X ({paperCfg.blocks[activeBlock].x}mm)</label>
+                    <input type="range" min="0" max="200" value={paperCfg.blocks[activeBlock].x} onChange={(e) => setBlockField(activeBlock, 'x', Number(e.target.value))} className="w-full accent-trust-blue" />
+                  </div>
+                  <div>
+                    <label className="label">Y ({paperCfg.blocks[activeBlock].y}mm)</label>
+                    <input type="range" min="0" max={(paperCfg.headerHeight || 40) - 2} value={paperCfg.blocks[activeBlock].y} onChange={(e) => setBlockField(activeBlock, 'y', Number(e.target.value))} className="w-full accent-trust-blue" />
+                  </div>
+                  <div>
+                    <label className="label">Width ({paperCfg.blocks[activeBlock].w}mm)</label>
+                    <input type="range" min="10" max="200" value={paperCfg.blocks[activeBlock].w} onChange={(e) => setBlockField(activeBlock, 'w', Number(e.target.value))} className="w-full accent-trust-blue" />
+                  </div>
                   <div className="flex items-center gap-3">
-                    <input
-                      type="color"
-                      value={layout.style.primaryColor}
-                      onChange={(e) => handleStyleChange('primaryColor', e.target.value)}
-                      className="w-10 h-10 rounded border border-slate-200 cursor-pointer"
-                    />
-                    <input
-                      type="text"
-                      value={layout.style.primaryColor}
-                      onChange={(e) => handleStyleChange('primaryColor', e.target.value)}
-                      className="input-field w-32 font-mono text-sm"
-                    />
+                    <label className="flex items-center gap-1.5 cursor-pointer">
+                      <input type="checkbox" checked={paperCfg.blocks[activeBlock].enabled !== false} onChange={(e) => setBlockField(activeBlock, 'enabled', e.target.checked)} className="h-4 w-4 rounded text-trust-blue focus:ring-trust-blue" />
+                      <span className="text-xs text-slate-700">Show</span>
+                    </label>
+                    {activeBlock !== 'logo' && (
+                      <select value={paperCfg.blocks[activeBlock].align || (activeBlock === 'meta' ? 'right' : 'left')} onChange={(e) => setBlockField(activeBlock, 'align', e.target.value)} className="input-field text-xs py-1">
+                        <option value="left">Left</option>
+                        <option value="center">Center</option>
+                        <option value="right">Right</option>
+                      </select>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-3">
+                  <label className="label">Header Band Height ({paperCfg.headerHeight}mm)</label>
+                  <input type="range" min="18" max="70" value={paperCfg.headerHeight} onChange={(e) => setPaperStyle('headerHeight', Number(e.target.value))} className="w-full accent-trust-blue" />
+                </div>
+              </div>
+
+              {/* Style + columns + preview */}
+              <div className="grid gap-5 lg:grid-cols-[1fr_auto] items-start mt-4">
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Accent Color</label>
+                      <div className="flex items-center gap-3">
+                        <input type="color" value={paperCfg.accentColor} onChange={(e) => setPaperStyle('accentColor', e.target.value)} className="w-10 h-10 rounded border border-slate-200 cursor-pointer" />
+                        <input type="text" value={paperCfg.accentColor} onChange={(e) => setPaperStyle('accentColor', e.target.value)} className="input-field w-28 font-mono text-sm" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="label">Font Scale ({paperCfg.fontScale}×)</label>
+                      <input type="range" min="0.8" max="1.3" step="0.05" value={paperCfg.fontScale} onChange={(e) => setPaperStyle('fontScale', Number(e.target.value))} className="w-full accent-trust-blue" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">Font Family</label>
+                    <select value={paperCfg.fontFamily} onChange={(e) => setPaperStyle('fontFamily', e.target.value)} className="input-field">
+                      <option value="'Helvetica Neue', Helvetica, Arial, sans-serif">Helvetica (Default)</option>
+                      <option value="'Segoe UI', system-ui, -apple-system, sans-serif">Segoe UI</option>
+                      <option value="'Arial', sans-serif">Arial</option>
+                      <option value="'Courier New', monospace">Courier New (Monospace)</option>
+                      <option value="'Georgia', serif">Georgia (Serif)</option>
+                      <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Invoice Title</label>
+                      <input type="text" value={paperCfg.titleText} onChange={(e) => setPaperStyle('titleText', e.target.value)} className="input-field" placeholder="Tax Invoice" />
+                    </div>
+                    <div>
+                      <label className="label">Thank-you Line</label>
+                      <input type="text" value={paperCfg.thanksText} onChange={(e) => setPaperStyle('thanksText', e.target.value)} className="input-field" placeholder="Thank you for your business" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">Signature Label</label>
+                    <input type="text" value={paperCfg.signatureLabel} onChange={(e) => setPaperStyle('signatureLabel', e.target.value)} className="input-field" placeholder="Authorised Signatory" />
+                  </div>
+                  <div>
+                    <label className="label">Terms &amp; Conditions</label>
+                    <textarea rows="2" value={paperCfg.termsText} onChange={(e) => setPaperStyle('termsText', e.target.value)} className="input-field" />
+                  </div>
+
+                  {/* Column toggles */}
+                  <div>
+                    <label className="label">Item Table Columns</label>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.keys(PAPER_COLUMN_LABELS).map((id) => (
+                        <button
+                          key={id}
+                          onClick={() => togglePaperColumn(id)}
+                          className={`px-2.5 py-1 rounded-md text-xs font-medium border ${
+                            paperCfg.columns?.[id] !== false ? 'bg-trust-blue text-white border-trust-blue' : 'bg-white text-slate-500 border-slate-200'
+                          }`}
+                        >
+                          {PAPER_COLUMN_LABELS[id]}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">Item, Qty and Amount are always shown.</p>
+                  </div>
+
+                  {/* Section toggles */}
+                  <div className="flex flex-wrap gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={paperCfg.showWords !== false} onChange={(e) => setPaperStyle('showWords', e.target.checked)} className="h-4 w-4 rounded text-trust-blue focus:ring-trust-blue" /><span className="text-sm text-slate-700">Amount in words</span></label>
+                    <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={paperCfg.showTerms !== false} onChange={(e) => setPaperStyle('showTerms', e.target.checked)} className="h-4 w-4 rounded text-trust-blue focus:ring-trust-blue" /><span className="text-sm text-slate-700">Terms</span></label>
+                    <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={paperCfg.showSignature !== false} onChange={(e) => setPaperStyle('showSignature', e.target.checked)} className="h-4 w-4 rounded text-trust-blue focus:ring-trust-blue" /><span className="text-sm text-slate-700">Signature</span></label>
+                    <label className="flex items-center gap-2 cursor-pointer"><input type="checkbox" checked={paperCfg.showBorder !== false} onChange={(e) => setPaperStyle('showBorder', e.target.checked)} className="h-4 w-4 rounded text-trust-blue focus:ring-trust-blue" /><span className="text-sm text-slate-700">Outer border</span></label>
                   </div>
                 </div>
 
-                {/* Font Sizes */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="label">Header Font Size</label>
-                    <input
-                      type="number"
-                      value={layout.style.headerFontSize}
-                      onChange={(e) => handleStyleChange('headerFontSize', parseInt(e.target.value) || 20)}
-                      min="12"
-                      max="36"
-                      className="input-field"
-                    />
+                {/* Live preview */}
+                <div className="justify-self-center self-start sticky top-4">
+                  <div className="flex items-center justify-center gap-1 mb-1">
+                    {['a4', 'a5'].map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => setPaperPreviewFormat(f)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase border ${
+                          paperPreviewFormat === f ? 'bg-trust-blue text-white border-trust-blue' : 'bg-white text-slate-500 border-slate-200'
+                        }`}
+                      >
+                        {f}
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setFullscreenPreview(true)}
+                      className="ml-1 flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold uppercase border bg-white text-slate-500 border-slate-200 hover:text-trust-blue hover:border-trust-blue"
+                      title="Preview full screen"
+                    >
+                      <ArrowsPointingOutIcon className="h-3 w-3" />
+                      Full screen
+                    </button>
                   </div>
-                  <div>
-                    <label className="label">Body Font Size</label>
-                    <input
-                      type="number"
-                      value={layout.style.bodyFontSize}
-                      onChange={(e) => handleStyleChange('bodyFontSize', parseInt(e.target.value) || 13)}
-                      min="9"
-                      max="20"
-                      className="input-field"
-                    />
+                  <div className="rounded-lg border border-slate-300 bg-slate-100 p-2 shadow-inner">
+                    <iframe title="Paper design preview" srcDoc={buildDesignPreviewHtml(paperPreviewFormat)} className="block bg-white rounded" style={{ width: '360px', height: '480px', border: 'none' }} />
                   </div>
-                  <div>
-                    <label className="label">Footer Font Size</label>
-                    <input
-                      type="number"
-                      value={layout.style.footerFontSize}
-                      onChange={(e) => handleStyleChange('footerFontSize', parseInt(e.target.value) || 10)}
-                      min="8"
-                      max="16"
-                      className="input-field"
-                    />
-                  </div>
-                </div>
-
-                {/* Texts */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="label">Receipt Title</label>
-                    <input
-                      type="text"
-                      value={layout.style.titleText}
-                      onChange={(e) => handleStyleChange('titleText', e.target.value)}
-                      className="input-field"
-                      placeholder="PAYMENT RECEIPT"
-                    />
-                  </div>
-                  <div>
-                    <label className="label">Footer Text</label>
-                    <input
-                      type="text"
-                      value={layout.style.footerText}
-                      onChange={(e) => handleStyleChange('footerText', e.target.value)}
-                      className="input-field"
-                      placeholder="Thank you for your business!"
-                    />
-                  </div>
-                </div>
-
-                {/* Border Toggle */}
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={layout.style.showBorder}
-                    onChange={(e) => handleStyleChange('showBorder', e.target.checked)}
-                    className="h-4 w-4 rounded text-trust-blue focus:ring-trust-blue"
-                  />
-                  <span className="text-sm text-slate-700">Show receipt border</span>
-                </label>
-
-                {/* Font Family */}
-                <div>
-                  <label className="label">Font Family</label>
-                  <select
-                    value={layout.style.fontFamily}
-                    onChange={(e) => handleStyleChange('fontFamily', e.target.value)}
-                    className="input-field"
-                  >
-                    <option value="'Segoe UI', system-ui, -apple-system, sans-serif">Segoe UI (Default)</option>
-                    <option value="'Arial', sans-serif">Arial</option>
-                    <option value="'Courier New', monospace">Courier New (Monospace)</option>
-                    <option value="'Georgia', serif">Georgia (Serif)</option>
-                    <option value="'Trebuchet MS', sans-serif">Trebuchet MS</option>
-                  </select>
                 </div>
               </div>
             </div>
@@ -1956,6 +2002,51 @@ export default function DeveloperSettingsPage() {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full-screen A4/A5 preview overlay */}
+      {fullscreenPreview && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col bg-slate-900/80 backdrop-blur-sm"
+          onClick={() => setFullscreenPreview(false)}
+        >
+          <div className="flex items-center justify-center gap-2 py-3">
+            {['a4', 'a5'].map((f) => (
+              <button
+                key={f}
+                onClick={(e) => { e.stopPropagation(); setPaperPreviewFormat(f); }}
+                className={`px-3 py-1 rounded text-xs font-semibold uppercase border ${
+                  paperPreviewFormat === f ? 'bg-trust-blue text-white border-trust-blue' : 'bg-white text-slate-600 border-slate-200'
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+            <button
+              onClick={() => setFullscreenPreview(false)}
+              className="ml-2 flex items-center gap-1 px-3 py-1 rounded text-xs font-semibold border bg-white text-slate-600 border-slate-200 hover:text-red-600 hover:border-red-300"
+              title="Close preview"
+            >
+              <XMarkIcon className="h-4 w-4" />
+              Close
+            </button>
+          </div>
+          <div className="flex-1 min-h-0 flex items-center justify-center p-4">
+            <iframe
+              title="Paper design full-screen preview"
+              srcDoc={buildDesignPreviewHtml(paperPreviewFormat)}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white rounded shadow-2xl"
+              style={{
+                width: paperPreviewFormat === 'a4' ? '794px' : '559px',
+                height: paperPreviewFormat === 'a4' ? '1123px' : '794px',
+                maxWidth: '100%',
+                maxHeight: '100%',
+                border: 'none',
+              }}
+            />
           </div>
         </div>
       )}

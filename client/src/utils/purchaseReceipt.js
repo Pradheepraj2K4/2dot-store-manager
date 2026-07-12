@@ -9,6 +9,8 @@
  *              Supplier block, ruled items table and totals panel
  */
 
+import { mergeReceiptConfig } from './receiptConfig';
+
 function fmt(date) {
   if (!date) return '—';
   const [y, m, d] = date.split('-');
@@ -23,7 +25,6 @@ function money(n) {
     minimumFractionDigits: 2,
   }).format(n ?? 0);
 }
-
 function num(n, decimals = 2) {
   return new Intl.NumberFormat('en-IN', {
     minimumFractionDigits: decimals,
@@ -78,10 +79,12 @@ export function buildPurchaseReceiptHtml({
   store = {},
   logoDataUrl = null,
   format = 'thermal',
+  config = null,
 }) {
   const ps = PAGE_SIZES[format] || PAGE_SIZES.thermal;
+  const fontFamily = mergeReceiptConfig(config).paper.fontFamily || "'Helvetica Neue', Helvetica, Arial, sans-serif";
   if (format === 'thermal') return buildThermal({ purchase, store, logoDataUrl, ps });
-  return buildPaper({ purchase, store, logoDataUrl, ps, format });
+  return buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily });
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -320,7 +323,7 @@ function buildThermal({ purchase, store, logoDataUrl, ps }) {
 // ───────────────────────────────────────────────────────────────────────────
 // A4 / A5 — standard monochrome purchase voucher
 // ───────────────────────────────────────────────────────────────────────────
-function buildPaper({ purchase, store, logoDataUrl, ps, format }) {
+function buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily }) {
   const isA5 = format === 'a5';
   const items = Array.isArray(purchase.items) ? purchase.items : [];
 
@@ -390,7 +393,7 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format }) {
     html, body { background: #fff; }
     body, body * { color: #000 !important; background: transparent !important; border-color: #000 !important; }
     body {
-      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-family: ${fontFamily};
       font-size: ${baseFs};
       line-height: 1.4;
       width: ${ps.width};

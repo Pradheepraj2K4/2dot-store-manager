@@ -5,6 +5,8 @@
  * Paper size is driven by `format`: 'a5' | 'a4' | 'thermal'
  */
 
+import { mergeReceiptConfig } from './receiptConfig';
+
 function fmt(date) {
   if (!date) return '—';
   const [y, m, d] = date.split('-');
@@ -22,9 +24,13 @@ const PAGE_SIZES = {
   thermal: { cssSize: '80mm auto', width: '76mm'  },
 };
 
-export function buildInterestReceiptHtml({ entry, ledgerName, store = {}, logoDataUrl = null, format = 'a5' }) {
+export function buildInterestReceiptHtml({ entry, ledgerName, store = {}, logoDataUrl = null, format = 'a5', config = null }) {
   const ps = PAGE_SIZES[format] || PAGE_SIZES.a5;
   const isThermal = format === 'thermal';
+  const cfgP = mergeReceiptConfig(config).paper;
+  const fontFamily = cfgP.fontFamily || "'Segoe UI', system-ui, -apple-system, sans-serif";
+  const thanksText = cfgP.thanksText || 'Thank you for your payment!';
+  const signatureLabel = cfgP.signatureLabel || 'Authorized Signature';
 
   const period = entry.from_date === entry.to_date
     ? fmt(entry.from_date)
@@ -47,7 +53,7 @@ export function buildInterestReceiptHtml({ entry, ledgerName, store = {}, logoDa
     @page { size: ${ps.cssSize}; margin: ${isThermal ? '4mm 3mm' : '12mm'}; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-family: ${fontFamily};
       font-size: ${bodyFontSize};
       color: #1a1a1a;
       width: ${ps.width};
@@ -215,13 +221,13 @@ export function buildInterestReceiptHtml({ entry, ledgerName, store = {}, logoDa
   </div>
 
   <!-- Footer -->
-  <div class="footer">Thank you for your payment!</div>
+  <div class="footer">${thanksText}</div>
 
   <!-- Signature -->
   <div class="signature">
     <div class="sig-inner">
       <div class="sig-line"></div>
-      <div class="sig-text">Authorized Signature</div>
+      <div class="sig-text">${signatureLabel}</div>
     </div>
   </div>
 

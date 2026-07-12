@@ -11,11 +11,11 @@ class SaleRepository {
     return String(row.next);
   }
 
-  create({ sale_number, ledger_id, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, cash_amount, upi_amount, tendered_amount, waiter_id, waiter_name, service_type, items }) {
+  create({ sale_number, ledger_id, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, cash_amount, upi_amount, tendered_amount, waiter_id, waiter_name, service_type, dining_type, items }) {
     const db = getDb();
     const info = db.prepare(`
-      INSERT INTO sales (sale_number, ledger_id, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, cash_amount, upi_amount, tendered_amount, waiter_id, waiter_name, service_type)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO sales (sale_number, ledger_id, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, cash_amount, upi_amount, tendered_amount, waiter_id, waiter_name, service_type, dining_type)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       sale_number,
       ledger_id,
@@ -36,7 +36,8 @@ class SaleRepository {
       tendered_amount || 0,
       waiter_id || null,
       waiter_name || '',
-      service_type || ''
+      service_type || '',
+      dining_type || 'dining'
     );
     const saleId = info.lastInsertRowid;
     if (Array.isArray(items)) {
@@ -184,7 +185,7 @@ class SaleRepository {
     `).all(...params);
   }
 
-  getFoodSalesReport({ fromDate, toDate, category, itemId, waiterName } = {}) {
+  getFoodSalesReport({ fromDate, toDate, category, itemId, waiterName, diningType } = {}) {
     const db = getDb();
     const conds = [];
     const params = [];
@@ -193,6 +194,7 @@ class SaleRepository {
     if (category)   { conds.push('LOWER(i.category) = ?'); params.push(String(category).toLowerCase()); }
     if (itemId)     { conds.push('si.item_id = ?'); params.push(parseInt(itemId)); }
     if (waiterName) { conds.push('s.waiter_name = ?'); params.push(waiterName); }
+    if (diningType) { conds.push('s.dining_type = ?'); params.push(diningType); }
     const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
     return db.prepare(`
       SELECT
@@ -270,6 +272,21 @@ class SaleRepository {
         nonAcTotal += row.total; nonAcCount += row.count;
       }
     }
+    const byDining = db.prepare(`
+      SELECT dining_type,
+             COALESCE(SUM(total_amount), 0) AS total,
+             COUNT(*) AS count
+      FROM sales WHERE date = ?
+      GROUP BY dining_type
+    `).all(today);
+    let diningTotal = 0, diningCount = 0, takeAwayTotal = 0, takeAwayCount = 0;
+    for (const row of byDining) {
+      if (row.dining_type === 'take_away') {
+        takeAwayTotal += row.total; takeAwayCount += row.count;
+      } else {
+        diningTotal += row.total; diningCount += row.count;
+      }
+    }
     const topWaiters = db.prepare(`
       SELECT waiter_name,
              COALESCE(SUM(total_amount), 0) AS total,
@@ -281,7 +298,7 @@ class SaleRepository {
       ORDER BY total DESC
       LIMIT 5
     `).all(monthStart, today);
-    return { acTotal, acCount, nonAcTotal, nonAcCount, topWaiters };
+    return { acTotal, acCount, nonAcTotal, nonAcCount, diningTotal, diningCount, takeAwayTotal, takeAwayCount, topWaiters };
   }
 
   delete(id) {
@@ -289,11 +306,11 @@ class SaleRepository {
     return db.prepare('DELETE FROM sales WHERE id = ?').run(id);
   }
 
-  update(id, { date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, cash_amount, upi_amount, tendered_amount, waiter_id, waiter_name, service_type, items }) {
+  update(id, { date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, cash_amount, upi_amount, tendered_amount, waiter_id, waiter_name, service_type, dining_type, items }) {
     const db = getDb();
     db.prepare(`
       UPDATE sales
-      SET date = ?, time = ?, total_amount = ?, total_discount = ?, bill_discount = ?, total_gst = ?, item_count = ?, notes = ?, customer_name = ?, customer_mobile = ?, customer_place = ?, customer_id = ?, cash_amount = ?, upi_amount = ?, tendered_amount = ?, waiter_id = ?, waiter_name = ?, service_type = ?
+      SET date = ?, time = ?, total_amount = ?, total_discount = ?, bill_discount = ?, total_gst = ?, item_count = ?, notes = ?, customer_name = ?, customer_mobile = ?, customer_place = ?, customer_id = ?, cash_amount = ?, upi_amount = ?, tendered_amount = ?, waiter_id = ?, waiter_name = ?, service_type = ?, dining_type = ?
       WHERE id = ?
     `).run(
       date,
@@ -314,6 +331,7 @@ class SaleRepository {
       waiter_id || null,
       waiter_name || '',
       service_type || '',
+      dining_type || 'dining',
       id
     );
     if (Array.isArray(items)) {

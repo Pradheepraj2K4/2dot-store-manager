@@ -551,6 +551,7 @@ export default function ItemSalesEntryPage() {
   const [waiters, setWaiters] = useState([]);
   const [waiterId, setWaiterId] = useState('');
   const [serviceType, setServiceType] = useState('non_ac'); // '', 'ac', 'non_ac'
+  const [diningType, setDiningType] = useState('dining'); // 'dining', 'take_away'
   // Multi-counter: keep two independent in-progress sales and switch between
   // them mid-entry. Enabled via the developer settings toggle.
   const [multiCounterEnabled, setMultiCounterEnabled] = useState(false);
@@ -834,6 +835,7 @@ export default function ItemSalesEntryPage() {
     if (d.billDiscount != null) setBillDiscount(d.billDiscount);
     if (d.waiterId != null) setWaiterId(d.waiterId);
     if (d.serviceType != null) setServiceType(d.serviceType);
+    if (d.diningType != null) setDiningType(d.diningType);
     if (Array.isArray(d.lines) && d.lines.length) setLines(d.lines);
   };
 
@@ -861,13 +863,13 @@ export default function ItemSalesEntryPage() {
         localStorage.setItem(draftKeyFor(activeCounter), JSON.stringify({
           ledger, date, time, notes,
           customerName, customerMobile, customerPlace, customerId,
-          billDiscount, waiterId, serviceType, lines,
+          billDiscount, waiterId, serviceType, diningType, lines,
         }));
       } else {
         localStorage.removeItem(draftKeyFor(activeCounter));
       }
     } catch (_) { /* ignore storage quota errors */ }
-  }, [isEdit, activeCounter, ledger, date, time, notes, customerName, customerMobile, customerPlace, customerId, billDiscount, waiterId, serviceType, lines]);
+  }, [isEdit, activeCounter, ledger, date, time, notes, customerName, customerMobile, customerPlace, customerId, billDiscount, waiterId, serviceType, diningType, lines]);
 
   // Switch between the two sale counters, persisting the current one and
   // loading the target's saved draft (or a fresh blank entry).
@@ -885,7 +887,7 @@ export default function ItemSalesEntryPage() {
         localStorage.setItem(draftKeyFor(activeCounter), JSON.stringify({
           ledger, date, time, notes,
           customerName, customerMobile, customerPlace, customerId,
-          billDiscount, waiterId, serviceType, lines,
+          billDiscount, waiterId, serviceType, diningType, lines,
         }));
       } else {
         localStorage.removeItem(draftKeyFor(activeCounter));
@@ -911,6 +913,7 @@ export default function ItemSalesEntryPage() {
     setTenderedAmount('');
     setWaiterId('');
     setServiceType('non_ac');
+    setDiningType('dining');
     setLines([emptyLine()]);
     setShowImeiErrors(false);
     let restored = false;
@@ -1044,6 +1047,7 @@ export default function ItemSalesEntryPage() {
         setTenderedAmount(sale.tendered_amount ? String(sale.tendered_amount) : '');
         setWaiterId(sale.waiter_id != null ? String(sale.waiter_id) : '');
         setServiceType(sale.service_type || '');
+        setDiningType(sale.dining_type || 'dining');
         setLedger({ id: sale.ledger_id, name: sale.ledger_name, behaviour: 'customer' });
         setLines(
           (sale.items || []).map((l) => ({
@@ -1447,6 +1451,7 @@ export default function ItemSalesEntryPage() {
           ? (waiters.find((w) => String(w.id) === String(waiterId))?.name || '')
           : '',
         service_type: restaurantEnabled ? serviceType : '',
+        dining_type: restaurantEnabled ? diningType : 'dining',
         items: validLines.map((l) => ({
           item_id: l.item_id,
           item_name: l.item_name.trim(),
@@ -1491,6 +1496,7 @@ export default function ItemSalesEntryPage() {
         setTenderedAmount('');
         setWaiterId('');
         setServiceType('non_ac');
+        setDiningType('dining');
         setLines([emptyLine()]);
         saleApi.getNextNumber()
           .then((r) => setSaleNumber(r.data?.sale_number || ''))
@@ -1568,6 +1574,7 @@ export default function ItemSalesEntryPage() {
     setTenderedAmount('');
     setWaiterId('');
     setServiceType('non_ac');
+    setDiningType('dining');
     setLines([emptyLine()]);
     setShowImeiErrors(false);
     ledgerApi.getCash().then((r) => { if (r.data) setLedger(r.data); }).catch(() => {});
@@ -1669,24 +1676,6 @@ export default function ItemSalesEntryPage() {
               </div>
             </div>
           </div>
-          <div className="w-36">
-            <label className="text-xs text-slate-500">Date</label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="input-field"
-            />
-          </div>
-          <div className="w-24">
-            <label className="text-xs text-slate-500">Time</label>
-            <input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              className="input-field"
-            />
-          </div>
           {restaurantEnabled && (
             <div className="flex items-end gap-2">
               <div className="w-32">
@@ -1708,6 +1697,25 @@ export default function ItemSalesEntryPage() {
                   </button>
                 </div>
               </div>
+              <div className="w-36">
+                <label className="text-xs text-slate-500">Dining</label>
+                <div className="flex h-9 rounded-lg border border-slate-300 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setDiningType('dining')}
+                    className={`flex-1 text-xs font-semibold transition-colors ${diningType === 'dining' ? 'bg-trust-blue text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    Dining
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDiningType('take_away')}
+                    className={`flex-1 text-xs font-semibold border-l border-slate-300 transition-colors ${diningType === 'take_away' ? 'bg-trust-blue text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+                  >
+                    Take-away
+                  </button>
+                </div>
+              </div>
               <div className="w-32">
                 <label className="text-xs text-slate-500">Waiter</label>
                 <select
@@ -1723,6 +1731,24 @@ export default function ItemSalesEntryPage() {
               </div>
             </div>
           )}
+          <div className="w-36">
+            <label className="text-xs text-slate-500">Date</label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="input-field"
+            />
+          </div>
+          <div className="w-24">
+            <label className="text-xs text-slate-500">Time</label>
+            <input
+              type="time"
+              value={time}
+              onChange={(e) => setTime(e.target.value)}
+              className="input-field"
+            />
+          </div>
         </div>
       </div>
 

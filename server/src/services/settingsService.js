@@ -45,12 +45,12 @@ class SettingsService {
   }
 
   // Reads the thermal logo height (mm) from receipt_config, clamped to a sane
-  // 6–40mm range. Falls back to 12mm when unset or invalid.
+  // 6–72mm range. Falls back to 12mm when unset or invalid.
   resolveThermalLogoHeight() {
     const cfg = settingsRepository.get('receipt_config');
     const raw = cfg && typeof cfg === 'object' ? Number(cfg.thermalLogoHeight) : NaN;
     if (!Number.isFinite(raw) || raw <= 0) return 12;
-    return Math.min(40, Math.max(6, raw));
+    return Math.min(72, Math.max(6, raw));
   }
 
   // Reads the thermal UPI QR size (mm) from receipt_config, clamped to a sane

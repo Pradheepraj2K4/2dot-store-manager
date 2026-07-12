@@ -62,7 +62,8 @@ export default function DayBookPage() {
         details: tx.ledger_name + (tx.notes ? ` — ${tx.notes}` : ''),
         voucherNo: tx.running_number || `TXN-${String(tx.id).padStart(5, '0')}`,
         debit: tx.entry_type === 'payment' ? tx.amount : 0,
-        credit: tx.entry_type === 'receipt' ? tx.amount : 0,
+        creditCash: tx.entry_type === 'receipt' ? tx.amount : 0,
+        creditUpi: 0,
       }));
 
       const expEntries = expenses.map((exp) => ({
@@ -73,20 +74,29 @@ export default function DayBookPage() {
         details: exp.expense_name + (exp.category_name ? ` [${exp.category_name}]` : ''),
         voucherNo: `EXP-${String(exp.id).padStart(5, '0')}`,
         debit: exp.amount,
-        credit: 0,
+        creditCash: 0,
+        creditUpi: 0,
       }));
 
-      // Sales → Credit (income)
-      const saleEntries = sales.map((s) => ({
-        id: `sal-${s.id}`,
-        type: 'sale',
-        sortKey: s.id,
-        date: s.date,
-        details: `${s.ledger_name} — Sale ${s.sale_number}`,
-        voucherNo: `SAL-${String(s.sale_number).padStart(5, '0')}`,
-        debit: 0,
-        credit: s.total_amount,
-      }));
+      // Sales → Credit (income), split between cash and UPI tender.
+      const saleEntries = sales.map((s) => {
+        const cash = Number(s.cash_amount) || 0;
+        const upi = Number(s.upi_amount) || 0;
+        const total = Number(s.total_amount) || 0;
+        // Legacy sales with no tender split recorded fall back to cash.
+        const creditCash = (cash === 0 && upi === 0) ? total : cash;
+        return {
+          id: `sal-${s.id}`,
+          type: 'sale',
+          sortKey: s.id,
+          date: s.date,
+          details: `${s.ledger_name} — Sale ${s.sale_number}`,
+          voucherNo: `SAL-${String(s.sale_number).padStart(5, '0')}`,
+          debit: 0,
+          creditCash,
+          creditUpi: upi,
+        };
+      });
 
       // Purchases → Debit (expenditure)
       const purchEntries = purchases.map((p) => {
@@ -99,7 +109,8 @@ export default function DayBookPage() {
           details: `${p.ledger_name} — Purchase ${p.purchase_number}${billRef}`,
           voucherNo: `PUR-${String(p.purchase_number).padStart(5, '0')}`,
           debit: p.total_amount,
-          credit: 0,
+          creditCash: 0,
+          creditUpi: 0,
         };
       });
 
@@ -114,7 +125,8 @@ export default function DayBookPage() {
           details: `${r.ledger_name} — Sales Return ${r.return_number}${ref}`,
           voucherNo: `SR-${String(r.return_number).padStart(5, '0')}`,
           debit: r.total_amount,
-          credit: 0,
+          creditCash: 0,
+          creditUpi: 0,
         };
       });
 
@@ -131,7 +143,8 @@ export default function DayBookPage() {
           details: `${r.ledger_name} — Purchase Return ${r.return_number}${ref}`,
           voucherNo: `PR-${String(r.return_number).padStart(5, '0')}`,
           debit: 0,
-          credit: r.total_amount,
+          creditCash: r.total_amount,
+          creditUpi: 0,
         };
       });
 
@@ -157,8 +170,9 @@ export default function DayBookPage() {
     return entries.filter((e) => e.type === filters.type);
   }, [entries, filters.type]);
 
-  const totalDebit  = useMemo(() => filtered.reduce((s, e) => s + e.debit, 0), [filtered]);
-  const totalCredit = useMemo(() => filtered.reduce((s, e) => s + e.credit, 0), [filtered]);
+  const totalDebit     = useMemo(() => filtered.reduce((s, e) => s + e.debit, 0), [filtered]);
+  const totalCreditCash = useMemo(() => filtered.reduce((s, e) => s + e.creditCash, 0), [filtered]);
+  const totalCreditUpi  = useMemo(() => filtered.reduce((s, e) => s + e.creditUpi, 0), [filtered]);
 
   const handleExportExcel = () => {
     const columns = [
@@ -167,7 +181,8 @@ export default function DayBookPage() {
       { header: 'Details',    key: 'details',   width: 40 },
       { header: 'Voucher No', key: 'voucherNo', width: 18 },
       { header: 'Debit (₹)', key: 'debit',     width: 15 },
-      { header: 'Credit (₹)',key: 'credit',    width: 15 },
+      { header: 'Cash Credit (₹)', key: 'creditCash', width: 16 },
+      { header: 'UPI Credit (₹)',  key: 'creditUpi',  width: 16 },
     ];
     const rows = filtered.map((e, idx) => ({
       sno: idx + 1,
@@ -175,7 +190,8 @@ export default function DayBookPage() {
       details: e.details,
       voucherNo: e.voucherNo,
       debit: e.debit > 0 ? e.debit : '',
-      credit: e.credit > 0 ? e.credit : '',
+      creditCash: e.creditCash > 0 ? e.creditCash : '',
+      creditUpi: e.creditUpi > 0 ? e.creditUpi : '',
     }));
     exportToExcel(rows, columns, 'Day_Book');
   };
@@ -259,7 +275,8 @@ export default function DayBookPage() {
                   <th className="px-3 py-2 text-left font-semibold border-b border-slate-200">Details</th>
                   <th className="px-3 py-2 text-left font-semibold border-b border-slate-200 whitespace-nowrap">Voucher No.</th>
                   <th className="px-3 py-2 text-right font-semibold border-b border-slate-200 whitespace-nowrap">Debit (₹)</th>
-                  <th className="px-3 py-2 text-right font-semibold border-b border-slate-200 whitespace-nowrap">Credit (₹)</th>
+                  <th className="px-3 py-2 text-right font-semibold border-b border-slate-200 whitespace-nowrap">Cash Credit (₹)</th>
+                  <th className="px-3 py-2 text-right font-semibold border-b border-slate-200 whitespace-nowrap">UPI Credit (₹)</th>
                 </tr>
               </thead>
               <tbody>
@@ -273,7 +290,10 @@ export default function DayBookPage() {
                       {entry.debit > 0 ? formatCurrency(entry.debit) : <span className="text-slate-300">—</span>}
                     </td>
                     <td className="px-3 py-1.5 text-right font-semibold text-green-600 whitespace-nowrap">
-                      {entry.credit > 0 ? formatCurrency(entry.credit) : <span className="text-slate-300">—</span>}
+                      {entry.creditCash > 0 ? formatCurrency(entry.creditCash) : <span className="text-slate-300">—</span>}
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-semibold text-green-600 whitespace-nowrap">
+                      {entry.creditUpi > 0 ? formatCurrency(entry.creditUpi) : <span className="text-slate-300">—</span>}
                     </td>
                   </tr>
                 ))}
@@ -287,7 +307,10 @@ export default function DayBookPage() {
                     {formatCurrency(totalDebit)}
                   </td>
                   <td className="px-3 py-2.5 text-right text-base font-bold text-green-300 whitespace-nowrap">
-                    {formatCurrency(totalCredit)}
+                    {formatCurrency(totalCreditCash)}
+                  </td>
+                  <td className="px-3 py-2.5 text-right text-base font-bold text-green-300 whitespace-nowrap">
+                    {formatCurrency(totalCreditUpi)}
                   </td>
                 </tr>
               </tfoot>

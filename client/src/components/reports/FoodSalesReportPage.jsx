@@ -33,6 +33,7 @@ export default function FoodSalesReportPage() {
   const [category, setCategory] = useState('');
   const [itemId, setItemId] = useState('');
   const [waiterName, setWaiterName] = useState('');
+  const [diningType, setDiningType] = useState('');
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState([]);
@@ -52,6 +53,7 @@ export default function FoodSalesReportPage() {
       if (category) params.category = category;
       if (itemId) params.itemId = itemId;
       if (waiterName) params.waiterName = waiterName;
+      if (diningType) params.diningType = diningType;
       const res = await saleApi.getFoodSalesReport(params);
       setRows(res.data || []);
     } catch (err) {
@@ -59,7 +61,7 @@ export default function FoodSalesReportPage() {
     } finally {
       setLoading(false);
     }
-  }, [fromDate, toDate, category, itemId, waiterName]);
+  }, [fromDate, toDate, category, itemId, waiterName, diningType]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -121,7 +123,7 @@ export default function FoodSalesReportPage() {
         </head>
         <body>
           <h1>Food Sales Report</h1>
-          <p class="meta">${fmtDate(fromDate)} to ${fmtDate(toDate)}${category ? ` &middot; Category: ${category}` : ''}${waiterName ? ` &middot; Waiter: ${waiterName}` : ''}</p>
+          <p class="meta">${fmtDate(fromDate)} to ${fmtDate(toDate)}${category ? ` &middot; Category: ${category}` : ''}${waiterName ? ` &middot; Waiter: ${waiterName}` : ''}${diningType ? ` &middot; ${diningType === 'take_away' ? 'Take-away' : 'Dining'}` : ''}</p>
           <table>
             <thead>
               <tr>
@@ -229,6 +231,14 @@ export default function FoodSalesReportPage() {
             {waiters.map((w) => (
               <option key={w.id} value={w.name}>{w.name}</option>
             ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-slate-500 mb-1">Dining</label>
+          <select value={diningType} onChange={(e) => setDiningType(e.target.value)} className="input-field">
+            <option value="">All</option>
+            <option value="dining">Dining</option>
+            <option value="take_away">Take-away</option>
           </select>
         </div>
       </div>

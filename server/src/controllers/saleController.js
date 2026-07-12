@@ -45,8 +45,8 @@ class SaleController {
 
   getFoodSalesReport(req, res, next) {
     try {
-      const { fromDate, toDate, category, itemId, waiterName } = req.query;
-      const rows = saleService.getFoodSalesReport({ fromDate, toDate, category, itemId, waiterName });
+      const { fromDate, toDate, category, itemId, waiterName, diningType } = req.query;
+      const rows = saleService.getFoodSalesReport({ fromDate, toDate, category, itemId, waiterName, diningType });
       res.json({ success: true, data: rows });
     } catch (err) { next(err); }
   }

@@ -18,6 +18,7 @@ import {
   BuildingStorefrontIcon,
   UserGroupIcon,
   FireIcon,
+  HomeModernIcon,
 } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
 
@@ -302,6 +303,32 @@ export default function DashboardPage() {
                 <p className="text-2xl font-bold text-slate-900 mt-3 leading-tight">{formatCurrency(data.restaurantSummary.nonAcTotal)}</p>
                 <span className="mt-1 text-xs text-slate-400">
                   {data.restaurantSummary.nonAcCount} bill{data.restaurantSummary.nonAcCount !== 1 ? 's' : ''} today
+                </span>
+              </div>
+              {/* Dining sales */}
+              <div className="card flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Dining Sales</span>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-500">
+                    <HomeModernIcon className="h-4 w-4" />
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-slate-900 mt-3 leading-tight">{formatCurrency(data.restaurantSummary.diningTotal)}</p>
+                <span className="mt-1 text-xs text-slate-400">
+                  {data.restaurantSummary.diningCount} bill{data.restaurantSummary.diningCount !== 1 ? 's' : ''} today
+                </span>
+              </div>
+              {/* Take-away sales */}
+              <div className="card flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">Take-away Sales</span>
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-50 text-violet-500">
+                    <ShoppingBagIcon className="h-4 w-4" />
+                  </div>
+                </div>
+                <p className="text-2xl font-bold text-slate-900 mt-3 leading-tight">{formatCurrency(data.restaurantSummary.takeAwayTotal)}</p>
+                <span className="mt-1 text-xs text-slate-400">
+                  {data.restaurantSummary.takeAwayCount} bill{data.restaurantSummary.takeAwayCount !== 1 ? 's' : ''} today
                 </span>
               </div>
             </div>

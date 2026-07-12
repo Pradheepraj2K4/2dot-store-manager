@@ -88,8 +88,12 @@ export default function ItemCreationPage() {
     setForm((p) => ({ ...p, [name]: value }));
   };
 
-  // Enter-key navigation between form fields
-  const FIELD_ORDER = ['item_code', 'name', 'unit', 'mrp', 'sales_rate', 'gst_percent', 'brand', 'category'];
+  // Enter-key navigation between form fields. When the restaurant module is
+  // enabled the A/C and Non-A/C rate fields sit between Sales Rate and GST %,
+  // so include them in the Enter-key chain too.
+  const FIELD_ORDER = restaurantEnabled
+    ? ['item_code', 'name', 'unit', 'mrp', 'sales_rate', 'ac_rate', 'non_ac_rate', 'gst_percent', 'brand', 'category']
+    : ['item_code', 'name', 'unit', 'mrp', 'sales_rate', 'gst_percent', 'brand', 'category'];
   const fieldRefs = useRef({});
   const setFieldRef = (name) => (el) => { fieldRefs.current[name] = el; };
   const submitBtnRef = useRef(null);
@@ -267,11 +271,13 @@ export default function ItemCreationPage() {
               <label className="w-28 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">A/C Rate</label>
               <div className="flex-1">
                 <input
+                  ref={setFieldRef('ac_rate')}
                   type="number"
                   step="0.01"
                   name="ac_rate"
                   value={form.ac_rate}
                   onChange={handleChange}
+                  onKeyDown={handleFieldKeyDown('ac_rate')}
                   placeholder="Fixed rate for A/C bills"
                   className="input-field"
                 />
@@ -283,11 +289,13 @@ export default function ItemCreationPage() {
               <label className="w-28 shrink-0 h-9 flex items-center text-sm font-medium text-slate-700">Non-A/C Rate</label>
               <div className="flex-1">
                 <input
+                  ref={setFieldRef('non_ac_rate')}
                   type="number"
                   step="0.01"
                   name="non_ac_rate"
                   value={form.non_ac_rate}
                   onChange={handleChange}
+                  onKeyDown={handleFieldKeyDown('non_ac_rate')}
                   placeholder="Fixed rate for Non-A/C bills"
                   className="input-field"
                 />

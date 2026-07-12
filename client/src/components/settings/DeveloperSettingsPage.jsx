@@ -216,7 +216,7 @@ export default function DeveloperSettingsPage() {
       setReceiptConfig(cfg);
       setDefaultPrintFormat(['thermal', 'a5', 'a4'].includes(cfg.format) ? cfg.format : 'thermal');
       const lh = Number(cfg.thermalLogoHeight);
-      setThermalLogoHeight(Number.isFinite(lh) && lh > 0 ? Math.min(40, Math.max(6, lh)) : 12);
+      setThermalLogoHeight(Number.isFinite(lh) && lh > 0 ? Math.min(72, Math.max(6, lh)) : 12);
       const qs = Number(cfg.thermalUpiQrSize);
       setThermalUpiQrSize(Number.isFinite(qs) && qs > 0 ? Math.min(50, Math.max(15, qs)) : 28);
       const tw = Number(cfg.thermalWidth);
@@ -414,7 +414,7 @@ export default function DeveloperSettingsPage() {
   // Persist the thermal logo height (mm) into receipt_config. Called when the
   // slider is released so we don't spam the API on every drag tick.
   const saveThermalLogoHeight = async (value) => {
-    const clamped = Math.min(40, Math.max(6, Number(value) || 12));
+    const clamped = Math.min(72, Math.max(6, Number(value) || 12));
     if ((receiptConfig.thermalLogoHeight || 12) === clamped) return;
     setSavingLogoHeight(true);
     try {
@@ -1284,7 +1284,7 @@ export default function DeveloperSettingsPage() {
                           <input
                             type="range"
                             min="6"
-                            max="40"
+                            max="72"
                             step="1"
                             value={thermalLogoHeight}
                             disabled={savingLogoHeight}
@@ -1296,7 +1296,7 @@ export default function DeveloperSettingsPage() {
                           />
                           <div className="flex justify-between text-[10px] text-slate-400 mt-1">
                             <span>Small · 6mm</span>
-                            <span>Large · 40mm</span>
+                            <span>Large · 72mm</span>
                           </div>
                           <div className="flex items-center gap-2 mt-3">
                             <button

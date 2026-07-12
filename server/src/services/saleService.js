@@ -160,6 +160,7 @@ class SaleService {
         waiter_id: data.waiter_id ? parseInt(data.waiter_id) : null,
         waiter_name: data.waiter_name || '',
         service_type: data.service_type || '',
+        dining_type: data.dining_type || 'dining',
         items: normalisedItems,
       });
 
@@ -251,6 +252,7 @@ class SaleService {
         waiter_id: data.waiter_id ? parseInt(data.waiter_id) : null,
         waiter_name: data.waiter_name || '',
         service_type: data.service_type || '',
+        dining_type: data.dining_type || 'dining',
         items: normalisedItems,
       });
       consumeImeis(normalisedItems, id);
@@ -332,9 +334,9 @@ class SaleService {
    * price, total sales value and total discount per item over a date range,
    * optionally filtered by category and/or a specific item.
    */
-  getFoodSalesReport({ fromDate, toDate, category, itemId, waiterName } = {}) {
+  getFoodSalesReport({ fromDate, toDate, category, itemId, waiterName, diningType } = {}) {
     const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
-    const rows = saleRepository.getFoodSalesReport({ fromDate, toDate, category, itemId, waiterName });
+    const rows = saleRepository.getFoodSalesReport({ fromDate, toDate, category, itemId, waiterName, diningType });
     return rows.map((r) => ({
       item_id: r.item_id,
       item_name: r.item_name,

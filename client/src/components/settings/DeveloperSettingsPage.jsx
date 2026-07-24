@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { settingsApi, ledgerTypeApi, interestSchemeApi } from '../../api';
 import { isDevAuthenticated, devLogin, devLogout, getDevPassword } from '../../utils/auth';
 import { mergeReceiptConfig, cacheReceiptConfig, THERMAL_SECTION_LABELS, PAPER_COLUMN_LABELS } from '../../utils/receiptConfig';
+import { SIDEBAR_MENU_GROUPS, SIDEBAR_MENU_LABELS_KEY } from '../../utils/sidebarMenus';
 import { buildSaleReceiptHtml } from '../../utils/saleReceipt';
 import { fetchLogoDataUrl } from '../../utils/interestReceipt';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -165,6 +166,10 @@ export default function DeveloperSettingsPage() {
   const [schSaving, setSchSaving] = useState(false);
   const [editingScheme, setEditingScheme] = useState(null);
 
+  // Sidebar menu labels state (custom names for sidebar menus)
+  const [menuLabels, setMenuLabels] = useState({});
+  const [savingMenuLabels, setSavingMenuLabels] = useState(false);
+
   useEffect(() => {
     if (authenticated) {
       fetchSettings();
@@ -215,6 +220,8 @@ export default function DeveloperSettingsPage() {
       setCashTenderEnabled(data.cash_tender_enabled !== false && data.cash_tender_enabled !== 'false');
       // Load IMEI tracking setting
       setImeiTrackingEnabled(data.imei_tracking_enabled === true || data.imei_tracking_enabled === 'true');
+      // Load custom sidebar menu labels
+      setMenuLabels(data[SIDEBAR_MENU_LABELS_KEY] && typeof data[SIDEBAR_MENU_LABELS_KEY] === 'object' ? data[SIDEBAR_MENU_LABELS_KEY] : {});
       // Load print receipt settings
       setPrintReceiptsPaymentEnabled(data.print_receipts_payment_enabled === true || data.print_receipts_payment_enabled === 'true');
       setPrintReceiptsInterestEnabled(data.print_receipts_interest_enabled === true || data.print_receipts_interest_enabled === 'true');
@@ -350,6 +357,42 @@ export default function DeveloperSettingsPage() {
       fetchSchemes();
     } catch (err) {
       toast.error(err.message);
+    }
+  };
+
+  const handleMenuLabelChange = (name, value) => {
+    setMenuLabels((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleSaveMenuLabels = async () => {
+    try {
+      setSavingMenuLabels(true);
+      // Persist only non-empty custom labels; blank inputs fall back to defaults.
+      const cleaned = {};
+      for (const [name, label] of Object.entries(menuLabels)) {
+        if (typeof label === 'string' && label.trim()) cleaned[name] = label.trim();
+      }
+      await settingsApi.update(SIDEBAR_MENU_LABELS_KEY, cleaned);
+      setMenuLabels(cleaned);
+      toast.success('Menu names saved');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSavingMenuLabels(false);
+    }
+  };
+
+  const handleResetMenuLabels = async () => {
+    if (!window.confirm('Reset all sidebar menu names to their defaults?')) return;
+    try {
+      setSavingMenuLabels(true);
+      await settingsApi.update(SIDEBAR_MENU_LABELS_KEY, {});
+      setMenuLabels({});
+      toast.success('Menu names reset to defaults');
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSavingMenuLabels(false);
     }
   };
 
@@ -698,6 +741,7 @@ export default function DeveloperSettingsPage() {
     { id: 'ledgerTypes',    label: 'Ledger Types'      },
     ...(interestModuleEnabled ? [{ id: 'interestSchemes', label: 'Interest Schemes' }] : []),
     { id: 'modules',        label: 'Modules'           },
+    { id: 'menuNames',      label: 'Menu Names'        },
     { id: 'receipt',        label: 'Receipt'           },
     { id: 'data',           label: 'Data'              },
   ];
@@ -1192,6 +1236,65 @@ export default function DeveloperSettingsPage() {
                   />
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Menu Names Tab */}
+      {activeTab === 'menuNames' && (
+        <div className="space-y-4">
+          <div className="card">
+            <div className="flex items-start justify-between gap-3 mb-1">
+              <div>
+                <h2 className="text-base font-semibold text-slate-900">Sidebar Menu Names</h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Rename any sidebar menu. Leave a field blank to use its default name.
+                  Some menus only appear when their module is enabled.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleResetMenuLabels}
+                  disabled={savingMenuLabels}
+                  className="btn-secondary text-xs"
+                >
+                  Reset to defaults
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveMenuLabels}
+                  disabled={savingMenuLabels}
+                  className="btn-primary text-xs"
+                >
+                  {savingMenuLabels ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-6 mt-5">
+              {SIDEBAR_MENU_GROUPS.map((group) => (
+                <div key={group.section}>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                    {group.section}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {group.items.map((name) => (
+                      <div key={name} className="flex flex-col gap-1">
+                        <label className="text-xs font-medium text-slate-500">{name}</label>
+                        <input
+                          type="text"
+                          className="input-field text-sm"
+                          value={menuLabels[name] ?? ''}
+                          placeholder={name}
+                          onChange={(e) => handleMenuLabelChange(name, e.target.value)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

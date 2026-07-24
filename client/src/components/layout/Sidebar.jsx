@@ -33,6 +33,7 @@ import {
 } from "@heroicons/react/24/outline";
 import { logout, hasPermission, getCurrentUser } from "../../utils/auth";
 import { interestApi, expenseApi, serviceApi, waiterApi, settingsApi } from "../../api";
+import { SIDEBAR_MENU_LABELS_KEY, menuLabel } from "../../utils/sidebarMenus";
 import toast from "react-hot-toast";
 
 const baseNavigation = [
@@ -110,6 +111,7 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
   // Default-enabled modules: treat a missing setting as on.
   const [purchaseEnabled, setPurchaseEnabled] = useState(true);
   const [accountTxnEnabled, setAccountTxnEnabled] = useState(true);
+  const [menuLabels, setMenuLabels] = useState({});
   const [expandedGroup, setExpandedGroup] = useState("Master");
   const [isFullscreen, setIsFullscreen] = useState(
     typeof document !== "undefined" && Boolean(document.fullscreenElement),
@@ -172,6 +174,13 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
       .then((res) => {
         const val = res.data?.value;
         setAccountTxnEnabled(val !== false && val !== "false");
+      })
+      .catch(() => {});
+    settingsApi
+      .get(SIDEBAR_MENU_LABELS_KEY)
+      .then((res) => {
+        const val = res.data?.value;
+        setMenuLabels(val && typeof val === "object" ? val : {});
       })
       .catch(() => {});
   }, []);
@@ -409,7 +418,7 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
                     }`}
                   >
                     <item.icon className="h-4 w-4 flex-shrink-0" />
-                    <span className="flex-1 text-left">{item.name}</span>
+                    <span className="flex-1 text-left">{menuLabel(menuLabels, item.name)}</span>
                     <ChevronDownIcon
                       className={`h-3.5 w-3.5 transition-transform ${isExpanded ? "rotate-180" : ""}`}
                     />
@@ -439,7 +448,7 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
                             }
                           >
                             <child.icon className="h-3.5 w-3.5 flex-shrink-0" />
-                            {child.name}
+                            {menuLabel(menuLabels, child.name)}
                           </NavLink>
                           );
                         })}
@@ -468,7 +477,7 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
                   }
                 >
                   <item.icon className="h-4 w-4 flex-shrink-0" />
-                  {item.name}
+                  {menuLabel(menuLabels, item.name)}
                 </NavLink>
               );
             }
@@ -487,7 +496,7 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
                 }
               >
                 <item.icon className="h-4 w-4 flex-shrink-0" />
-                {item.name}
+                {menuLabel(menuLabels, item.name)}
               </NavLink>
             );
           })}

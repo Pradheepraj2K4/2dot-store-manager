@@ -51,6 +51,11 @@ export default function PurchaseReportPage() {
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // PO number column: shown only when `po_number_enabled` is on.
+  const [poEnabled, setPoEnabled] = useState(false);
+  // Freight column: shown only when `freight_charge_enabled` is on.
+  const [freightEnabled, setFreightEnabled] = useState(false);
+
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState("all");
 
@@ -115,6 +120,26 @@ export default function PurchaseReportPage() {
   useEffect(() => {
     fetchPurchases();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Load the PO-number toggle once on mount.
+  useEffect(() => {
+    settingsApi.get('po_number_enabled')
+      .then((r) => {
+        const v = r.data?.value;
+        setPoEnabled(v === true || v === 'true');
+      })
+      .catch(() => {});
+  }, []);
+
+  // Load the freight-charge toggle once on mount.
+  useEffect(() => {
+    settingsApi.get('freight_charge_enabled')
+      .then((r) => {
+        const v = r.data?.value;
+        setFreightEnabled(v === true || v === 'true');
+      })
+      .catch(() => {});
   }, []);
 
   const toggleExpand = async (id) => {
@@ -313,11 +338,17 @@ export default function PurchaseReportPage() {
                   <th className="px-4 py-2.5 w-10"></th>
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600 w-24">Purchase #</th>
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Supplier</th>
+                  {poEnabled && (
+                    <th className="px-4 py-2.5 text-left font-semibold text-slate-600 w-32">PO #</th>
+                  )}
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600 w-32">Bill #</th>
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Date / Time</th>
                   <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Items</th>
                   <th className="px-4 py-2.5 text-right font-semibold text-slate-600">GST</th>
                   <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Discount</th>
+                  {freightEnabled && (
+                    <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Freight</th>
+                  )}
                   <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Total</th>
                   <th className="px-4 py-2.5"></th>
                 </tr>
@@ -346,6 +377,9 @@ export default function PurchaseReportPage() {
                           {p.ledger_name}
                         </button>
                       </td>
+                      {poEnabled && (
+                        <td className="px-4 py-2.5 text-slate-600">{p.po_number || '—'}</td>
+                      )}
                       <td className="px-4 py-2.5 text-slate-600">{p.bill_number || '—'}</td>
                       <td className="px-4 py-2.5 text-slate-600 text-xs whitespace-nowrap">
                         {formatDate(p.date)}{p.time ? ` · ${p.time}` : ""}
@@ -357,6 +391,11 @@ export default function PurchaseReportPage() {
                       <td className="px-4 py-2.5 text-right text-amber-600">
                         {p.total_discount > 0 ? formatCurrency(p.total_discount) : "—"}
                       </td>
+                      {freightEnabled && (
+                        <td className="px-4 py-2.5 text-right text-slate-600">
+                          {p.freight_charge > 0 ? formatCurrency(p.freight_charge) : "—"}
+                        </td>
+                      )}
                       <td className="px-4 py-2.5 text-right font-semibold text-credit-green">
                         {formatCurrency(p.total_amount)}
                       </td>
@@ -391,7 +430,7 @@ export default function PurchaseReportPage() {
                   if (isOpen) {
                     rows.push(
                       <tr key={`${p.id}-detail`} className="border-b border-slate-100 bg-slate-50/50">
-                        <td colSpan={10} className="px-6 py-3">
+                        <td colSpan={10 + (poEnabled ? 1 : 0) + (freightEnabled ? 1 : 0)} className="px-6 py-3">
                           <table className="w-full text-xs">
                             <thead>
                               <tr className="text-slate-500">

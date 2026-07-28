@@ -52,6 +52,9 @@ export default function SalesReportPage() {
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(false);
 
+  // Freight column: shown only when `freight_charge_enabled` is on.
+  const [freightEnabled, setFreightEnabled] = useState(false);
+
   // Search state
   const [search, setSearch] = useState("");
   const [searchField, setSearchField] = useState("all");
@@ -117,6 +120,16 @@ export default function SalesReportPage() {
   useEffect(() => {
     fetchSales();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Load the freight-charge toggle once on mount.
+  useEffect(() => {
+    settingsApi.get('freight_charge_enabled')
+      .then((r) => {
+        const v = r.data?.value;
+        setFreightEnabled(v === true || v === 'true');
+      })
+      .catch(() => {});
   }, []);
 
   const toggleExpand = async (id) => {
@@ -355,6 +368,11 @@ export default function SalesReportPage() {
                   <th className="px-4 py-2.5 text-right font-semibold text-slate-600">
                     Discount
                   </th>
+                  {freightEnabled && (
+                    <th className="px-4 py-2.5 text-right font-semibold text-slate-600">
+                      Freight
+                    </th>
+                  )}
                   <th className="px-4 py-2.5 text-right font-semibold text-slate-600">
                     Total
                   </th>
@@ -403,6 +421,13 @@ export default function SalesReportPage() {
                           ? formatCurrency(s.total_discount)
                           : "—"}
                       </td>
+                      {freightEnabled && (
+                        <td className="px-4 py-2.5 text-right text-slate-600">
+                          {s.freight_charge > 0
+                            ? formatCurrency(s.freight_charge)
+                            : "—"}
+                        </td>
+                      )}
                       <td className="px-4 py-2.5 text-right font-semibold text-debit-red">
                         {formatCurrency(s.total_amount)}
                       </td>
@@ -442,7 +467,7 @@ export default function SalesReportPage() {
                         key={`${s.id}-detail`}
                         className="border-b border-slate-100 bg-slate-50/50"
                       >
-                        <td colSpan={8} className="px-6 py-3">
+                        <td colSpan={freightEnabled ? 9 : 8} className="px-6 py-3">
                           <table className="w-full text-xs">
                             <thead>
                               <tr className="text-slate-500">

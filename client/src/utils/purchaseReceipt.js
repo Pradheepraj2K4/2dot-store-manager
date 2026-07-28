@@ -95,6 +95,7 @@ function buildThermal({ purchase, store, logoDataUrl, ps }) {
   const totalQty          = items.reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0);
   const totalItemDiscount = parseFloat(purchase.total_discount) || 0;
   const totalBillDiscount = parseFloat(purchase.bill_discount) || 0;
+  const totalFreight      = parseFloat(purchase.freight_charge) || 0;
   const totalAmount       = parseFloat(purchase.total_amount) || 0;
 
   const subtotal = items.reduce((s, l) => {
@@ -271,6 +272,7 @@ function buildThermal({ purchase, store, logoDataUrl, ps }) {
     <div class="row"><span class="lbl">Voucher No.</span><span class="val">${escapeHtml(purchase.purchase_number || '—')}</span></div>
     <div class="row"><span class="lbl">Date</span><span class="val">${fmt(purchase.date)}${purchase.time ? '  ' + escapeHtml(purchase.time) : ''}</span></div>
     <div class="row"><span class="lbl">Supplier</span><span class="val">${escapeHtml(purchase.ledger_name || '—')}</span></div>
+    ${purchase.po_number ? `<div class="row"><span class="lbl">PO No.</span><span class="val">${escapeHtml(purchase.po_number)}</span></div>` : ''}
     ${purchase.bill_number ? `<div class="row"><span class="lbl">Bill No.</span><span class="val">${escapeHtml(purchase.bill_number)}</span></div>` : ''}
   </div>
 
@@ -284,6 +286,7 @@ function buildThermal({ purchase, store, logoDataUrl, ps }) {
     ${totalItemDiscount > 0 ? `<div class="row"><span class="lbl">Item Discount</span><span class="val">- ${money(totalItemDiscount)}</span></div>` : ''}
     ${gstSlabRows}
     ${totalBillDiscount > 0 ? `<div class="row"><span class="lbl">Bill Discount</span><span class="val">- ${money(totalBillDiscount)}</span></div>` : ''}
+    ${totalFreight > 0 ? `<div class="row"><span class="lbl">Freight Charge</span><span class="val">+ ${money(totalFreight)}</span></div>` : ''}
     <div class="row grand"><span class="lbl">Total</span><span class="val">${money(totalAmount)}</span></div>
   </div>
 
@@ -329,6 +332,7 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily }) {
 
   const totalItemDiscount = parseFloat(purchase.total_discount) || 0;
   const totalBillDiscount = parseFloat(purchase.bill_discount) || 0;
+  const totalFreight      = parseFloat(purchase.freight_charge) || 0;
   const totalAmount       = parseFloat(purchase.total_amount) || 0;
 
   const subtotal = items.reduce((s, l) => {
@@ -566,6 +570,7 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily }) {
         <div class="doc-meta">
           <div><span class="lbl">Voucher No.</span><span class="val">${escapeHtml(purchase.purchase_number || '—')}</span></div>
           <div><span class="lbl">Date</span><span class="val">${fmt(purchase.date)}${purchase.time ? ' · ' + escapeHtml(purchase.time) : ''}</span></div>
+          ${purchase.po_number ? `<div><span class="lbl">PO #</span><span class="val">${escapeHtml(purchase.po_number)}</span></div>` : ''}
           ${purchase.bill_number ? `<div><span class="lbl">Supplier Bill #</span><span class="val">${escapeHtml(purchase.bill_number)}</span></div>` : ''}
           <div><span class="lbl">Items</span><span class="val">${items.length}</span></div>
         </div>
@@ -622,6 +627,7 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily }) {
             ${totalItemDiscount > 0 ? `<tr><td>Item Discount</td><td class="r">− ${money(totalItemDiscount)}</td></tr>` : ''}
             ${gstSlabRows}
             ${totalBillDiscount > 0 ? `<tr><td>Bill Discount</td><td class="r">− ${money(totalBillDiscount)}</td></tr>` : ''}
+            ${totalFreight > 0 ? `<tr><td>Freight Charge</td><td class="r">+ ${money(totalFreight)}</td></tr>` : ''}
             <tr class="grand"><td>Grand Total</td><td class="r">${money(totalAmount)}</td></tr>
           </tbody>
         </table>

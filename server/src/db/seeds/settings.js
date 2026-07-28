@@ -24,6 +24,8 @@ const DEFAULT_SETTINGS = [
   ['account_transaction_enabled', 'true'],
   ['gst_fields_enabled', 'false'],
   ['cash_tender_enabled', 'true'],
+  ['freight_charge_enabled', 'false'],
+  ['po_number_enabled', 'false'],
   ['print_receipts_payment_enabled', 'false'],
   ['print_receipts_interest_enabled', 'false'],
   ['print_receipts_sale_enabled', 'false'],

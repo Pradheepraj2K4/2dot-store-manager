@@ -532,6 +532,10 @@ export default function ItemSalesEntryPage() {
   // null for a fresh walk-in — the backend then resolves/creates by mobile.
   const [customerId, setCustomerId] = useState(null);
   const [billDiscount, setBillDiscount] = useState('0');
+  // Freight/shipping charge added on top of the bill total. Surfaced only when
+  // the developer setting `freight_charge_enabled` is on.
+  const [freightCharge, setFreightCharge] = useState('0');
+  const [freightEnabled, setFreightEnabled] = useState(false);
   // Split payment: amount tendered in cash vs UPI. The two are kept in sync so
   // they always add up to the bill's net total (see the netTotal effect below).
   const [cashAmount, setCashAmount] = useState('');
@@ -783,6 +787,16 @@ export default function ItemSalesEntryPage() {
       .catch(() => {});
   }, []);
 
+  // Load the freight-charge toggle once on mount.
+  useEffect(() => {
+    settingsApi.get('freight_charge_enabled')
+      .then((r) => {
+        const v = r.data?.value;
+        setFreightEnabled(v === true || v === 'true');
+      })
+      .catch(() => {});
+  }, []);
+
   // Load the restaurant module flag and, when enabled, the waiter list.
   useEffect(() => {
     settingsApi.get('restaurant_module_enabled')
@@ -836,6 +850,7 @@ export default function ItemSalesEntryPage() {
     if (d.customerPlace != null) setCustomerPlace(d.customerPlace);
     if (d.customerId != null) setCustomerId(d.customerId);
     if (d.billDiscount != null) setBillDiscount(d.billDiscount);
+    if (d.freightCharge != null) setFreightCharge(d.freightCharge);
     if (d.waiterId != null) setWaiterId(d.waiterId);
     if (d.serviceType != null) setServiceType(d.serviceType);
     if (d.diningType != null) setDiningType(d.diningType);
@@ -866,13 +881,13 @@ export default function ItemSalesEntryPage() {
         localStorage.setItem(draftKeyFor(activeCounter), JSON.stringify({
           ledger, date, time, notes,
           customerName, customerMobile, customerPlace, customerId,
-          billDiscount, waiterId, serviceType, diningType, lines,
+          billDiscount, freightCharge, waiterId, serviceType, diningType, lines,
         }));
       } else {
         localStorage.removeItem(draftKeyFor(activeCounter));
       }
     } catch (_) { /* ignore storage quota errors */ }
-  }, [isEdit, activeCounter, ledger, date, time, notes, customerName, customerMobile, customerPlace, customerId, billDiscount, waiterId, serviceType, diningType, lines]);
+  }, [isEdit, activeCounter, ledger, date, time, notes, customerName, customerMobile, customerPlace, customerId, billDiscount, freightCharge, waiterId, serviceType, diningType, lines]);
 
   // Switch between the two sale counters, persisting the current one and
   // loading the target's saved draft (or a fresh blank entry).
@@ -890,7 +905,7 @@ export default function ItemSalesEntryPage() {
         localStorage.setItem(draftKeyFor(activeCounter), JSON.stringify({
           ledger, date, time, notes,
           customerName, customerMobile, customerPlace, customerId,
-          billDiscount, waiterId, serviceType, diningType, lines,
+          billDiscount, freightCharge, waiterId, serviceType, diningType, lines,
         }));
       } else {
         localStorage.removeItem(draftKeyFor(activeCounter));
@@ -911,6 +926,7 @@ export default function ItemSalesEntryPage() {
     setCustomerPlace('');
     setCustomerId(null);
     setBillDiscount('0');
+    setFreightCharge('0');
     setCashAmount('');
     setUpiAmount('');
     setTenderedAmount('');
@@ -1045,6 +1061,7 @@ export default function ItemSalesEntryPage() {
         setCustomerPlace(sale.customer_place || '');
         setCustomerId(sale.customer_id || null);
         setBillDiscount(sale.bill_discount != null ? String(sale.bill_discount) : '0');
+        setFreightCharge(sale.freight_charge != null ? String(sale.freight_charge) : '0');
         setCashAmount(sale.cash_amount != null ? String(sale.cash_amount) : '');
         setUpiAmount(sale.upi_amount ? String(sale.upi_amount) : '');
         setTenderedAmount(sale.tendered_amount ? String(sale.tendered_amount) : '');
@@ -1305,7 +1322,7 @@ export default function ItemSalesEntryPage() {
     return { total, discountTotal, gstTotal, lineCount };
   }, [lines, rateTaxMode]);
 
-  const netTotal = Math.max(0, totals.total - (parseFloat(billDiscount) || 0));
+  const netTotal = Math.max(0, totals.total - (parseFloat(billDiscount) || 0) + (freightEnabled ? (parseFloat(freightCharge) || 0) : 0));
 
   // Keep the Cash/UPI split summed to the invoice total: hold the UPI amount
   // (clamped to the total) and put whatever remains into Cash. This defaults a
@@ -1446,6 +1463,7 @@ export default function ItemSalesEntryPage() {
         customer_place: isCashLedger ? customerPlace.trim() : '',
         customer_id: isCashLedger ? (customerId || null) : null,
         bill_discount: parseFloat(billDiscount) || 0,
+        freight_charge: freightEnabled ? (parseFloat(freightCharge) || 0) : 0,
         cash_amount: parseFloat(cashAmount) || 0,
         upi_amount: parseFloat(upiAmount) || 0,
         tendered_amount: parseFloat(tenderedAmount) || 0,
@@ -1494,6 +1512,7 @@ export default function ItemSalesEntryPage() {
         setCustomerPlace('');
         setCustomerId(null);
         setBillDiscount('0');
+        setFreightCharge('0');
         setCashAmount('');
         setUpiAmount('');
         setTenderedAmount('');
@@ -1573,6 +1592,7 @@ export default function ItemSalesEntryPage() {
     setCustomerPlace('');
     setCustomerId(null);
     setBillDiscount('0');
+    setFreightCharge('0');
     setCashAmount('');
     setUpiAmount('');
     setTenderedAmount('');
@@ -2020,6 +2040,19 @@ export default function ItemSalesEntryPage() {
                   className={`w-28 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm text-amber-700 font-medium focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue ${!canEditBillDiscount ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : ''}`}
                 />
               </div>
+              {freightEnabled && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-500">Freight Charge</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={freightCharge}
+                    onChange={(e) => setFreightCharge(e.target.value)}
+                    className="w-28 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm text-slate-700 font-medium focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
+                  />
+                </div>
+              )}
               {ledger?.igst_status === 'YES' ? (
                 showIgst && (
                   <div className="flex items-center justify-between text-sm">

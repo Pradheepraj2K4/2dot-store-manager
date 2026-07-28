@@ -11,20 +11,22 @@ class PurchaseRepository {
     return String(row.next);
   }
 
-  create({ purchase_number, ledger_id, bill_number, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, items }) {
+  create({ purchase_number, ledger_id, bill_number, po_number, date, time, total_amount, total_discount, bill_discount, freight_charge, total_gst, item_count, notes, items }) {
     const db = getDb();
     const info = db.prepare(`
-      INSERT INTO purchases (purchase_number, ledger_id, bill_number, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO purchases (purchase_number, ledger_id, bill_number, po_number, date, time, total_amount, total_discount, bill_discount, freight_charge, total_gst, item_count, notes)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       purchase_number,
       ledger_id,
       (bill_number || '').toString().trim(),
+      (po_number || '').toString().trim(),
       date,
       time || '',
       total_amount,
       total_discount || 0,
       bill_discount || 0,
+      freight_charge || 0,
       total_gst || 0,
       item_count || (items ? items.length : 0),
       notes || ''
@@ -94,11 +96,12 @@ class PurchaseRepository {
       conds.push(`(
         p.purchase_number LIKE ? OR
         p.bill_number LIKE ? OR
+        p.po_number LIKE ? OR
         l.name LIKE ? OR
         EXISTS (SELECT 1 FROM purchase_items pi WHERE pi.purchase_id = p.id AND pi.item_name LIKE ?) OR
         EXISTS (SELECT 1 FROM item_imeis iu WHERE iu.purchase_id = p.id AND iu.imei LIKE ?)
       )`);
-      params.push(like, like, like, like, like);
+      params.push(like, like, like, like, like, like);
     }
     const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
     const limitClause = limit ? `LIMIT ${parseInt(limit, 10)}` : '';
@@ -132,21 +135,23 @@ class PurchaseRepository {
     return db.prepare('DELETE FROM purchases WHERE id = ?').run(id);
   }
 
-  update(id, { ledger_id, bill_number, date, time, total_amount, total_discount, bill_discount, total_gst, item_count, notes, items }) {
+  update(id, { ledger_id, bill_number, po_number, date, time, total_amount, total_discount, bill_discount, freight_charge, total_gst, item_count, notes, items }) {
     const db = getDb();
     db.prepare(`
       UPDATE purchases
-      SET ledger_id = ?, bill_number = ?, date = ?, time = ?, total_amount = ?,
-          total_discount = ?, bill_discount = ?, total_gst = ?, item_count = ?, notes = ?
+      SET ledger_id = ?, bill_number = ?, po_number = ?, date = ?, time = ?, total_amount = ?,
+          total_discount = ?, bill_discount = ?, freight_charge = ?, total_gst = ?, item_count = ?, notes = ?
       WHERE id = ?
     `).run(
       ledger_id,
       (bill_number || '').toString().trim(),
+      (po_number || '').toString().trim(),
       date,
       time || '',
       total_amount,
       total_discount || 0,
       bill_discount || 0,
+      freight_charge || 0,
       total_gst || 0,
       item_count || (items ? items.length : 0),
       notes || '',

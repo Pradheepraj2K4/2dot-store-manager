@@ -396,10 +396,17 @@ export default function ItemPurchaseEntryPage() {
   const [ledger, setLedger] = useState(null);
   const [purchaseNumber, setPurchaseNumber] = useState('');
   const [billNumber, setBillNumber] = useState('');
+  const [poNumber, setPoNumber] = useState('');
+  // PO number field: surfaced only when `po_number_enabled` is on.
+  const [poEnabled, setPoEnabled] = useState(false);
   const [date, setDate] = useState(todayISO());
   const [time, setTime] = useState(nowHHMM());
   const [notes, setNotes] = useState('');
   const [billDiscount, setBillDiscount] = useState('0');
+  // Freight/shipping charge added on top of the bill total. Surfaced only when
+  // the developer setting `freight_charge_enabled` is on.
+  const [freightCharge, setFreightCharge] = useState('0');
+  const [freightEnabled, setFreightEnabled] = useState(false);
   const [lines, setLines] = useState([emptyLine()]);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
@@ -458,6 +465,26 @@ export default function ItemPurchaseEntryPage() {
       .catch(() => {});
   }, []);
 
+  // Load the freight-charge toggle once on mount.
+  useEffect(() => {
+    settingsApi.get('freight_charge_enabled')
+      .then((r) => {
+        const v = r.data?.value;
+        setFreightEnabled(v === true || v === 'true');
+      })
+      .catch(() => {});
+  }, []);
+
+  // Load the PO-number toggle once on mount.
+  useEffect(() => {
+    settingsApi.get('po_number_enabled')
+      .then((r) => {
+        const v = r.data?.value;
+        setPoEnabled(v === true || v === 'true');
+      })
+      .catch(() => {});
+  }, []);
+
   // ── Draft persistence ───────────────────────────────────────────
   // Restore a partially-filled new entry when returning to this page, and
   // auto-save changes so switching to another menu doesn't lose the data.
@@ -469,10 +496,12 @@ export default function ItemPurchaseEntryPage() {
         const d = JSON.parse(raw);
         if (d.ledger) setLedger(d.ledger);
         if (d.billNumber != null) setBillNumber(d.billNumber);
+        if (d.poNumber != null) setPoNumber(d.poNumber);
         if (d.date) setDate(d.date);
         if (d.time != null) setTime(d.time);
         if (d.notes != null) setNotes(d.notes);
         if (d.billDiscount != null) setBillDiscount(d.billDiscount);
+        if (d.freightCharge != null) setFreightCharge(d.freightCharge);
         if (Array.isArray(d.lines) && d.lines.length) setLines(d.lines);
       }
     } catch (_) { /* ignore malformed draft */ }
@@ -484,18 +513,19 @@ export default function ItemPurchaseEntryPage() {
     const meaningful =
       Boolean(ledger) ||
       (billNumber && billNumber.trim()) ||
+      (poNumber && poNumber.trim()) ||
       (notes && notes.trim()) ||
       lines.some((l) => l.item_name && l.item_name.trim());
     try {
       if (meaningful) {
         localStorage.setItem(PURCHASE_DRAFT_KEY, JSON.stringify({
-          ledger, billNumber, date, time, notes, billDiscount, lines,
+          ledger, billNumber, poNumber, date, time, notes, billDiscount, freightCharge, lines,
         }));
       } else {
         localStorage.removeItem(PURCHASE_DRAFT_KEY);
       }
     } catch (_) { /* ignore storage quota errors */ }
-  }, [isEdit, ledger, billNumber, date, time, notes, billDiscount, lines]);
+  }, [isEdit, ledger, billNumber, poNumber, date, time, notes, billDiscount, freightCharge, lines]);
 
   // When returning from the ledger-creation page (opened via the '+' button),
   // auto-select the freshly created ledger.
@@ -518,10 +548,12 @@ export default function ItemPurchaseEntryPage() {
         const p = res.data;
         setPurchaseNumber(p.purchase_number);
         setBillNumber(p.bill_number || '');
+        setPoNumber(p.po_number || '');
         setDate(p.date);
         setTime(p.time || '');
         setNotes(p.notes || '');
         setBillDiscount(p.bill_discount != null ? String(p.bill_discount) : '0');
+        setFreightCharge(p.freight_charge != null ? String(p.freight_charge) : '0');
         setLedger({ id: p.ledger_id, name: p.ledger_name });
         setLines(
           (p.items || []).map((l) => ({
@@ -704,7 +736,7 @@ export default function ItemPurchaseEntryPage() {
     return { total, discountTotal, gstTotal, lineCount, qtyTotal };
   }, [lines]);
 
-  const netTotal = Math.max(0, totals.total - (parseFloat(billDiscount) || 0));
+  const netTotal = Math.max(0, totals.total - (parseFloat(billDiscount) || 0) + (freightEnabled ? (parseFloat(freightCharge) || 0) : 0));
 
   const handleSave = async () => {
     if (!ledger) { toast.error('Select a ledger'); return; }
@@ -754,10 +786,12 @@ export default function ItemPurchaseEntryPage() {
       const payload = {
         ledger_id: ledger.id,
         bill_number: billNumber,
+        po_number: poEnabled ? poNumber : '',
         date,
         time,
         notes,
         bill_discount: parseFloat(billDiscount) || 0,
+        freight_charge: freightEnabled ? (parseFloat(freightCharge) || 0) : 0,
         items: validLines.map((l) => ({
           item_id: l.item_id,
           item_name: l.item_name.trim(),
@@ -781,10 +815,12 @@ export default function ItemPurchaseEntryPage() {
         localStorage.removeItem(PURCHASE_DRAFT_KEY);
         setLedger(null);
         setBillNumber('');
+        setPoNumber('');
         setDate(todayISO());
         setTime(nowHHMM());
         setNotes('');
         setBillDiscount('0');
+        setFreightCharge('0');
         setLines([emptyLine()]);
         purchaseApi.getNextNumber()
           .then((r) => setPurchaseNumber(r.data?.purchase_number || ''))
@@ -811,6 +847,7 @@ export default function ItemPurchaseEntryPage() {
     localStorage.removeItem(PURCHASE_DRAFT_KEY);
     setLedger(null);
     setBillNumber('');
+    setPoNumber('');
     setDate(todayISO());
     setTime(nowHHMM());
     setNotes('');
@@ -872,6 +909,18 @@ export default function ItemPurchaseEntryPage() {
               </div>
             </div>
           </div>
+          {poEnabled && (
+            <div className="w-36">
+              <label className="text-xs text-slate-500">PO #</label>
+              <input
+                type="text"
+                value={poNumber}
+                onChange={(e) => setPoNumber(e.target.value)}
+                className="input-field"
+                placeholder="Purchase order no."
+              />
+            </div>
+          )}
           <div className="w-36">
             <label className="text-xs text-slate-500">Bill #</label>
             <input
@@ -1086,6 +1135,19 @@ export default function ItemPurchaseEntryPage() {
                   className="w-28 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm text-amber-700 font-medium focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
                 />
               </div>
+              {freightEnabled && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-500">Freight Charge</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={freightCharge}
+                    onChange={(e) => setFreightCharge(e.target.value)}
+                    className="w-28 rounded border border-slate-300 bg-white px-2 py-0.5 text-right text-sm text-slate-700 font-medium focus:border-trust-blue focus:outline-none focus:ring-1 focus:ring-trust-blue"
+                  />
+                </div>
+              )}
               {ledger?.igst_status === 'YES' ? (
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-500">IGST</span>

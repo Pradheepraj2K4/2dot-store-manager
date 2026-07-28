@@ -116,6 +116,10 @@ export default function DeveloperSettingsPage() {
   const [gstFieldsEnabled, setGstFieldsEnabled] = useState(false);
   // Cash tender field state (default enabled)
   const [cashTenderEnabled, setCashTenderEnabled] = useState(true);
+  // Freight charge field state
+  const [freightChargeEnabled, setFreightChargeEnabled] = useState(false);
+  // PO number field state
+  const [poNumberEnabled, setPoNumberEnabled] = useState(false);
   // IMEI tracking state
   const [imeiTrackingEnabled, setImeiTrackingEnabled] = useState(false);
   // Print receipt settings
@@ -218,6 +222,10 @@ export default function DeveloperSettingsPage() {
       setGstFieldsEnabled(data.gst_fields_enabled === true || data.gst_fields_enabled === 'true');
       // Load cash tender setting (default enabled — missing key counts as on)
       setCashTenderEnabled(data.cash_tender_enabled !== false && data.cash_tender_enabled !== 'false');
+      // Load freight charge setting
+      setFreightChargeEnabled(data.freight_charge_enabled === true || data.freight_charge_enabled === 'true');
+      // Load PO number setting
+      setPoNumberEnabled(data.po_number_enabled === true || data.po_number_enabled === 'true');
       // Load IMEI tracking setting
       setImeiTrackingEnabled(data.imei_tracking_enabled === true || data.imei_tracking_enabled === 'true');
       // Load custom sidebar menu labels
@@ -1184,6 +1192,20 @@ export default function DeveloperSettingsPage() {
                     checked={cashTenderEnabled}
                     onChange={setCashTenderEnabled}
                     toastLabel="Cash tender field"
+                  />
+                  <ModuleToggle
+                    label="Freight Charge Field"
+                    settingKey="freight_charge_enabled"
+                    checked={freightChargeEnabled}
+                    onChange={setFreightChargeEnabled}
+                    toastLabel="Freight charge field"
+                  />
+                  <ModuleToggle
+                    label="PO Number Field"
+                    settingKey="po_number_enabled"
+                    checked={poNumberEnabled}
+                    onChange={setPoNumberEnabled}
+                    toastLabel="PO number field"
                   />
                 </div>
               </div>

@@ -123,7 +123,8 @@ class SaleService {
     const run = db.transaction(() => {
       const sale_number = saleRepository.getNextSaleNumber();
       const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
-      const net_total = Math.round((total_amount - bill_discount_val) * 100) / 100;
+      const freight_charge_val = Math.round((parseFloat(data.freight_charge) || 0) * 100) / 100;
+      const net_total = Math.round((total_amount - bill_discount_val + freight_charge_val) * 100) / 100;
       const cash_amount = Math.round((parseFloat(data.cash_amount) || 0) * 100) / 100;
       const upi_amount = Math.round((parseFloat(data.upi_amount) || 0) * 100) / 100;
       if (Math.abs(cash_amount + upi_amount - net_total) > 0.01) {
@@ -144,9 +145,10 @@ class SaleService {
         ledger_id: parseInt(data.ledger_id),
         date: data.date || new Date().toISOString().split('T')[0],
         time: data.time || '',
-        total_amount: Math.round((total_amount - bill_discount_val) * 100) / 100,
+        total_amount: net_total,
         total_discount: Math.round(total_discount * 100) / 100,
         bill_discount: bill_discount_val,
+        freight_charge: freight_charge_val,
         total_gst: Math.round(total_gst * 100) / 100,
         item_count: normalisedItems.length,
         notes: data.notes || '',
@@ -164,7 +166,7 @@ class SaleService {
         items: normalisedItems,
       });
 
-      const delta = applyLedgerDelta(ledger.behaviour, total_amount - bill_discount_val);
+      const delta = applyLedgerDelta(ledger.behaviour, net_total);
       ledgerRepository.updateBalance(ledger.id, ledger.current_balance + delta);
 
       // Decrement stock for every linked item line
@@ -208,7 +210,8 @@ class SaleService {
     const run = db.transaction(() => {
       // Reverse previous delta, apply new delta
       const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
-      const net_total = Math.round((total_amount - bill_discount_val) * 100) / 100;
+      const freight_charge_val = Math.round((parseFloat(data.freight_charge) || 0) * 100) / 100;
+      const net_total = Math.round((total_amount - bill_discount_val + freight_charge_val) * 100) / 100;
       const cash_amount = Math.round((parseFloat(data.cash_amount) || 0) * 100) / 100;
       const upi_amount = Math.round((parseFloat(data.upi_amount) || 0) * 100) / 100;
       if (Math.abs(cash_amount + upi_amount - net_total) > 0.01) {
@@ -236,9 +239,10 @@ class SaleService {
       const updated = saleRepository.update(id, {
         date: data.date || existing.date,
         time: data.time != null ? data.time : existing.time,
-        total_amount: Math.round((total_amount - bill_discount_val) * 100) / 100,
+        total_amount: net_total,
         total_discount: Math.round(total_discount * 100) / 100,
         bill_discount: bill_discount_val,
+        freight_charge: freight_charge_val,
         total_gst: Math.round(total_gst * 100) / 100,
         item_count: normalisedItems.length,
         notes: data.notes || '',

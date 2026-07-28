@@ -181,6 +181,7 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docTyp
   const totalQty          = items.reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0);
   const totalItemDiscount = parseFloat(sale.total_discount) || 0;
   const totalBillDiscount = parseFloat(sale.bill_discount) || 0;
+  const totalFreight      = parseFloat(sale.freight_charge) || 0;
   const totalAmount       = parseFloat(sale.total_amount) || 0;
   const cashAmt           = parseFloat(sale.cash_amount) || 0;
   const upiAmt            = parseFloat(sale.upi_amount) || 0;
@@ -299,6 +300,7 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docTyp
     totals: `
       <div class="totals">
         ${totalDiscount > 0 ? `<div class="trow disc"><span class="tl">(-) Discount</span><span class="tr">${num(totalDiscount, 2)}</span></div>` : ''}
+        ${totalFreight > 0 ? `<div class="trow"><span class="tl">(+) Freight</span><span class="tr">${num(totalFreight, 2)}</span></div>` : ''}
         <div class="gst">${gstSlabRows}</div>
       </div>
       <div class="grand">
@@ -486,6 +488,7 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels, cfg }) {
 
   const totalItemDiscount = parseFloat(sale.total_discount) || 0;
   const totalBillDiscount = parseFloat(sale.bill_discount) || 0;
+  const totalFreight      = parseFloat(sale.freight_charge) || 0;
   const totalAmount       = parseFloat(sale.total_amount) || 0;
   const cashAmt           = parseFloat(sale.cash_amount) || 0;
   const upiAmt            = parseFloat(sale.upi_amount) || 0;
@@ -760,6 +763,7 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels, cfg }) {
             ${totalItemDiscount > 0 ? `<tr><td>Item Discount</td><td class="r">− ${money(totalItemDiscount)}</td></tr>` : ''}
             ${gstSlabRows}
             ${totalBillDiscount > 0 ? `<tr><td>Bill Discount</td><td class="r">− ${money(totalBillDiscount)}</td></tr>` : ''}
+            ${totalFreight > 0 ? `<tr><td>Freight Charge</td><td class="r">+ ${money(totalFreight)}</td></tr>` : ''}
             <tr class="grand"><td>Grand Total</td><td class="r">${money(totalAmount)}</td></tr>
             ${cashAmt > 0 ? `<tr><td>Cash</td><td class="r">${money(cashAmt)}</td></tr>` : ''}
             ${upiAmt > 0 ? `<tr><td>UPI</td><td class="r">${money(upiAmt)}</td></tr>` : ''}

@@ -1,28 +1,27 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import toast from 'react-hot-toast';
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
+import toast from "react-hot-toast";
 import {
   ArrowLeftIcon,
   ArrowPathIcon,
   PlusIcon,
   TrashIcon,
-} from '@heroicons/react/24/outline';
-import { itemApi, purchaseApi, ledgerApi, settingsApi } from '../../api';
-import { ITEM_UNITS, DEFAULT_ITEM_UNIT } from '../../utils/itemConstants';
-import { formatCurrency, todayISO } from '../../utils/helpers';
-import LedgerAutocomplete from '../ui/LedgerAutocomplete';
-import LoadingSpinner from '../ui/LoadingSpinner';
-import GstSelect from '../ui/GstSelect';
+} from "@heroicons/react/24/outline";
+import { itemApi, purchaseApi, ledgerApi, settingsApi } from "../../api";
+import { ITEM_UNITS, DEFAULT_ITEM_UNIT } from "../../utils/itemConstants";
+import { formatCurrency, todayISO } from "../../utils/helpers";
+import LedgerAutocomplete from "../ui/LedgerAutocomplete";
+import LoadingSpinner from "../ui/LoadingSpinner";
 
-const FIELD_ORDER = ['itemName', 'unit', 'rate', 'qty', 'discount'];
+const FIELD_ORDER = ["itemName", "unit", "rate", "qty", "discount"];
 
 // localStorage key for the in-progress (new) purchase entry, so partially
 // filled data survives navigating to another menu and back.
-const PURCHASE_DRAFT_KEY = 'item_purchase_entry_draft';
+const PURCHASE_DRAFT_KEY = "item_purchase_entry_draft";
 
 function nowHHMM() {
   const d = new Date();
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
 function computeAmount({ rate, quantity, discount_percent }) {
@@ -39,20 +38,33 @@ function computeAmount({ rate, quantity, discount_percent }) {
 function emptyLine() {
   return {
     item_id: null,
-    item_name: '',
+    item_name: "",
     unit: DEFAULT_ITEM_UNIT,
     mrp: 0,
-    rate: '',
-    quantity: '1',
-    discount_percent: '',
-    gst_percent: '',
+    rate: "",
+    sales_rate: "",
+    quantity: "1",
+    discount_percent: "",
+    gst_percent: "",
     amount: 0,
     current_stock: null,
+    batch_no: "",
     imeis: [],
   };
 }
 
-function ItemNameCell({ value, items, selected, onSelect, onChange, registerRef, onKeyEnter, onAddNew, onEnterEmpty, onKeyBack }) {
+function ItemNameCell({
+  value,
+  items,
+  selected,
+  onSelect,
+  onChange,
+  registerRef,
+  onKeyEnter,
+  onAddNew,
+  onEnterEmpty,
+  onKeyBack,
+}) {
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(-1);
   const [anchorRect, setAnchorRect] = useState(null);
@@ -60,59 +72,67 @@ function ItemNameCell({ value, items, selected, onSelect, onChange, registerRef,
   const containerRef = useRef(null);
   const dropdownRef = useRef(null);
 
-  useEffect(() => { registerRef(inputRef); }, [registerRef]);
+  useEffect(() => {
+    registerRef(inputRef);
+  }, [registerRef]);
 
   useEffect(() => {
     const handler = (e) => {
       if (
-        containerRef.current && !containerRef.current.contains(e.target) &&
-        dropdownRef.current && !dropdownRef.current.contains(e.target)
+        containerRef.current &&
+        !containerRef.current.contains(e.target) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target)
       ) {
         setOpen(false);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   useEffect(() => {
     if (!open) return;
     const update = () => {
-      if (inputRef.current) setAnchorRect(inputRef.current.getBoundingClientRect());
+      if (inputRef.current)
+        setAnchorRect(inputRef.current.getBoundingClientRect());
     };
     update();
-    window.addEventListener('scroll', update, true);
-    window.addEventListener('resize', update);
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
     return () => {
-      window.removeEventListener('scroll', update, true);
-      window.removeEventListener('resize', update);
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
     };
   }, [open]);
 
   const filtered = useMemo(() => {
-    const q = (value || '').toLowerCase().trim();
+    const q = (value || "").toLowerCase().trim();
     if (!q) return items.slice(0, 20);
     return items
-      .filter((it) =>
-        it.name.toLowerCase().includes(q) ||
-        (it.item_code || '').toLowerCase().includes(q) ||
-        (it.brand || '').toLowerCase().includes(q) ||
-        (it.category || '').toLowerCase().includes(q)
+      .filter(
+        (it) =>
+          it.name.toLowerCase().includes(q) ||
+          (it.item_code || "").toLowerCase().includes(q) ||
+          (it.brand || "").toLowerCase().includes(q) ||
+          (it.category || "").toLowerCase().includes(q),
       )
       .slice(0, 20);
   }, [items, value]);
 
-  useEffect(() => { setHighlight(-1); }, [value]);
+  useEffect(() => {
+    setHighlight(-1);
+  }, [value]);
 
   const handleKeyDown = (e) => {
-    if (e.key === 'ArrowDown') {
+    if (e.key === "ArrowDown") {
       e.preventDefault();
       setOpen(true);
       setHighlight((h) => (h + 1) % Math.max(1, filtered.length));
-    } else if (e.key === 'ArrowUp') {
+    } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setHighlight((h) => (h <= 0 ? filtered.length - 1 : h - 1));
-    } else if (e.key === 'Enter') {
+    } else if (e.key === "Enter") {
       e.preventDefault();
       if (open && highlight >= 0 && filtered[highlight]) {
         onSelect(filtered[highlight]);
@@ -126,10 +146,10 @@ function ItemNameCell({ value, items, selected, onSelect, onChange, registerRef,
       }
       // Empty field or typed-but-unmatched text — do nothing, keep focus on
       // the item name input.
-    } else if (e.key === 'ArrowLeft' && !value) {
+    } else if (e.key === "ArrowLeft" && !value) {
       e.preventDefault();
       onKeyBack?.();
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       setOpen(false);
     }
   };
@@ -140,8 +160,11 @@ function ItemNameCell({ value, items, selected, onSelect, onChange, registerRef,
         <input
           ref={inputRef}
           type="text"
-          value={value || ''}
-          onChange={(e) => { onChange(e.target.value); setOpen(true); }}
+          value={value || ""}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setOpen(true);
+          }}
           onFocus={() => setOpen(true)}
           onKeyDown={handleKeyDown}
           placeholder="Search by code, name, brand, category…"
@@ -162,7 +185,7 @@ function ItemNameCell({ value, items, selected, onSelect, onChange, registerRef,
         <div
           ref={dropdownRef}
           style={{
-            position: 'fixed',
+            position: "fixed",
             top: anchorRect.bottom + 4,
             left: anchorRect.left,
             minWidth: 420,
@@ -180,9 +203,12 @@ function ItemNameCell({ value, items, selected, onSelect, onChange, registerRef,
                 type="button"
                 key={it.id}
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => { onSelect(it); setOpen(false); }}
+                onClick={() => {
+                  onSelect(it);
+                  setOpen(false);
+                }}
                 className={`w-full px-3 py-2 text-left text-sm border-b border-slate-100 last:border-0 hover:bg-slate-50 ${
-                  idx === highlight ? 'bg-trust-blue/10' : ''
+                  idx === highlight ? "bg-trust-blue/10" : ""
                 }`}
               >
                 <div className="flex items-center gap-4 whitespace-nowrap">
@@ -192,9 +218,15 @@ function ItemNameCell({ value, items, selected, onSelect, onChange, registerRef,
                     </span>
                   ) : null}
                   <span className="font-medium text-slate-800">{it.name}</span>
-                  <span className="text-xs text-slate-400">{[it.brand, it.category].filter(Boolean).join(' · ')}</span>
-                  <span className="text-xs text-slate-500">{formatCurrency(it.mrp)}</span>
-                  <span className="ml-auto text-xs font-medium text-slate-600">Stock: {Number(it.current_stock ?? 0)}</span>
+                  <span className="text-xs text-slate-400">
+                    {[it.brand, it.category].filter(Boolean).join(" · ")}
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    {formatCurrency(it.mrp)}
+                  </span>
+                  <span className="ml-auto text-xs font-medium text-slate-600">
+                    Stock: {Number(it.current_stock ?? 0)}
+                  </span>
                 </div>
               </button>
             ))
@@ -229,7 +261,9 @@ function ImeiQtyCell({
   const panelRef = useRef(null);
   const imeiRefs = useRef([]);
 
-  useEffect(() => { registerRef(inputRef); }, [registerRef]);
+  useEffect(() => {
+    registerRef(inputRef);
+  }, [registerRef]);
 
   const qty = Math.max(0, Math.floor(parseFloat(quantity) || 0));
   const showPanel = enabled && hasItem && qty > 0;
@@ -237,35 +271,38 @@ function ImeiQtyCell({
   // Keep the IMEI slot array length in sync with the quantity.
   const slots = useMemo(() => {
     const arr = Array.isArray(imeis) ? imeis.slice(0, qty) : [];
-    while (arr.length < qty) arr.push('');
+    while (arr.length < qty) arr.push("");
     return arr;
   }, [imeis, qty]);
 
   useEffect(() => {
     if (!open || !showPanel) return;
     const update = () => {
-      if (inputRef.current) setAnchorRect(inputRef.current.getBoundingClientRect());
+      if (inputRef.current)
+        setAnchorRect(inputRef.current.getBoundingClientRect());
     };
     update();
-    window.addEventListener('scroll', update, true);
-    window.addEventListener('resize', update);
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
     return () => {
-      window.removeEventListener('scroll', update, true);
-      window.removeEventListener('resize', update);
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
     };
   }, [open, showPanel]);
 
   useEffect(() => {
     const handler = (e) => {
       if (
-        containerRef.current && !containerRef.current.contains(e.target) &&
-        panelRef.current && !panelRef.current.contains(e.target)
+        containerRef.current &&
+        !containerRef.current.contains(e.target) &&
+        panelRef.current &&
+        !panelRef.current.contains(e.target)
       ) {
         setOpen(false);
       }
     };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
   }, []);
 
   const setImeiAt = (i, val) => {
@@ -275,21 +312,21 @@ function ImeiQtyCell({
   };
 
   const handleQtyKeyDown = (e) => {
-    if (e.key === 'ArrowDown' && showPanel) {
+    if (e.key === "ArrowDown" && showPanel) {
       e.preventDefault();
       setOpen(true);
       setTimeout(() => imeiRefs.current[0]?.focus(), 0);
-    } else if (e.key === 'Enter') {
+    } else if (e.key === "Enter") {
       e.preventDefault();
       onKeyEnter();
-    } else if (e.key === 'ArrowLeft' && !quantity) {
+    } else if (e.key === "ArrowLeft" && !quantity) {
       e.preventDefault();
       onKeyBack?.();
     }
   };
 
   const handleImeiKeyDown = (e, i) => {
-    if (e.key === 'Enter') {
+    if (e.key === "Enter") {
       e.preventDefault();
       if (i < qty - 1) {
         imeiRefs.current[i + 1]?.focus();
@@ -297,20 +334,20 @@ function ImeiQtyCell({
         setOpen(false);
         onKeyEnter();
       }
-    } else if (e.key === 'ArrowDown') {
+    } else if (e.key === "ArrowDown") {
       e.preventDefault();
       if (i < qty - 1) imeiRefs.current[i + 1]?.focus();
-    } else if (e.key === 'ArrowUp') {
+    } else if (e.key === "ArrowUp") {
       e.preventDefault();
       if (i > 0) imeiRefs.current[i - 1]?.focus();
       else inputRef.current?.focus();
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       setOpen(false);
       inputRef.current?.focus();
     }
   };
 
-  const filledCount = slots.filter((s) => String(s || '').trim()).length;
+  const filledCount = slots.filter((s) => String(s || "").trim()).length;
 
   return (
     <div
@@ -319,8 +356,13 @@ function ImeiQtyCell({
       onBlur={(e) => {
         const root = e.currentTarget;
         setTimeout(() => {
-          if (!root.contains(document.activeElement) &&
-              !(panelRef.current && panelRef.current.contains(document.activeElement))) {
+          if (
+            !root.contains(document.activeElement) &&
+            !(
+              panelRef.current &&
+              panelRef.current.contains(document.activeElement)
+            )
+          ) {
             setOpen(false);
           }
         }, 0);
@@ -333,12 +375,14 @@ function ImeiQtyCell({
         min="0"
         value={quantity}
         onChange={(e) => onQuantityChange(e.target.value)}
-        onFocus={() => { if (showPanel) setOpen(true); }}
+        onFocus={() => {
+          if (showPanel) setOpen(true);
+        }}
         onKeyDown={handleQtyKeyDown}
         className={`w-full px-2 py-1.5 text-sm text-right border rounded focus:outline-none focus:ring-1 ${
           invalid
-            ? 'border-debit-red focus:border-debit-red focus:ring-debit-red'
-            : 'border-slate-200 focus:border-trust-blue focus:ring-trust-blue'
+            ? "border-debit-red focus:border-debit-red focus:ring-debit-red"
+            : "border-slate-200 focus:border-trust-blue focus:ring-trust-blue"
         }`}
         placeholder="1"
       />
@@ -347,7 +391,7 @@ function ImeiQtyCell({
         <div
           ref={panelRef}
           style={{
-            position: 'fixed',
+            position: "fixed",
             top: anchorRect.bottom + 4,
             left: Math.max(8, anchorRect.right - 240),
             width: 240,
@@ -356,24 +400,32 @@ function ImeiQtyCell({
           className="bg-white rounded-lg border border-slate-200 shadow-lg p-2"
         >
           <div className="flex items-center justify-between px-1 pb-1.5 mb-1 border-b border-slate-100">
-            <span className="text-[11px] font-semibold text-slate-600">Enter IMEI numbers</span>
-            <span className="text-[10px] text-slate-400">{filledCount}/{qty}</span>
+            <span className="text-[11px] font-semibold text-slate-600">
+              Enter IMEI numbers
+            </span>
+            <span className="text-[10px] text-slate-400">
+              {filledCount}/{qty}
+            </span>
           </div>
           <div className="max-h-56 overflow-y-auto space-y-1">
             {slots.map((val, i) => (
               <div key={i} className="flex items-center gap-1.5">
-                <span className="w-4 shrink-0 text-right text-[10px] font-mono text-slate-400">{i + 1}</span>
+                <span className="w-4 shrink-0 text-right text-[10px] font-mono text-slate-400">
+                  {i + 1}
+                </span>
                 <input
-                  ref={(el) => { imeiRefs.current[i] = el; }}
+                  ref={(el) => {
+                    imeiRefs.current[i] = el;
+                  }}
                   type="text"
                   value={val}
                   onChange={(e) => setImeiAt(i, e.target.value)}
                   onKeyDown={(e) => handleImeiKeyDown(e, i)}
                   placeholder={`IMEI ${i + 1}`}
                   className={`flex-1 px-2 py-1 text-xs border rounded focus:outline-none focus:ring-1 ${
-                    invalid && !String(val || '').trim()
-                      ? 'border-debit-red focus:border-debit-red focus:ring-debit-red'
-                      : 'border-slate-200 focus:border-trust-blue focus:ring-trust-blue'
+                    invalid && !String(val || "").trim()
+                      ? "border-debit-red focus:border-debit-red focus:ring-debit-red"
+                      : "border-slate-200 focus:border-trust-blue focus:ring-trust-blue"
                   }`}
                   autoComplete="off"
                 />
@@ -394,20 +446,29 @@ export default function ItemPurchaseEntryPage() {
 
   const [items, setItems] = useState([]);
   const [ledger, setLedger] = useState(null);
-  const [purchaseNumber, setPurchaseNumber] = useState('');
-  const [billNumber, setBillNumber] = useState('');
-  const [poNumber, setPoNumber] = useState('');
+  const [purchaseNumber, setPurchaseNumber] = useState("");
+  const [billNumber, setBillNumber] = useState("");
+  const [poNumber, setPoNumber] = useState("");
   // PO number field: surfaced only when `po_number_enabled` is on.
   const [poEnabled, setPoEnabled] = useState(false);
   const [date, setDate] = useState(todayISO());
   const [time, setTime] = useState(nowHHMM());
-  const [notes, setNotes] = useState('');
-  const [billDiscount, setBillDiscount] = useState('0');
+  const [notes, setNotes] = useState("");
+  const [billDiscount, setBillDiscount] = useState("0");
   // Freight/shipping charge added on top of the bill total. Surfaced only when
   // the developer setting `freight_charge_enabled` is on.
-  const [freightCharge, setFreightCharge] = useState('0');
+  const [freightCharge, setFreightCharge] = useState("0");
   const [freightEnabled, setFreightEnabled] = useState(false);
   const [lines, setLines] = useState([emptyLine()]);
+  // Batch tracking: when enabled, each line records a batch number (manual
+  // entry, or generated automatically on the server for auto mode).
+  const [batchEnabled, setBatchEnabled] = useState(false);
+  const [batchMode, setBatchMode] = useState("manual");
+  const [batchPrefix, setBatchPrefix] = useState("");
+  // Running counter for previewing auto batch numbers so the operator can see
+  // the value that will be saved. Seeded from the server's next number and
+  // advanced locally as lines are assigned.
+  const autoBatchSeq = useRef(1);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
   const [imeiEnabled, setImeiEnabled] = useState(false);
@@ -432,7 +493,7 @@ export default function ItemPurchaseEntryPage() {
   const ledgerFieldRef = useRef(null);
   const focusLedger = () => {
     setTimeout(() => {
-      const el = ledgerFieldRef.current?.querySelector('input, [tabindex]');
+      const el = ledgerFieldRef.current?.querySelector("input, [tabindex]");
       el?.focus();
     }, 0);
   };
@@ -449,47 +510,94 @@ export default function ItemPurchaseEntryPage() {
   useEffect(() => {
     refreshItems();
     if (!isEdit) {
-      purchaseApi.getNextNumber()
-        .then((r) => setPurchaseNumber(r.data?.purchase_number || ''))
+      purchaseApi
+        .getNextNumber()
+        .then((r) => setPurchaseNumber(r.data?.purchase_number || ""))
         .catch(() => {});
     }
   }, [refreshItems, isEdit]);
 
   // Load the IMEI-tracking toggle once on mount.
   useEffect(() => {
-    settingsApi.get('imei_tracking_enabled')
+    settingsApi
+      .get("imei_tracking_enabled")
       .then((r) => {
         const v = r.data?.value;
-        setImeiEnabled(v === true || v === 'true');
+        setImeiEnabled(v === true || v === "true");
       })
       .catch(() => {});
   }, []);
 
   // Load the freight-charge toggle once on mount.
   useEffect(() => {
-    settingsApi.get('freight_charge_enabled')
+    settingsApi
+      .get("freight_charge_enabled")
       .then((r) => {
         const v = r.data?.value;
-        setFreightEnabled(v === true || v === 'true');
+        setFreightEnabled(v === true || v === "true");
       })
       .catch(() => {});
   }, []);
 
   // Load the PO-number toggle once on mount.
   useEffect(() => {
-    settingsApi.get('po_number_enabled')
+    settingsApi
+      .get("po_number_enabled")
       .then((r) => {
         const v = r.data?.value;
-        setPoEnabled(v === true || v === 'true');
+        setPoEnabled(v === true || v === "true");
       })
       .catch(() => {});
   }, []);
+
+  // Load batch-tracking settings once on mount.
+  useEffect(() => {
+    settingsApi
+      .getAll()
+      .then((r) => {
+        const d = r.data || {};
+        const enabled =
+          d.purchase_batch_enabled === true ||
+          d.purchase_batch_enabled === "true";
+        const mode = d.purchase_batch_mode === "auto" ? "auto" : "manual";
+        setBatchEnabled(enabled);
+        setBatchMode(mode);
+        setBatchPrefix(
+          typeof d.purchase_batch_prefix === "string"
+            ? d.purchase_batch_prefix
+            : "",
+        );
+      })
+      .catch(() => {});
+  }, []);
+
+  // Seed the auto batch-number counter from the server whenever auto mode is
+  // active (new entries only — edits keep their saved batch numbers).
+  const seedAutoBatchSeq = useCallback(() => {
+    if (isEdit) return;
+    itemApi
+      .getNextBatchNumber()
+      .then((r) => {
+        const next = r.data?.batch_no || "";
+        const prefix = r.data?.prefix || "";
+        const n = parseInt(String(next).slice(prefix.length), 10);
+        autoBatchSeq.current = isNaN(n) ? 1 : n;
+      })
+      .catch(() => {});
+  }, [isEdit]);
+
+  useEffect(() => {
+    if (batchEnabled && batchMode === "auto") seedAutoBatchSeq();
+  }, [batchEnabled, batchMode, seedAutoBatchSeq]);
 
   // ── Draft persistence ───────────────────────────────────────────
   // Restore a partially-filled new entry when returning to this page, and
   // auto-save changes so switching to another menu doesn't lose the data.
   useEffect(() => {
-    if (isEdit) { draftLoaded.current = true; return; }
+    if (isEdit) {
+      draftLoaded.current = true;
+      return;
+    }
     try {
       const raw = localStorage.getItem(PURCHASE_DRAFT_KEY);
       if (raw) {
@@ -504,7 +612,9 @@ export default function ItemPurchaseEntryPage() {
         if (d.freightCharge != null) setFreightCharge(d.freightCharge);
         if (Array.isArray(d.lines) && d.lines.length) setLines(d.lines);
       }
-    } catch (_) { /* ignore malformed draft */ }
+    } catch (_) {
+      /* ignore malformed draft */
+    }
     draftLoaded.current = true;
   }, [isEdit]);
 
@@ -518,42 +628,77 @@ export default function ItemPurchaseEntryPage() {
       lines.some((l) => l.item_name && l.item_name.trim());
     try {
       if (meaningful) {
-        localStorage.setItem(PURCHASE_DRAFT_KEY, JSON.stringify({
-          ledger, billNumber, poNumber, date, time, notes, billDiscount, freightCharge, lines,
-        }));
+        localStorage.setItem(
+          PURCHASE_DRAFT_KEY,
+          JSON.stringify({
+            ledger,
+            billNumber,
+            poNumber,
+            date,
+            time,
+            notes,
+            billDiscount,
+            freightCharge,
+            lines,
+          }),
+        );
       } else {
         localStorage.removeItem(PURCHASE_DRAFT_KEY);
       }
-    } catch (_) { /* ignore storage quota errors */ }
-  }, [isEdit, ledger, billNumber, poNumber, date, time, notes, billDiscount, freightCharge, lines]);
+    } catch (_) {
+      /* ignore storage quota errors */
+    }
+  }, [
+    isEdit,
+    ledger,
+    billNumber,
+    poNumber,
+    date,
+    time,
+    notes,
+    billDiscount,
+    freightCharge,
+    lines,
+  ]);
 
   // When returning from the ledger-creation page (opened via the '+' button),
   // auto-select the freshly created ledger.
   useEffect(() => {
     const newLedgerId = location.state?.newLedgerId;
     if (!newLedgerId) return;
-    ledgerApi.getById(newLedgerId)
-      .then((r) => { if (r.data) setLedger(r.data); })
+    ledgerApi
+      .getById(newLedgerId)
+      .then((r) => {
+        if (r.data) setLedger(r.data);
+      })
       .catch(() => {})
       .finally(() => {
-        navigate(location.pathname + location.search, { replace: true, state: {} });
+        navigate(location.pathname + location.search, {
+          replace: true,
+          state: {},
+        });
       });
   }, [location.state, location.pathname, location.search, navigate]);
 
   useEffect(() => {
     if (!isEdit) return;
     setLoading(true);
-    purchaseApi.getById(purchaseIdParam)
+    purchaseApi
+      .getById(purchaseIdParam)
       .then((res) => {
         const p = res.data;
         setPurchaseNumber(p.purchase_number);
-        setBillNumber(p.bill_number || '');
-        setPoNumber(p.po_number || '');
+        setBillNumber(p.bill_number || "");
+        setPoNumber(p.po_number || "");
         setDate(p.date);
-        setTime(p.time || '');
-        setNotes(p.notes || '');
-        setBillDiscount(p.bill_discount != null ? String(p.bill_discount) : '0');
-        setFreightCharge(p.freight_charge != null ? String(p.freight_charge) : '0');
+        setTime(p.time || "");
+        setNotes(p.notes || "");
+        setBillDiscount(
+          p.bill_discount != null ? String(p.bill_discount) : "0",
+        );
+        setFreightCharge(
+          p.freight_charge != null ? String(p.freight_charge) : "0",
+        );
         setLedger({ id: p.ledger_id, name: p.ledger_name });
         setLines(
           (p.items || []).map((l) => ({
@@ -563,12 +708,16 @@ export default function ItemPurchaseEntryPage() {
             mrp: l.mrp || 0,
             rate: String(l.rate),
             quantity: String(l.quantity ?? 1),
-            discount_percent: l.discount_percent ? String(l.discount_percent) : '',
-            gst_percent: l.gst_percent ? String(l.gst_percent) : '',
+            discount_percent: l.discount_percent
+              ? String(l.discount_percent)
+              : "",
+            gst_percent: l.gst_percent ? String(l.gst_percent) : "",
             amount: l.amount,
             current_stock: null,
+            batch_no: l.batch_no || "",
+            sales_rate: l.sales_rate != null ? String(l.sales_rate) : "",
             imeis: Array.isArray(l.imeis) ? l.imeis : [],
-          }))
+          })),
         );
       })
       .catch((err) => toast.error(err.message))
@@ -578,20 +727,20 @@ export default function ItemPurchaseEntryPage() {
   // F10 → purchase report
   useEffect(() => {
     const handler = (e) => {
-      if (e.key === 'F10') {
+      if (e.key === "F10") {
         e.preventDefault();
-        navigate('/purchase-report');
+        navigate("/purchase-report");
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, [navigate]);
 
   // After returning from item creation
   useEffect(() => {
-    const raw = sessionStorage.getItem('lastCreatedItem');
+    const raw = sessionStorage.getItem("lastCreatedItem");
     if (!raw) return;
-    sessionStorage.removeItem('lastCreatedItem');
+    sessionStorage.removeItem("lastCreatedItem");
     try {
       const newItem = JSON.parse(raw);
       refreshItems();
@@ -605,16 +754,25 @@ export default function ItemPurchaseEntryPage() {
           item_name: newItem.name,
           unit: newItem.unit || DEFAULT_ITEM_UNIT,
           mrp: newItem.mrp || 0,
-          rate: '',
-          quantity: '1',
-          gst_percent: newItem.gst_percent ? String(newItem.gst_percent) : '',
+          rate: "",
+          sales_rate:
+            newItem.sales_rate != null ? String(newItem.sales_rate) : "",
+          quantity: "1",
+          gst_percent: newItem.gst_percent ? String(newItem.gst_percent) : "",
           current_stock: newItem.current_stock ?? 0,
           amount: 0,
+          ...(batchEnabled && batchMode === "auto" && !next[target].batch_no
+            ? {
+                batch_no: `${batchPrefix}${String(autoBatchSeq.current++).padStart(4, "0")}`,
+              }
+            : {}),
         };
         return next;
       });
-    } catch (_) { /* noop */ }
-  }, [location.key, refreshItems]);
+    } catch (_) {
+      /* noop */
+    }
+  }, [location.key, refreshItems, batchEnabled, batchMode, batchPrefix]);
 
   // A line needs IMEI capture only when the IMEI module is enabled AND the
   // selected item has been flagged "IMEI Enable" in its master record.
@@ -629,7 +787,7 @@ export default function ItemPurchaseEntryPage() {
     if (!itemImeiTracked(line)) return false;
     const qty = Math.floor(parseFloat(line.quantity) || 0);
     const filled = Array.isArray(line.imeis)
-      ? line.imeis.map((s) => String(s || '').trim()).filter(Boolean).length
+      ? line.imeis.map((s) => String(s || "").trim()).filter(Boolean).length
       : 0;
     return filled !== qty;
   };
@@ -651,15 +809,30 @@ export default function ItemPurchaseEntryPage() {
     });
   };
 
+  // Returns the next preview batch number for auto mode, advancing the counter
+  // and skipping any number already assigned to another line in this entry.
+  // The numeric part is zero-padded to 4 digits to match the server.
+  const nextAutoBatchNo = () => {
+    const used = new Set(
+      lines.map((l) => (l.batch_no || "").trim()).filter(Boolean),
+    );
+    let candidate;
+    do {
+      candidate = `${batchPrefix}${String(autoBatchSeq.current).padStart(4, "0")}`;
+      autoBatchSeq.current += 1;
+    } while (used.has(candidate));
+    return candidate;
+  };
+
   const addLine = () => {
     const hasEmptyRow = lines.some((l) => !l.item_id);
     if (hasEmptyRow) {
       const emptyIdx = lines.findIndex((l) => !l.item_id);
-      focusCell(emptyIdx, 'itemName');
+      focusCell(emptyIdx, "itemName");
       return;
     }
     setLines((prev) => [...prev, emptyLine()]);
-    setTimeout(() => focusCell(lines.length, 'itemName'), 0);
+    setTimeout(() => focusCell(lines.length, "itemName"), 0);
   };
 
   const handleSelectItem = (idx, item) => {
@@ -668,34 +841,56 @@ export default function ItemPurchaseEntryPage() {
       item_name: item.name,
       unit: item.unit || DEFAULT_ITEM_UNIT,
       mrp: item.mrp || 0,
-      rate: '',
-      quantity: '1',
-      gst_percent: item.gst_percent ? String(item.gst_percent) : '',
+      rate: "",
+      sales_rate: item.sales_rate != null ? String(item.sales_rate) : "",
+      quantity: "1",
+      gst_percent: item.gst_percent ? String(item.gst_percent) : "",
       current_stock: item.current_stock ?? 0,
       imeis: [],
+      // In auto mode, preview the batch number that will be saved. Reuse any
+      // number already shown on this line so re-selecting an item is stable.
+      ...(batchEnabled && batchMode === "auto"
+        ? { batch_no: lines[idx]?.batch_no || nextAutoBatchNo() }
+        : {}),
     });
   };
 
+  // Keyboard navigation order. The batch cell is only reachable when batch
+  // tracking is on in manual mode (auto batches are generated server-side).
+  // Batch mode also exposes editable MRP and Sales Rate cells (the per-batch
+  // prices), which are otherwise read-only / hidden.
+  const batchFieldEditable = batchEnabled && batchMode === "manual";
+  const fieldOrder = useMemo(() => {
+    const order = ["itemName"];
+    if (batchFieldEditable) order.push("batch");
+    order.push("unit");
+    if (batchEnabled) order.push("mrp", "salesRate");
+    order.push("rate", "qty", "discount");
+    return order;
+  }, [batchFieldEditable, batchEnabled]);
+
   const handleCellBack = (rowIdx, field) => {
-    const currentIdx = FIELD_ORDER.indexOf(field);
+    const currentIdx = fieldOrder.indexOf(field);
     if (currentIdx > 0) {
-      focusCell(rowIdx, FIELD_ORDER[currentIdx - 1]);
+      focusCell(rowIdx, fieldOrder[currentIdx - 1]);
     } else if (rowIdx > 0) {
-      focusCell(rowIdx - 1, FIELD_ORDER[FIELD_ORDER.length - 1]);
+      focusCell(rowIdx - 1, fieldOrder[fieldOrder.length - 1]);
     }
   };
 
   const handleCellEnter = (rowIdx, field) => {
-    const currentIdx = FIELD_ORDER.indexOf(field);
-    if (currentIdx < FIELD_ORDER.length - 1) {
-      focusCell(rowIdx, FIELD_ORDER[currentIdx + 1]);
+    const currentIdx = fieldOrder.indexOf(field);
+    if (currentIdx < fieldOrder.length - 1) {
+      focusCell(rowIdx, fieldOrder[currentIdx + 1]);
     } else {
       // Leaving this row — IMEI-tracked items must have every IMEI filled in
       // before the cursor is allowed to move on to the next line.
       if (imeiIncomplete(lines[rowIdx])) {
         setShowImeiErrors(true);
-        toast.error(`Enter all IMEI numbers for "${lines[rowIdx].item_name}" before continuing`);
-        focusCell(rowIdx, 'qty');
+        toast.error(
+          `Enter all IMEI numbers for "${lines[rowIdx].item_name}" before continuing`,
+        );
+        focusCell(rowIdx, "qty");
         return;
       }
       const isLastRow = rowIdx === lines.length - 1;
@@ -703,13 +898,13 @@ export default function ItemPurchaseEntryPage() {
         const hasEmptyRow = lines.some((l) => !l.item_id);
         if (hasEmptyRow) {
           const emptyIdx = lines.findIndex((l) => !l.item_id);
-          focusCell(emptyIdx, 'itemName');
+          focusCell(emptyIdx, "itemName");
         } else {
           setLines((prev) => [...prev, emptyLine()]);
-          setTimeout(() => focusCell(rowIdx + 1, 'itemName'), 0);
+          setTimeout(() => focusCell(rowIdx + 1, "itemName"), 0);
         }
       } else {
-        focusCell(rowIdx + 1, 'itemName');
+        focusCell(rowIdx + 1, "itemName");
       }
     }
   };
@@ -729,19 +924,35 @@ export default function ItemPurchaseEntryPage() {
     const discountTotal = lines.reduce((s, l) => {
       const gross = (parseFloat(l.rate) || 0) * (parseFloat(l.quantity) || 1);
       const d = parseFloat(l.discount_percent) || 0;
-      return s + gross * d / 100;
+      return s + (gross * d) / 100;
     }, 0);
-    const lineCount = lines.filter((l) => l.item_name && l.item_name.trim()).length;
-    const qtyTotal = lines.reduce((s, l) => s + (parseFloat(l.quantity) || 0), 0);
+    const lineCount = lines.filter(
+      (l) => l.item_name && l.item_name.trim(),
+    ).length;
+    const qtyTotal = lines.reduce(
+      (s, l) => s + (parseFloat(l.quantity) || 0),
+      0,
+    );
     return { total, discountTotal, gstTotal, lineCount, qtyTotal };
   }, [lines]);
 
-  const netTotal = Math.max(0, totals.total - (parseFloat(billDiscount) || 0) + (freightEnabled ? (parseFloat(freightCharge) || 0) : 0));
+  const netTotal = Math.max(
+    0,
+    totals.total -
+      (parseFloat(billDiscount) || 0) +
+      (freightEnabled ? parseFloat(freightCharge) || 0 : 0),
+  );
 
   const handleSave = async () => {
-    if (!ledger) { toast.error('Select a ledger'); return; }
+    if (!ledger) {
+      toast.error("Select a ledger");
+      return;
+    }
     const validLines = lines.filter((l) => l.item_name && l.item_name.trim());
-    if (validLines.length === 0) { toast.error('Add at least one item line'); return; }
+    if (validLines.length === 0) {
+      toast.error("Add at least one item line");
+      return;
+    }
     for (let i = 0; i < validLines.length; i++) {
       const l = validLines[i];
       if (isNaN(parseFloat(l.rate)) || parseFloat(l.rate) < 0) {
@@ -761,12 +972,16 @@ export default function ItemPurchaseEntryPage() {
       for (let i = 0; i < validLines.length; i++) {
         const l = validLines[i];
         const tracked = itemImeiTracked(l);
-        const imeis = Array.isArray(l.imeis) ? l.imeis.map((s) => String(s || '').trim()).filter(Boolean) : [];
+        const imeis = Array.isArray(l.imeis)
+          ? l.imeis.map((s) => String(s || "").trim()).filter(Boolean)
+          : [];
         if (tracked) {
           const qty = Math.floor(parseFloat(l.quantity) || 0);
           if (imeis.length !== qty) {
             setShowImeiErrors(true);
-            toast.error(`Row ${i + 1}: enter ${qty} IMEI${qty === 1 ? '' : 's'} for "${l.item_name}" (entered ${imeis.length})`);
+            toast.error(
+              `Row ${i + 1}: enter ${qty} IMEI${qty === 1 ? "" : "s"} for "${l.item_name}" (entered ${imeis.length})`,
+            );
             return;
           }
           for (const imei of imeis) {
@@ -786,12 +1001,12 @@ export default function ItemPurchaseEntryPage() {
       const payload = {
         ledger_id: ledger.id,
         bill_number: billNumber,
-        po_number: poEnabled ? poNumber : '',
+        po_number: poEnabled ? poNumber : "",
         date,
         time,
         notes,
         bill_discount: parseFloat(billDiscount) || 0,
-        freight_charge: freightEnabled ? (parseFloat(freightCharge) || 0) : 0,
+        freight_charge: freightEnabled ? parseFloat(freightCharge) || 0 : 0,
         items: validLines.map((l) => ({
           item_id: l.item_id,
           item_name: l.item_name.trim(),
@@ -802,28 +1017,41 @@ export default function ItemPurchaseEntryPage() {
           discount_percent: parseFloat(l.discount_percent) || 0,
           gst_percent: parseFloat(l.gst_percent) || 0,
           amount: parseFloat(l.amount) || 0,
+          batch_no: batchEnabled ? (l.batch_no || "").trim() : "",
+          sales_rate:
+            batchEnabled && l.sales_rate !== "" && l.sales_rate != null
+              ? parseFloat(l.sales_rate)
+              : null,
           imeis: itemImeiTracked(l)
-            ? (Array.isArray(l.imeis) ? l.imeis.map((s) => String(s || '').trim()).filter(Boolean) : [])
+            ? Array.isArray(l.imeis)
+              ? l.imeis.map((s) => String(s || "").trim()).filter(Boolean)
+              : []
             : [],
         })),
       };
       const res = isEdit
         ? await purchaseApi.update(purchaseIdParam, payload)
         : await purchaseApi.create(payload);
-      toast.success(isEdit ? 'Purchase updated' : `Purchase ${res.data.purchase_number} saved`);
+      toast.success(
+        isEdit
+          ? "Purchase updated"
+          : `Purchase ${res.data.purchase_number} saved`,
+      );
       if (!isEdit) {
         localStorage.removeItem(PURCHASE_DRAFT_KEY);
         setLedger(null);
-        setBillNumber('');
-        setPoNumber('');
+        setBillNumber("");
+        setPoNumber("");
         setDate(todayISO());
         setTime(nowHHMM());
-        setNotes('');
-        setBillDiscount('0');
-        setFreightCharge('0');
+        setNotes("");
+        setBillDiscount("0");
+        setFreightCharge("0");
         setLines([emptyLine()]);
-        purchaseApi.getNextNumber()
-          .then((r) => setPurchaseNumber(r.data?.purchase_number || ''))
+        if (batchEnabled && batchMode === "auto") seedAutoBatchSeq();
+        purchaseApi
+          .getNextNumber()
+          .then((r) => setPurchaseNumber(r.data?.purchase_number || ""))
           .catch(() => {});
       }
     } catch (err) {
@@ -834,9 +1062,11 @@ export default function ItemPurchaseEntryPage() {
   };
 
   const handleAddNewItem = (rowIdx) => {
-    const currentName = lines[rowIdx]?.item_name || '';
+    const currentName = lines[rowIdx]?.item_name || "";
     const qs = new URLSearchParams({
-      returnTo: isEdit ? `/item-purchases/${purchaseIdParam}/edit` : '/item-purchases/new',
+      returnTo: isEdit
+        ? `/item-purchases/${purchaseIdParam}/edit`
+        : "/item-purchases/new",
       ...(currentName ? { name: currentName } : {}),
     }).toString();
     navigate(`/items/new?${qs}`);
@@ -846,15 +1076,15 @@ export default function ItemPurchaseEntryPage() {
   const handleResetDraft = () => {
     localStorage.removeItem(PURCHASE_DRAFT_KEY);
     setLedger(null);
-    setBillNumber('');
-    setPoNumber('');
+    setBillNumber("");
+    setPoNumber("");
     setDate(todayISO());
     setTime(nowHHMM());
-    setNotes('');
-    setBillDiscount('0');
+    setNotes("");
+    setBillDiscount("0");
     setLines([emptyLine()]);
     setShowImeiErrors(false);
-    toast.success('Entry reset');
+    toast.success("Entry reset");
   };
 
   if (loading) return <LoadingSpinner className="py-20" size="lg" />;
@@ -871,9 +1101,11 @@ export default function ItemPurchaseEntryPage() {
             <ArrowLeftIcon className="h-5 w-5" />
           </button>
           <div>
-            <h1 className="page-title">{isEdit ? 'Edit Purchase' : 'Item Purchase'}</h1>
+            <h1 className="page-title">
+              {isEdit ? "Edit Purchase" : "Item Purchase"}
+            </h1>
             <p className="text-sm text-slate-500">
-              Purchase {purchaseNumber || '—'}
+              Purchase {purchaseNumber || "—"}
             </p>
           </div>
           {!isEdit && (
@@ -890,12 +1122,19 @@ export default function ItemPurchaseEntryPage() {
 
         <div className="flex flex-wrap items-end gap-2">
           <div className="w-52">
-            <label className="text-xs text-slate-500">Supplier / Ledger *</label>
+            <label className="text-xs text-slate-500">
+              Supplier / Ledger *
+            </label>
             <div className="flex items-center gap-1">
               <button
                 type="button"
                 title="Create new ledger"
-                onClick={() => navigate('/ledger-creation?returnTo=' + encodeURIComponent(location.pathname + location.search))}
+                onClick={() =>
+                  navigate(
+                    "/ledger-creation?returnTo=" +
+                      encodeURIComponent(location.pathname + location.search),
+                  )
+                }
                 className="flex h-9 w-7 shrink-0 items-center justify-center rounded bg-trust-blue/10 text-trust-blue hover:bg-trust-blue/20 transition-colors"
               >
                 <PlusIcon className="h-4 w-4" />
@@ -957,17 +1196,49 @@ export default function ItemPurchaseEntryPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-indigo-600 sticky top-0 z-10">
-                <th className="px-3 py-2 text-left font-semibold text-white w-12">S.no</th>
-                <th className="px-3 py-2 text-left font-semibold text-white w-20 whitespace-nowrap">Item ID</th>
-                <th className="px-3 py-2 text-left font-semibold text-white min-w-[18rem]">Item Name</th>
-                <th className="px-3 py-2 text-left font-semibold text-white w-28">Unit</th>
-                <th className="px-3 py-2 text-right font-semibold text-white w-20 whitespace-nowrap">In Stock</th>
-                <th className="px-3 py-2 text-right font-semibold text-white w-24">MRP</th>
-                <th className="px-3 py-2 text-right font-semibold text-white w-28">Cost Rate</th>
-                <th className="px-3 py-2 text-right font-semibold text-white w-24">Qty</th>
-                <th className="px-3 py-2 text-right font-semibold text-white w-24">Disc %</th>
-                <th className="px-3 py-2 text-right font-semibold text-white w-24">GST %</th>
-                <th className="px-3 py-2 text-right font-semibold text-white w-28">Amount</th>
+                <th className="px-3 py-2 text-left font-semibold text-white w-12">
+                  S.no
+                </th>
+                <th className="px-3 py-2 text-left font-semibold text-white w-20 whitespace-nowrap">
+                  Item ID
+                </th>
+                <th className="px-3 py-2 text-left font-semibold text-white min-w-[18rem]">
+                  Item Name
+                </th>
+                {batchEnabled && (
+                  <th className="px-3 py-2 text-left font-semibold text-white w-32 whitespace-nowrap">
+                    Batch No.
+                  </th>
+                )}
+                <th className="px-3 py-2 text-left font-semibold text-white w-28">
+                  Unit
+                </th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-20 whitespace-nowrap">
+                  In Stock
+                </th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-24">
+                  MRP
+                </th>
+                {batchEnabled && (
+                  <th className="px-3 py-2 text-right font-semibold text-white w-28 whitespace-nowrap">
+                    Sales Rate
+                  </th>
+                )}
+                <th className="px-3 py-2 text-right font-semibold text-white w-28">
+                  Cost Rate
+                </th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-24">
+                  Qty
+                </th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-24">
+                  Disc %
+                </th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-24">
+                  GST %
+                </th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-28">
+                  Amount
+                </th>
                 <th className="px-3 py-2 w-10"></th>
               </tr>
             </thead>
@@ -978,55 +1249,177 @@ export default function ItemPurchaseEntryPage() {
                   <tr key={idx} className="border-b border-slate-100">
                     <td className="px-3 py-2 text-slate-500">{idx + 1}</td>
                     <td className="px-3 py-2 font-mono text-xs text-slate-600">
-                      {line.item_id || '—'}
+                      {line.item_id || "—"}
                     </td>
                     <td className="px-3 py-2">
                       <ItemNameCell
                         value={line.item_name}
                         items={items}
                         selected={!!line.item_id}
-                        onChange={(v) => updateLine(idx, { item_name: v, item_id: null, current_stock: null, imeis: [] })}
+                        onChange={(v) =>
+                          updateLine(idx, {
+                            item_name: v,
+                            item_id: null,
+                            current_stock: null,
+                            imeis: [],
+                          })
+                        }
                         onSelect={(it) => handleSelectItem(idx, it)}
-                        registerRef={(ref) => setCellRef(idx, 'itemName', ref)}
-                        onKeyEnter={() => handleCellEnter(idx, 'itemName')}
-                        onKeyBack={() => handleCellBack(idx, 'itemName')}
+                        registerRef={(ref) => setCellRef(idx, "itemName", ref)}
+                        onKeyEnter={() => handleCellEnter(idx, "itemName")}
+                        onKeyBack={() => handleCellBack(idx, "itemName")}
                         onAddNew={() => handleAddNewItem(idx)}
                         onEnterEmpty={focusLedger}
                       />
                     </td>
+                    {batchEnabled && (
+                      <td className="px-3 py-2">
+                        {batchFieldEditable ? (
+                          <input
+                            ref={(el) =>
+                              setCellRef(idx, "batch", { current: el })
+                            }
+                            type="text"
+                            value={line.batch_no || ""}
+                            onChange={(e) =>
+                              updateLine(idx, { batch_no: e.target.value })
+                            }
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleCellEnter(idx, "batch");
+                              } else if (
+                                e.key === "ArrowLeft" &&
+                                !e.target.value
+                              ) {
+                                e.preventDefault();
+                                handleCellBack(idx, "batch");
+                              }
+                            }}
+                            className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
+                            placeholder="Batch no."
+                          />
+                        ) : line.batch_no ? (
+                          <span className="inline-block rounded bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-700">
+                            {line.batch_no}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-slate-400">(auto)</span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-3 py-2">
                       <select
-                        ref={(el) => setCellRef(idx, 'unit', { current: el })}
+                        ref={(el) => setCellRef(idx, "unit", { current: el })}
                         value={line.unit}
-                        onChange={(e) => updateLine(idx, { unit: e.target.value })}
+                        onChange={(e) =>
+                          updateLine(idx, { unit: e.target.value })
+                        }
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'unit'); }
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleCellEnter(idx, "unit");
+                          }
                         }}
                         className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
                       >
-                        {ITEM_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                        {ITEM_UNITS.map((u) => (
+                          <option key={u} value={u}>
+                            {u}
+                          </option>
+                        ))}
                       </select>
                     </td>
                     <td className="px-3 py-2 text-right">
                       {stock == null ? (
                         <span className="text-slate-300">—</span>
                       ) : (
-                        <span className={Number(stock) < 0 ? 'text-debit-red font-medium' : 'text-slate-600'}>
+                        <span
+                          className={
+                            Number(stock) < 0
+                              ? "text-debit-red font-medium"
+                              : "text-slate-600"
+                          }
+                        >
                           {Number(stock)}
                         </span>
                       )}
                     </td>
-                    <td className="px-3 py-2 text-right text-slate-700">{formatCurrency(line.mrp || 0)}</td>
+                    <td className="px-3 py-2 text-right text-slate-700">
+                      {batchEnabled ? (
+                        <input
+                          ref={(el) => setCellRef(idx, "mrp", { current: el })}
+                          type="number"
+                          step="0.01"
+                          value={line.mrp}
+                          onChange={(e) =>
+                            updateLine(idx, { mrp: e.target.value })
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleCellEnter(idx, "mrp");
+                            } else if (
+                              e.key === "ArrowLeft" &&
+                              !e.target.value
+                            ) {
+                              e.preventDefault();
+                              handleCellBack(idx, "mrp");
+                            }
+                          }}
+                          className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
+                          placeholder="0.00"
+                        />
+                      ) : (
+                        formatCurrency(line.mrp || 0)
+                      )}
+                    </td>
+                    {batchEnabled && (
+                      <td className="px-3 py-2">
+                        <input
+                          ref={(el) =>
+                            setCellRef(idx, "salesRate", { current: el })
+                          }
+                          type="number"
+                          step="0.01"
+                          value={line.sales_rate}
+                          onChange={(e) =>
+                            updateLine(idx, { sales_rate: e.target.value })
+                          }
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleCellEnter(idx, "salesRate");
+                            } else if (
+                              e.key === "ArrowLeft" &&
+                              !e.target.value
+                            ) {
+                              e.preventDefault();
+                              handleCellBack(idx, "salesRate");
+                            }
+                          }}
+                          className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
+                          placeholder="0.00"
+                        />
+                      </td>
+                    )}
                     <td className="px-3 py-2">
                       <input
-                        ref={(el) => setCellRef(idx, 'rate', { current: el })}
+                        ref={(el) => setCellRef(idx, "rate", { current: el })}
                         type="number"
                         step="0.01"
                         value={line.rate}
-                        onChange={(e) => updateLine(idx, { rate: e.target.value })}
+                        onChange={(e) =>
+                          updateLine(idx, { rate: e.target.value })
+                        }
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'rate'); }
-                          else if (e.key === 'ArrowLeft' && !e.target.value) { e.preventDefault(); handleCellBack(idx, 'rate'); }
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleCellEnter(idx, "rate");
+                          } else if (e.key === "ArrowLeft" && !e.target.value) {
+                            e.preventDefault();
+                            handleCellBack(idx, "rate");
+                          }
                         }}
                         className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
                         placeholder="0.00"
@@ -1038,31 +1431,42 @@ export default function ItemPurchaseEntryPage() {
                         hasItem={Boolean(line.item_id)}
                         quantity={line.quantity}
                         imeis={line.imeis}
-                        onQuantityChange={(v) => updateLine(idx, { quantity: v })}
+                        onQuantityChange={(v) =>
+                          updateLine(idx, { quantity: v })
+                        }
                         onImeisChange={(arr) => updateLine(idx, { imeis: arr })}
-                        registerRef={(ref) => setCellRef(idx, 'qty', ref)}
-                        onKeyEnter={() => handleCellEnter(idx, 'qty')}
-                        onKeyBack={() => handleCellBack(idx, 'qty')}
+                        registerRef={(ref) => setCellRef(idx, "qty", ref)}
+                        onKeyEnter={() => handleCellEnter(idx, "qty")}
+                        onKeyBack={() => handleCellBack(idx, "qty")}
                         invalid={showImeiErrors && imeiIncomplete(line)}
                       />
                     </td>
                     <td className="px-3 py-2">
                       <input
-                        ref={(el) => setCellRef(idx, 'discount', { current: el })}
+                        ref={(el) =>
+                          setCellRef(idx, "discount", { current: el })
+                        }
                         type="number"
                         step="0.01"
                         value={line.discount_percent}
-                        onChange={(e) => updateLine(idx, { discount_percent: e.target.value })}
+                        onChange={(e) =>
+                          updateLine(idx, { discount_percent: e.target.value })
+                        }
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') { e.preventDefault(); handleCellEnter(idx, 'discount'); }
-                          else if (e.key === 'ArrowLeft' && !e.target.value) { e.preventDefault(); handleCellBack(idx, 'discount'); }
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleCellEnter(idx, "discount");
+                          } else if (e.key === "ArrowLeft" && !e.target.value) {
+                            e.preventDefault();
+                            handleCellBack(idx, "discount");
+                          }
                         }}
                         className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
                         placeholder="0"
                       />
                     </td>
                     <td className="px-3 py-2 text-sm text-center text-slate-600">
-                      {line.gst_percent ? `${line.gst_percent}%` : '—'}
+                      {line.gst_percent ? `${line.gst_percent}%` : "—"}
                     </td>
                     <td className="px-3 py-2 text-right font-semibold text-slate-800">
                       {formatCurrency(line.amount || 0)}
@@ -1110,11 +1514,15 @@ export default function ItemPurchaseEntryPage() {
             <div className="flex items-center gap-3 mt-1">
               <div className="flex items-center gap-2 rounded-lg bg-slate-50 border border-slate-100 px-3 py-1.5 text-sm">
                 <span className="text-slate-500">Items</span>
-                <span className="font-medium text-slate-700">{totals.lineCount}</span>
+                <span className="font-medium text-slate-700">
+                  {totals.lineCount}
+                </span>
               </div>
               <div className="flex items-center gap-2 rounded-lg bg-slate-50 border border-slate-100 px-3 py-1.5 text-sm">
                 <span className="text-slate-500">Total Qty</span>
-                <span className="font-medium text-slate-700">{totals.qtyTotal}</span>
+                <span className="font-medium text-slate-700">
+                  {totals.qtyTotal}
+                </span>
               </div>
             </div>
           </div>
@@ -1122,7 +1530,9 @@ export default function ItemPurchaseEntryPage() {
             <div className="space-y-1">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-500">Total Item Discount</span>
-                <span className="font-medium text-amber-700">{formatCurrency(totals.discountTotal)}</span>
+                <span className="font-medium text-amber-700">
+                  {formatCurrency(totals.discountTotal)}
+                </span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-500">Total Bill Discount</span>
@@ -1148,31 +1558,41 @@ export default function ItemPurchaseEntryPage() {
                   />
                 </div>
               )}
-              {ledger?.igst_status === 'YES' ? (
+              {ledger?.igst_status === "YES" ? (
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-500">IGST</span>
-                  <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal)}</span>
+                  <span className="font-medium text-blue-700">
+                    {formatCurrency(totals.gstTotal)}
+                  </span>
                 </div>
               ) : (
                 <>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500">CGST</span>
-                    <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal / 2)}</span>
+                    <span className="font-medium text-blue-700">
+                      {formatCurrency(totals.gstTotal / 2)}
+                    </span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-500">SGST</span>
-                    <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal / 2)}</span>
+                    <span className="font-medium text-blue-700">
+                      {formatCurrency(totals.gstTotal / 2)}
+                    </span>
                   </div>
                 </>
               )}
               <div className="flex items-center justify-between text-sm">
                 <span className="text-slate-500">Total GST</span>
-                <span className="font-medium text-blue-700">{formatCurrency(totals.gstTotal)}</span>
+                <span className="font-medium text-blue-700">
+                  {formatCurrency(totals.gstTotal)}
+                </span>
               </div>
             </div>
             <div className="flex items-center justify-between text-base border-t border-slate-200 pt-2 mt-1">
               <span className="font-semibold text-slate-700">Total Amount</span>
-              <span className="font-bold text-lg text-credit-green">{formatCurrency(netTotal)}</span>
+              <span className="font-bold text-lg text-credit-green">
+                {formatCurrency(netTotal)}
+              </span>
             </div>
           </div>
         </div>
@@ -1182,15 +1602,25 @@ export default function ItemPurchaseEntryPage() {
             {ledger && (
               <span className="flex items-center gap-1">
                 <span className="text-slate-400">{ledger.name} Balance:</span>
-                <span className={`font-bold ${(parseFloat(ledger.current_balance) || 0) < 0 ? 'text-debit-red' : 'text-credit-green'}`}>
-                  {formatCurrency(Math.abs(parseFloat(ledger.current_balance) || 0))}
-                  {(parseFloat(ledger.current_balance) || 0) < 0 ? ' Dr' : ' Cr'}
+                <span
+                  className={`font-bold ${(parseFloat(ledger.current_balance) || 0) < 0 ? "text-debit-red" : "text-credit-green"}`}
+                >
+                  {formatCurrency(
+                    Math.abs(parseFloat(ledger.current_balance) || 0),
+                  )}
+                  {(parseFloat(ledger.current_balance) || 0) < 0
+                    ? " Dr"
+                    : " Cr"}
                 </span>
               </span>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button type="button" onClick={() => navigate('/item-purchases')} className="btn-secondary">
+            <button
+              type="button"
+              onClick={() => navigate("/item-purchases")}
+              className="btn-secondary"
+            >
               Cancel
             </button>
             <button
@@ -1199,7 +1629,11 @@ export default function ItemPurchaseEntryPage() {
               disabled={saving}
               className="btn-primary"
             >
-              {saving ? 'Saving…' : (isEdit ? 'Update Purchase' : 'Save Purchase')}
+              {saving
+                ? "Saving…"
+                : isEdit
+                  ? "Update Purchase"
+                  : "Save Purchase"}
             </button>
           </div>
         </div>

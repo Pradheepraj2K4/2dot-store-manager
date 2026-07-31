@@ -1,57 +1,89 @@
-const { getDb } = require('../db/database');
-const imeiRepository = require('./imeiRepository');
+const { getDb } = require("../db/database");
+const imeiRepository = require("./imeiRepository");
 
 class SaleRepository {
   getNextSaleNumber() {
     const db = getDb();
-    const row = db.prepare(`
+    const row = db
+      .prepare(
+        `
       SELECT COALESCE(MAX(CAST(sale_number AS INTEGER)), 0) + 1 AS next
       FROM sales
-    `).get();
+    `,
+      )
+      .get();
     return String(row.next);
   }
 
-  create({ sale_number, ledger_id, date, time, total_amount, total_discount, bill_discount, freight_charge, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, cash_amount, upi_amount, tendered_amount, waiter_id, waiter_name, service_type, dining_type, items }) {
+  create({
+    sale_number,
+    ledger_id,
+    date,
+    time,
+    total_amount,
+    total_discount,
+    bill_discount,
+    freight_charge,
+    total_gst,
+    item_count,
+    notes,
+    customer_name,
+    customer_mobile,
+    customer_place,
+    customer_id,
+    cash_amount,
+    upi_amount,
+    tendered_amount,
+    waiter_id,
+    waiter_name,
+    service_type,
+    dining_type,
+    items,
+  }) {
     const db = getDb();
-    const info = db.prepare(`
+    const info = db
+      .prepare(
+        `
       INSERT INTO sales (sale_number, ledger_id, date, time, total_amount, total_discount, bill_discount, freight_charge, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, cash_amount, upi_amount, tendered_amount, waiter_id, waiter_name, service_type, dining_type)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      sale_number,
-      ledger_id,
-      date,
-      time || '',
-      total_amount,
-      total_discount || 0,
-      bill_discount || 0,
-      freight_charge || 0,
-      total_gst || 0,
-      item_count || (items ? items.length : 0),
-      notes || '',
-      customer_name || '',
-      customer_mobile || '',
-      customer_place || '',
-      customer_id || null,
-      cash_amount || 0,
-      upi_amount || 0,
-      tendered_amount || 0,
-      waiter_id || null,
-      waiter_name || '',
-      service_type || '',
-      dining_type || 'dining'
-    );
+    `,
+      )
+      .run(
+        sale_number,
+        ledger_id,
+        date,
+        time || "",
+        total_amount,
+        total_discount || 0,
+        bill_discount || 0,
+        freight_charge || 0,
+        total_gst || 0,
+        item_count || (items ? items.length : 0),
+        notes || "",
+        customer_name || "",
+        customer_mobile || "",
+        customer_place || "",
+        customer_id || null,
+        cash_amount || 0,
+        upi_amount || 0,
+        tendered_amount || 0,
+        waiter_id || null,
+        waiter_name || "",
+        service_type || "",
+        dining_type || "dining",
+      );
     const saleId = info.lastInsertRowid;
     if (Array.isArray(items)) {
       const stmt = db.prepare(`
-        INSERT INTO sale_items (sale_id, item_id, item_name, unit, mrp, rate, quantity, discount_percent, gst_percent, gst_amount, amount, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO sale_items (sale_id, item_id, item_name, unit, mrp, rate, quantity, discount_percent, gst_percent, gst_amount, amount, batch_no, batch_id, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       items.forEach((line, idx) => {
         stmt.run(
           saleId,
           line.item_id || null,
           line.item_name,
-          line.unit || 'Nos',
+          line.unit || "Nos",
           parseFloat(line.mrp) || 0,
           parseFloat(line.rate) || 0,
           parseFloat(line.quantity) || 1,
@@ -59,7 +91,9 @@ class SaleRepository {
           parseFloat(line.gst_percent) || 0,
           parseFloat(line.gst_amount) || 0,
           parseFloat(line.amount) || 0,
-          idx
+          (line.batch_no || "").toString().trim(),
+          line.batch_id || null,
+          idx,
         );
       });
     }
@@ -68,16 +102,24 @@ class SaleRepository {
 
   getById(id) {
     const db = getDb();
-    const sale = db.prepare(`
+    const sale = db
+      .prepare(
+        `
       SELECT s.*, l.name AS ledger_name
       FROM sales s
       JOIN ledgers l ON l.id = s.ledger_id
       WHERE s.id = ?
-    `).get(id);
+    `,
+      )
+      .get(id);
     if (!sale) return null;
-    sale.items = db.prepare(`
+    sale.items = db
+      .prepare(
+        `
       SELECT * FROM sale_items WHERE sale_id = ? ORDER BY sort_order ASC, id ASC
-    `).all(id);
+    `,
+      )
+      .all(id);
     // Attach the IMEIs consumed by this sale, grouped per item, so the edit
     // screen can re-populate the per-line IMEI selections.
     const imeiRows = imeiRepository.getBySale(id);
@@ -88,7 +130,7 @@ class SaleRepository {
     }
     sale.items = sale.items.map((line) => ({
       ...line,
-      imeis: line.item_id ? (byItem.get(line.item_id) || []) : [],
+      imeis: line.item_id ? byItem.get(line.item_id) || [] : [],
     }));
     return sale;
   }
@@ -97,9 +139,18 @@ class SaleRepository {
     const db = getDb();
     const conds = [];
     const params = [];
-    if (ledgerId)  { conds.push('s.ledger_id = ?'); params.push(ledgerId); }
-    if (fromDate)  { conds.push('s.date >= ?');    params.push(fromDate); }
-    if (toDate)    { conds.push('s.date <= ?');    params.push(toDate); }
+    if (ledgerId) {
+      conds.push("s.ledger_id = ?");
+      params.push(ledgerId);
+    }
+    if (fromDate) {
+      conds.push("s.date >= ?");
+      params.push(fromDate);
+    }
+    if (toDate) {
+      conds.push("s.date <= ?");
+      params.push(toDate);
+    }
     if (search && String(search).trim()) {
       const like = `%${String(search).trim()}%`;
       conds.push(`(
@@ -112,27 +163,35 @@ class SaleRepository {
       )`);
       params.push(like, like, like, like, like, like);
     }
-    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
-    const limitClause = limit ? `LIMIT ${parseInt(limit, 10)}` : '';
-    return db.prepare(`
+    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+    const limitClause = limit ? `LIMIT ${parseInt(limit, 10)}` : "";
+    return db
+      .prepare(
+        `
       SELECT s.*, l.name AS ledger_name
       FROM sales s
       JOIN ledgers l ON l.id = s.ledger_id
       ${where}
       ORDER BY s.date DESC, s.id DESC
       ${limitClause}
-    `).all(...params);
+    `,
+      )
+      .all(...params);
   }
 
   getByLedger(ledgerId) {
     const db = getDb();
-    const sales = db.prepare(`
+    const sales = db
+      .prepare(
+        `
       SELECT s.*, l.name AS ledger_name
       FROM sales s
       JOIN ledgers l ON l.id = s.ledger_id
       WHERE s.ledger_id = ?
       ORDER BY s.date DESC, s.id DESC
-    `).all(ledgerId);
+    `,
+      )
+      .all(ledgerId);
     const itemStmt = db.prepare(`
       SELECT * FROM sale_items WHERE sale_id = ? ORDER BY sort_order ASC, id ASC
     `);
@@ -154,10 +213,18 @@ class SaleRepository {
     const db = getDb();
     const conds = [];
     const params = [];
-    if (fromDate) { conds.push('s.date >= ?'); params.push(fromDate); }
-    if (toDate)   { conds.push('s.date <= ?'); params.push(toDate); }
-    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
-    return db.prepare(`
+    if (fromDate) {
+      conds.push("s.date >= ?");
+      params.push(fromDate);
+    }
+    if (toDate) {
+      conds.push("s.date <= ?");
+      params.push(toDate);
+    }
+    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+    return db
+      .prepare(
+        `
       WITH item_cost AS (
         SELECT item_id,
                SUM(rate * quantity) / NULLIF(SUM(quantity), 0) AS avg_cost
@@ -183,21 +250,50 @@ class SaleRepository {
       ${where}
       GROUP BY s.id
       ORDER BY s.date DESC, s.id DESC
-    `).all(...params);
+    `,
+      )
+      .all(...params);
   }
 
-  getFoodSalesReport({ fromDate, toDate, category, itemId, waiterName, diningType } = {}) {
+  getFoodSalesReport({
+    fromDate,
+    toDate,
+    category,
+    itemId,
+    waiterName,
+    diningType,
+  } = {}) {
     const db = getDb();
     const conds = [];
     const params = [];
-    if (fromDate)   { conds.push('s.date >= ?'); params.push(fromDate); }
-    if (toDate)     { conds.push('s.date <= ?'); params.push(toDate); }
-    if (category)   { conds.push('LOWER(i.category) = ?'); params.push(String(category).toLowerCase()); }
-    if (itemId)     { conds.push('si.item_id = ?'); params.push(parseInt(itemId)); }
-    if (waiterName) { conds.push('s.waiter_name = ?'); params.push(waiterName); }
-    if (diningType) { conds.push('s.dining_type = ?'); params.push(diningType); }
-    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
-    return db.prepare(`
+    if (fromDate) {
+      conds.push("s.date >= ?");
+      params.push(fromDate);
+    }
+    if (toDate) {
+      conds.push("s.date <= ?");
+      params.push(toDate);
+    }
+    if (category) {
+      conds.push("LOWER(i.category) = ?");
+      params.push(String(category).toLowerCase());
+    }
+    if (itemId) {
+      conds.push("si.item_id = ?");
+      params.push(parseInt(itemId));
+    }
+    if (waiterName) {
+      conds.push("s.waiter_name = ?");
+      params.push(waiterName);
+    }
+    if (diningType) {
+      conds.push("s.dining_type = ?");
+      params.push(diningType);
+    }
+    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+    return db
+      .prepare(
+        `
       SELECT
         si.item_id                              AS item_id,
         si.item_name                            AS item_name,
@@ -216,7 +312,9 @@ class SaleRepository {
       ${where}
       GROUP BY si.item_name, si.item_id
       ORDER BY total_sales DESC, si.item_name ASC
-    `).all(...params);
+    `,
+      )
+      .all(...params);
   }
 
   /**
@@ -226,15 +324,25 @@ class SaleRepository {
    */
   getSalesStats({ today, monthStart } = {}) {
     const db = getDb();
-    const todayRow = db.prepare(`
+    const todayRow = db
+      .prepare(
+        `
       SELECT COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS count
       FROM sales WHERE date = ?
-    `).get(today);
-    const monthRow = db.prepare(`
+    `,
+      )
+      .get(today);
+    const monthRow = db
+      .prepare(
+        `
       SELECT COALESCE(SUM(total_amount), 0) AS total, COUNT(*) AS count
       FROM sales WHERE date >= ? AND date <= ?
-    `).get(monthStart, today);
-    const recent = db.prepare(`
+    `,
+      )
+      .get(monthStart, today);
+    const recent = db
+      .prepare(
+        `
       SELECT s.id, s.sale_number, s.date, s.time, s.total_amount, s.item_count,
              s.service_type, s.waiter_name,
              COALESCE(NULLIF(TRIM(s.customer_name), ''), l.name) AS party_name
@@ -242,7 +350,9 @@ class SaleRepository {
       JOIN ledgers l ON l.id = s.ledger_id
       ORDER BY s.date DESC, s.id DESC
       LIMIT 6
-    `).all();
+    `,
+      )
+      .all();
     return {
       todayTotal: todayRow.total,
       todayCount: todayRow.count,
@@ -258,37 +368,57 @@ class SaleRepository {
    */
   getRestaurantStats({ today, monthStart } = {}) {
     const db = getDb();
-    const byService = db.prepare(`
+    const byService = db
+      .prepare(
+        `
       SELECT service_type,
              COALESCE(SUM(total_amount), 0) AS total,
              COUNT(*) AS count
       FROM sales WHERE date = ?
       GROUP BY service_type
-    `).all(today);
-    let acTotal = 0, acCount = 0, nonAcTotal = 0, nonAcCount = 0;
+    `,
+      )
+      .all(today);
+    let acTotal = 0,
+      acCount = 0,
+      nonAcTotal = 0,
+      nonAcCount = 0;
     for (const row of byService) {
-      if (row.service_type === 'ac') {
-        acTotal += row.total; acCount += row.count;
+      if (row.service_type === "ac") {
+        acTotal += row.total;
+        acCount += row.count;
       } else {
-        nonAcTotal += row.total; nonAcCount += row.count;
+        nonAcTotal += row.total;
+        nonAcCount += row.count;
       }
     }
-    const byDining = db.prepare(`
+    const byDining = db
+      .prepare(
+        `
       SELECT dining_type,
              COALESCE(SUM(total_amount), 0) AS total,
              COUNT(*) AS count
       FROM sales WHERE date = ?
       GROUP BY dining_type
-    `).all(today);
-    let diningTotal = 0, diningCount = 0, takeAwayTotal = 0, takeAwayCount = 0;
+    `,
+      )
+      .all(today);
+    let diningTotal = 0,
+      diningCount = 0,
+      takeAwayTotal = 0,
+      takeAwayCount = 0;
     for (const row of byDining) {
-      if (row.dining_type === 'take_away') {
-        takeAwayTotal += row.total; takeAwayCount += row.count;
+      if (row.dining_type === "take_away") {
+        takeAwayTotal += row.total;
+        takeAwayCount += row.count;
       } else {
-        diningTotal += row.total; diningCount += row.count;
+        diningTotal += row.total;
+        diningCount += row.count;
       }
     }
-    const topWaiters = db.prepare(`
+    const topWaiters = db
+      .prepare(
+        `
       SELECT waiter_name,
              COALESCE(SUM(total_amount), 0) AS total,
              COUNT(*) AS count
@@ -298,56 +428,95 @@ class SaleRepository {
       GROUP BY waiter_name
       ORDER BY total DESC
       LIMIT 5
-    `).all(monthStart, today);
-    return { acTotal, acCount, nonAcTotal, nonAcCount, diningTotal, diningCount, takeAwayTotal, takeAwayCount, topWaiters };
+    `,
+      )
+      .all(monthStart, today);
+    return {
+      acTotal,
+      acCount,
+      nonAcTotal,
+      nonAcCount,
+      diningTotal,
+      diningCount,
+      takeAwayTotal,
+      takeAwayCount,
+      topWaiters,
+    };
   }
 
   delete(id) {
     const db = getDb();
-    return db.prepare('DELETE FROM sales WHERE id = ?').run(id);
+    return db.prepare("DELETE FROM sales WHERE id = ?").run(id);
   }
 
-  update(id, { date, time, total_amount, total_discount, bill_discount, freight_charge, total_gst, item_count, notes, customer_name, customer_mobile, customer_place, customer_id, cash_amount, upi_amount, tendered_amount, waiter_id, waiter_name, service_type, dining_type, items }) {
+  update(
+    id,
+    {
+      date,
+      time,
+      total_amount,
+      total_discount,
+      bill_discount,
+      freight_charge,
+      total_gst,
+      item_count,
+      notes,
+      customer_name,
+      customer_mobile,
+      customer_place,
+      customer_id,
+      cash_amount,
+      upi_amount,
+      tendered_amount,
+      waiter_id,
+      waiter_name,
+      service_type,
+      dining_type,
+      items,
+    },
+  ) {
     const db = getDb();
-    db.prepare(`
+    db.prepare(
+      `
       UPDATE sales
       SET date = ?, time = ?, total_amount = ?, total_discount = ?, bill_discount = ?, freight_charge = ?, total_gst = ?, item_count = ?, notes = ?, customer_name = ?, customer_mobile = ?, customer_place = ?, customer_id = ?, cash_amount = ?, upi_amount = ?, tendered_amount = ?, waiter_id = ?, waiter_name = ?, service_type = ?, dining_type = ?
       WHERE id = ?
-    `).run(
+    `,
+    ).run(
       date,
-      time || '',
+      time || "",
       total_amount,
       total_discount || 0,
       bill_discount || 0,
       freight_charge || 0,
       total_gst || 0,
       item_count || (items ? items.length : 0),
-      notes || '',
-      customer_name || '',
-      customer_mobile || '',
-      customer_place || '',
+      notes || "",
+      customer_name || "",
+      customer_mobile || "",
+      customer_place || "",
       customer_id || null,
       cash_amount || 0,
       upi_amount || 0,
       tendered_amount || 0,
       waiter_id || null,
-      waiter_name || '',
-      service_type || '',
-      dining_type || 'dining',
-      id
+      waiter_name || "",
+      service_type || "",
+      dining_type || "dining",
+      id,
     );
     if (Array.isArray(items)) {
-      db.prepare('DELETE FROM sale_items WHERE sale_id = ?').run(id);
+      db.prepare("DELETE FROM sale_items WHERE sale_id = ?").run(id);
       const stmt = db.prepare(`
-        INSERT INTO sale_items (sale_id, item_id, item_name, unit, mrp, rate, quantity, discount_percent, gst_percent, gst_amount, amount, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO sale_items (sale_id, item_id, item_name, unit, mrp, rate, quantity, discount_percent, gst_percent, gst_amount, amount, batch_no, batch_id, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       items.forEach((line, idx) => {
         stmt.run(
           id,
           line.item_id || null,
           line.item_name,
-          line.unit || 'Nos',
+          line.unit || "Nos",
           parseFloat(line.mrp) || 0,
           parseFloat(line.rate) || 0,
           parseFloat(line.quantity) || 1,
@@ -355,7 +524,9 @@ class SaleRepository {
           parseFloat(line.gst_percent) || 0,
           parseFloat(line.gst_amount) || 0,
           parseFloat(line.amount) || 0,
-          idx
+          (line.batch_no || "").toString().trim(),
+          line.batch_id || null,
+          idx,
         );
       });
     }

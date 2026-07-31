@@ -1,56 +1,84 @@
-const { getDb } = require('../db/database');
-const imeiRepository = require('./imeiRepository');
+const { getDb } = require("../db/database");
+const imeiRepository = require("./imeiRepository");
 
 class PurchaseRepository {
   getNextPurchaseNumber() {
     const db = getDb();
-    const row = db.prepare(`
+    const row = db
+      .prepare(
+        `
       SELECT COALESCE(MAX(CAST(purchase_number AS INTEGER)), 0) + 1 AS next
       FROM purchases
-    `).get();
+    `,
+      )
+      .get();
     return String(row.next);
   }
 
-  create({ purchase_number, ledger_id, bill_number, po_number, date, time, total_amount, total_discount, bill_discount, freight_charge, total_gst, item_count, notes, items }) {
+  create({
+    purchase_number,
+    ledger_id,
+    bill_number,
+    po_number,
+    date,
+    time,
+    total_amount,
+    total_discount,
+    bill_discount,
+    freight_charge,
+    total_gst,
+    item_count,
+    notes,
+    items,
+  }) {
     const db = getDb();
-    const info = db.prepare(`
+    const info = db
+      .prepare(
+        `
       INSERT INTO purchases (purchase_number, ledger_id, bill_number, po_number, date, time, total_amount, total_discount, bill_discount, freight_charge, total_gst, item_count, notes)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      purchase_number,
-      ledger_id,
-      (bill_number || '').toString().trim(),
-      (po_number || '').toString().trim(),
-      date,
-      time || '',
-      total_amount,
-      total_discount || 0,
-      bill_discount || 0,
-      freight_charge || 0,
-      total_gst || 0,
-      item_count || (items ? items.length : 0),
-      notes || ''
-    );
+    `,
+      )
+      .run(
+        purchase_number,
+        ledger_id,
+        (bill_number || "").toString().trim(),
+        (po_number || "").toString().trim(),
+        date,
+        time || "",
+        total_amount,
+        total_discount || 0,
+        bill_discount || 0,
+        freight_charge || 0,
+        total_gst || 0,
+        item_count || (items ? items.length : 0),
+        notes || "",
+      );
     const purchaseId = info.lastInsertRowid;
     if (Array.isArray(items)) {
       const stmt = db.prepare(`
-        INSERT INTO purchase_items (purchase_id, item_id, item_name, unit, mrp, rate, quantity, discount_percent, gst_percent, gst_amount, amount, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO purchase_items (purchase_id, item_id, item_name, unit, mrp, rate, sales_rate, quantity, discount_percent, gst_percent, gst_amount, amount, batch_no, batch_id, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       items.forEach((line, idx) => {
         stmt.run(
           purchaseId,
           line.item_id || null,
           line.item_name,
-          line.unit || 'Nos',
+          line.unit || "Nos",
           parseFloat(line.mrp) || 0,
           parseFloat(line.rate) || 0,
+          line.sales_rate != null && line.sales_rate !== ""
+            ? parseFloat(line.sales_rate)
+            : null,
           parseFloat(line.quantity) || 1,
           parseFloat(line.discount_percent) || 0,
           parseFloat(line.gst_percent) || 0,
           parseFloat(line.gst_amount) || 0,
           parseFloat(line.amount) || 0,
-          idx
+          (line.batch_no || "").toString().trim(),
+          line.batch_id || null,
+          idx,
         );
       });
     }
@@ -59,16 +87,24 @@ class PurchaseRepository {
 
   getById(id) {
     const db = getDb();
-    const purchase = db.prepare(`
+    const purchase = db
+      .prepare(
+        `
       SELECT p.*, l.name AS ledger_name
       FROM purchases p
       JOIN ledgers l ON l.id = p.ledger_id
       WHERE p.id = ?
-    `).get(id);
+    `,
+      )
+      .get(id);
     if (!purchase) return null;
-    purchase.items = db.prepare(`
+    purchase.items = db
+      .prepare(
+        `
       SELECT * FROM purchase_items WHERE purchase_id = ? ORDER BY sort_order ASC, id ASC
-    `).all(id);
+    `,
+      )
+      .all(id);
     // Attach IMEIs (grouped by item) registered by this purchase so the edit
     // screen can re-populate the per-line IMEI inputs.
     const imeiRows = imeiRepository.getByPurchase(id);
@@ -79,7 +115,7 @@ class PurchaseRepository {
     }
     purchase.items = purchase.items.map((line) => ({
       ...line,
-      imeis: line.item_id ? (byItem.get(line.item_id) || []) : [],
+      imeis: line.item_id ? byItem.get(line.item_id) || [] : [],
     }));
     return purchase;
   }
@@ -88,9 +124,18 @@ class PurchaseRepository {
     const db = getDb();
     const conds = [];
     const params = [];
-    if (ledgerId) { conds.push('p.ledger_id = ?'); params.push(ledgerId); }
-    if (fromDate) { conds.push('p.date >= ?');    params.push(fromDate); }
-    if (toDate)   { conds.push('p.date <= ?');    params.push(toDate); }
+    if (ledgerId) {
+      conds.push("p.ledger_id = ?");
+      params.push(ledgerId);
+    }
+    if (fromDate) {
+      conds.push("p.date >= ?");
+      params.push(fromDate);
+    }
+    if (toDate) {
+      conds.push("p.date <= ?");
+      params.push(toDate);
+    }
     if (search && String(search).trim()) {
       const like = `%${String(search).trim()}%`;
       conds.push(`(
@@ -103,27 +148,35 @@ class PurchaseRepository {
       )`);
       params.push(like, like, like, like, like, like);
     }
-    const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
-    const limitClause = limit ? `LIMIT ${parseInt(limit, 10)}` : '';
-    return db.prepare(`
+    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+    const limitClause = limit ? `LIMIT ${parseInt(limit, 10)}` : "";
+    return db
+      .prepare(
+        `
       SELECT p.*, l.name AS ledger_name
       FROM purchases p
       JOIN ledgers l ON l.id = p.ledger_id
       ${where}
       ORDER BY p.date DESC, p.id DESC
       ${limitClause}
-    `).all(...params);
+    `,
+      )
+      .all(...params);
   }
 
   getByLedger(ledgerId) {
     const db = getDb();
-    const purchases = db.prepare(`
+    const purchases = db
+      .prepare(
+        `
       SELECT p.*, l.name AS ledger_name
       FROM purchases p
       JOIN ledgers l ON l.id = p.ledger_id
       WHERE p.ledger_id = ?
       ORDER BY p.date DESC, p.id DESC
-    `).all(ledgerId);
+    `,
+      )
+      .all(ledgerId);
     const itemStmt = db.prepare(`
       SELECT * FROM purchase_items WHERE purchase_id = ? ORDER BY sort_order ASC, id ASC
     `);
@@ -132,51 +185,75 @@ class PurchaseRepository {
 
   delete(id) {
     const db = getDb();
-    return db.prepare('DELETE FROM purchases WHERE id = ?').run(id);
+    return db.prepare("DELETE FROM purchases WHERE id = ?").run(id);
   }
 
-  update(id, { ledger_id, bill_number, po_number, date, time, total_amount, total_discount, bill_discount, freight_charge, total_gst, item_count, notes, items }) {
+  update(
+    id,
+    {
+      ledger_id,
+      bill_number,
+      po_number,
+      date,
+      time,
+      total_amount,
+      total_discount,
+      bill_discount,
+      freight_charge,
+      total_gst,
+      item_count,
+      notes,
+      items,
+    },
+  ) {
     const db = getDb();
-    db.prepare(`
+    db.prepare(
+      `
       UPDATE purchases
       SET ledger_id = ?, bill_number = ?, po_number = ?, date = ?, time = ?, total_amount = ?,
           total_discount = ?, bill_discount = ?, freight_charge = ?, total_gst = ?, item_count = ?, notes = ?
       WHERE id = ?
-    `).run(
+    `,
+    ).run(
       ledger_id,
-      (bill_number || '').toString().trim(),
-      (po_number || '').toString().trim(),
+      (bill_number || "").toString().trim(),
+      (po_number || "").toString().trim(),
       date,
-      time || '',
+      time || "",
       total_amount,
       total_discount || 0,
       bill_discount || 0,
       freight_charge || 0,
       total_gst || 0,
       item_count || (items ? items.length : 0),
-      notes || '',
-      id
+      notes || "",
+      id,
     );
     if (Array.isArray(items)) {
-      db.prepare('DELETE FROM purchase_items WHERE purchase_id = ?').run(id);
+      db.prepare("DELETE FROM purchase_items WHERE purchase_id = ?").run(id);
       const stmt = db.prepare(`
-        INSERT INTO purchase_items (purchase_id, item_id, item_name, unit, mrp, rate, quantity, discount_percent, gst_percent, gst_amount, amount, sort_order)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO purchase_items (purchase_id, item_id, item_name, unit, mrp, rate, sales_rate, quantity, discount_percent, gst_percent, gst_amount, amount, batch_no, batch_id, sort_order)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       items.forEach((line, idx) => {
         stmt.run(
           id,
           line.item_id || null,
           line.item_name,
-          line.unit || 'Nos',
+          line.unit || "Nos",
           parseFloat(line.mrp) || 0,
           parseFloat(line.rate) || 0,
+          line.sales_rate != null && line.sales_rate !== ""
+            ? parseFloat(line.sales_rate)
+            : null,
           parseFloat(line.quantity) || 1,
           parseFloat(line.discount_percent) || 0,
           parseFloat(line.gst_percent) || 0,
           parseFloat(line.gst_amount) || 0,
           parseFloat(line.amount) || 0,
-          idx
+          (line.batch_no || "").toString().trim(),
+          line.batch_id || null,
+          idx,
         );
       });
     }

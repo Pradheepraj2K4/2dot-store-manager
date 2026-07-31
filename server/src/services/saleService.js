@@ -1,16 +1,17 @@
-const saleRepository = require('../repositories/saleRepository');
-const ledgerRepository = require('../repositories/ledgerRepository');
-const itemRepository = require('../repositories/itemRepository');
-const imeiRepository = require('../repositories/imeiRepository');
-const settingsRepository = require('../repositories/settingsRepository');
-const customerService = require('./customerService');
-const { AppError } = require('../middleware/errorHandler');
-const { getDb } = require('../db/database');
+const saleRepository = require("../repositories/saleRepository");
+const ledgerRepository = require("../repositories/ledgerRepository");
+const itemRepository = require("../repositories/itemRepository");
+const itemBatchRepository = require("../repositories/itemBatchRepository");
+const imeiRepository = require("../repositories/imeiRepository");
+const settingsRepository = require("../repositories/settingsRepository");
+const customerService = require("./customerService");
+const { AppError } = require("../middleware/errorHandler");
+const { getDb } = require("../db/database");
 
 /** Restaurant items are made-to-order and carry no inventory. */
 function isRestaurantModuleEnabled() {
-  const v = settingsRepository.get('restaurant_module_enabled');
-  return v === true || v === 'true';
+  const v = settingsRepository.get("restaurant_module_enabled");
+  return v === true || v === "true";
 }
 
 /** Apply +qty per line (use negative sign to reverse). */
@@ -24,11 +25,33 @@ function applyStockDelta(items, sign) {
   }
 }
 
+/** Whether per-batch inventory tracking is enabled. */
+function isBatchEnabled() {
+  const v = settingsRepository.get("purchase_batch_enabled");
+  return v === true || v === "true";
+}
+
+/**
+ * Apply +qty per batch-linked line (use negative sign to reverse). Mirrors
+ * applyStockDelta but targets the specific batch a line drew from, keeping the
+ * per-batch on-hand quantity consistent with the item total. No-op unless the
+ * batch feature is enabled.
+ */
+function applyBatchStockDelta(items, sign) {
+  if (isRestaurantModuleEnabled() || !isBatchEnabled()) return;
+  for (const line of items || []) {
+    if (!line.batch_id) continue;
+    const qty = parseFloat(line.quantity) || 0;
+    if (!qty) continue;
+    itemBatchRepository.adjustStock(line.batch_id, sign * qty);
+  }
+}
+
 /** Mark the IMEIs selected on each sale line as sold and link them to a sale. */
 function consumeImeis(items, saleId) {
   for (const line of items || []) {
     if (!line.item_id || !Array.isArray(line.imeis)) continue;
-    const clean = line.imeis.map((s) => String(s || '').trim()).filter(Boolean);
+    const clean = line.imeis.map((s) => String(s || "").trim()).filter(Boolean);
     if (clean.length === 0) continue;
     imeiRepository.markSold(line.item_id, saleId, clean);
   }
@@ -49,17 +72,17 @@ function consumeImeis(items, saleId) {
  */
 function computeLineAmounts(line) {
   const rate = parseFloat(line.rate) || 0;
-  const qty  = parseFloat(line.quantity) || 1;
+  const qty = parseFloat(line.quantity) || 1;
   const disc = parseFloat(line.discount_percent) || 0;
-  const gst  = parseFloat(line.gst_percent) || 0;
+  const gst = parseFloat(line.gst_percent) || 0;
   const gross = rate * qty * (1 - disc / 100);
-  if (line.rate_tax_mode === 'taxable') {
-    const gst_amount = Math.round(gross * gst / 100 * 100) / 100;
-    const amount     = Math.round((gross + gst_amount) * 100) / 100;
+  if (line.rate_tax_mode === "taxable") {
+    const gst_amount = Math.round(((gross * gst) / 100) * 100) / 100;
+    const amount = Math.round((gross + gst_amount) * 100) / 100;
     return { gst_amount, amount };
   }
   const gst_amount = Math.round((gross - gross / (1 + gst / 100)) * 100) / 100;
-  const amount     = Math.round(gross * 100) / 100;
+  const amount = Math.round(gross * 100) / 100;
   return { gst_amount, amount };
 }
 
@@ -71,15 +94,15 @@ function computeLineAmount(line) {
 function applyLedgerDelta(behaviour, delta) {
   // For customer ledgers: sale increases what customer owes (current_balance + delta).
   // For supplier ledgers: sale (selling TO a supplier) reduces what we owe them.
-  return behaviour === 'customer' ? delta : -delta;
+  return behaviour === "customer" ? delta : -delta;
 }
 
 class SaleService {
   validate(data) {
-    if (!data) throw new AppError('Invalid payload', 400);
-    if (!data.ledger_id) throw new AppError('Customer ledger is required', 400);
+    if (!data) throw new AppError("Invalid payload", 400);
+    if (!data.ledger_id) throw new AppError("Customer ledger is required", 400);
     if (!Array.isArray(data.items) || data.items.length === 0) {
-      throw new AppError('At least one item line is required', 400);
+      throw new AppError("At least one item line is required", 400);
     }
     data.items.forEach((line, idx) => {
       if (!line.item_name || !String(line.item_name).trim()) {
@@ -87,7 +110,10 @@ class SaleService {
       }
       const rate = parseFloat(line.rate);
       if (isNaN(rate) || rate < 0) {
-        throw new AppError(`Row ${idx + 1}: rate must be a non-negative number`, 400);
+        throw new AppError(
+          `Row ${idx + 1}: rate must be a non-negative number`,
+          400,
+        );
       }
     });
   }
@@ -96,8 +122,9 @@ class SaleService {
     this.validate(data);
     const db = getDb();
     const ledger = ledgerRepository.findById(data.ledger_id);
-    if (!ledger) throw new AppError('Ledger not found', 404);
-    if (ledger.status === 'closed') throw new AppError('Cannot record sale on a closed ledger', 400);
+    if (!ledger) throw new AppError("Ledger not found", 404);
+    if (ledger.status === "closed")
+      throw new AppError("Cannot record sale on a closed ledger", 400);
 
     const normalisedItems = data.items.map((line) => {
       const { gst_amount, amount } = computeLineAmounts(line);
@@ -113,7 +140,7 @@ class SaleService {
       };
     });
     const total_amount = normalisedItems.reduce((s, l) => s + l.amount, 0);
-    const total_gst    = normalisedItems.reduce((s, l) => s + l.gst_amount, 0);
+    const total_gst = normalisedItems.reduce((s, l) => s + l.gst_amount, 0);
     const total_discount = normalisedItems.reduce((s, l) => {
       const gross = (parseFloat(l.rate) || 0) * (parseFloat(l.quantity) || 1);
       const taxable = gross * (1 - (parseFloat(l.discount_percent) || 0) / 100);
@@ -122,16 +149,27 @@ class SaleService {
 
     const run = db.transaction(() => {
       const sale_number = saleRepository.getNextSaleNumber();
-      const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
-      const freight_charge_val = Math.round((parseFloat(data.freight_charge) || 0) * 100) / 100;
-      const net_total = Math.round((total_amount - bill_discount_val + freight_charge_val) * 100) / 100;
-      const cash_amount = Math.round((parseFloat(data.cash_amount) || 0) * 100) / 100;
-      const upi_amount = Math.round((parseFloat(data.upi_amount) || 0) * 100) / 100;
+      const bill_discount_val =
+        Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
+      const freight_charge_val =
+        Math.round((parseFloat(data.freight_charge) || 0) * 100) / 100;
+      const net_total =
+        Math.round(
+          (total_amount - bill_discount_val + freight_charge_val) * 100,
+        ) / 100;
+      const cash_amount =
+        Math.round((parseFloat(data.cash_amount) || 0) * 100) / 100;
+      const upi_amount =
+        Math.round((parseFloat(data.upi_amount) || 0) * 100) / 100;
       if (Math.abs(cash_amount + upi_amount - net_total) > 0.01) {
-        throw new AppError('Cash and UPI amounts must add up to the bill total', 400);
+        throw new AppError(
+          "Cash and UPI amounts must add up to the bill total",
+          400,
+        );
       }
       // Physical cash handed over (>= cash portion). 0 = not separately recorded.
-      const tendered_amount = Math.round((parseFloat(data.tendered_amount) || 0) * 100) / 100;
+      const tendered_amount =
+        Math.round((parseFloat(data.tendered_amount) || 0) * 100) / 100;
       // Implicitly retain the buyer: reuse an existing customer (matched by
       // mobile) or auto-create one when a valid mobile is supplied.
       const customer_id = customerService.resolveForSale({
@@ -143,26 +181,26 @@ class SaleService {
       const sale = saleRepository.create({
         sale_number,
         ledger_id: parseInt(data.ledger_id),
-        date: data.date || new Date().toISOString().split('T')[0],
-        time: data.time || '',
+        date: data.date || new Date().toISOString().split("T")[0],
+        time: data.time || "",
         total_amount: net_total,
         total_discount: Math.round(total_discount * 100) / 100,
         bill_discount: bill_discount_val,
         freight_charge: freight_charge_val,
         total_gst: Math.round(total_gst * 100) / 100,
         item_count: normalisedItems.length,
-        notes: data.notes || '',
-        customer_name: data.customer_name || '',
-        customer_mobile: data.customer_mobile || '',
-        customer_place: data.customer_place || '',
+        notes: data.notes || "",
+        customer_name: data.customer_name || "",
+        customer_mobile: data.customer_mobile || "",
+        customer_place: data.customer_place || "",
         customer_id,
         cash_amount,
         upi_amount,
         tendered_amount,
         waiter_id: data.waiter_id ? parseInt(data.waiter_id) : null,
-        waiter_name: data.waiter_name || '',
-        service_type: data.service_type || '',
-        dining_type: data.dining_type || 'dining',
+        waiter_name: data.waiter_name || "",
+        service_type: data.service_type || "",
+        dining_type: data.dining_type || "dining",
         items: normalisedItems,
       });
 
@@ -171,6 +209,8 @@ class SaleService {
 
       // Decrement stock for every linked item line
       applyStockDelta(normalisedItems, -1);
+      // Decrement the per-batch stock for batch-linked lines
+      applyBatchStockDelta(normalisedItems, -1);
       // Mark any selected IMEIs as sold against this sale.
       consumeImeis(normalisedItems, sale.id);
       return sale;
@@ -182,9 +222,9 @@ class SaleService {
     this.validate(data);
     const db = getDb();
     const existing = saleRepository.getById(id);
-    if (!existing) throw new AppError('Sale not found', 404);
+    if (!existing) throw new AppError("Sale not found", 404);
     const ledger = ledgerRepository.findById(existing.ledger_id);
-    if (!ledger) throw new AppError('Ledger not found', 404);
+    if (!ledger) throw new AppError("Ledger not found", 404);
 
     const normalisedItems = data.items.map((line) => {
       const { gst_amount, amount } = computeLineAmounts(line);
@@ -200,7 +240,7 @@ class SaleService {
       };
     });
     const total_amount = normalisedItems.reduce((s, l) => s + l.amount, 0);
-    const total_gst    = normalisedItems.reduce((s, l) => s + l.gst_amount, 0);
+    const total_gst = normalisedItems.reduce((s, l) => s + l.gst_amount, 0);
     const total_discount = normalisedItems.reduce((s, l) => {
       const gross = (parseFloat(l.rate) || 0) * (parseFloat(l.quantity) || 1);
       const taxable = gross * (1 - (parseFloat(l.discount_percent) || 0) / 100);
@@ -209,22 +249,42 @@ class SaleService {
 
     const run = db.transaction(() => {
       // Reverse previous delta, apply new delta
-      const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
-      const freight_charge_val = Math.round((parseFloat(data.freight_charge) || 0) * 100) / 100;
-      const net_total = Math.round((total_amount - bill_discount_val + freight_charge_val) * 100) / 100;
-      const cash_amount = Math.round((parseFloat(data.cash_amount) || 0) * 100) / 100;
-      const upi_amount = Math.round((parseFloat(data.upi_amount) || 0) * 100) / 100;
+      const bill_discount_val =
+        Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
+      const freight_charge_val =
+        Math.round((parseFloat(data.freight_charge) || 0) * 100) / 100;
+      const net_total =
+        Math.round(
+          (total_amount - bill_discount_val + freight_charge_val) * 100,
+        ) / 100;
+      const cash_amount =
+        Math.round((parseFloat(data.cash_amount) || 0) * 100) / 100;
+      const upi_amount =
+        Math.round((parseFloat(data.upi_amount) || 0) * 100) / 100;
       if (Math.abs(cash_amount + upi_amount - net_total) > 0.01) {
-        throw new AppError('Cash and UPI amounts must add up to the bill total', 400);
+        throw new AppError(
+          "Cash and UPI amounts must add up to the bill total",
+          400,
+        );
       }
-      const tendered_amount = Math.round((parseFloat(data.tendered_amount) || 0) * 100) / 100;
-      const oldDelta = applyLedgerDelta(ledger.behaviour, existing.total_amount);
+      const tendered_amount =
+        Math.round((parseFloat(data.tendered_amount) || 0) * 100) / 100;
+      const oldDelta = applyLedgerDelta(
+        ledger.behaviour,
+        existing.total_amount,
+      );
       const newDelta = applyLedgerDelta(ledger.behaviour, net_total);
-      ledgerRepository.updateBalance(ledger.id, ledger.current_balance - oldDelta + newDelta);
+      ledgerRepository.updateBalance(
+        ledger.id,
+        ledger.current_balance - oldDelta + newDelta,
+      );
 
       // Reverse previous stock impact, apply new
       applyStockDelta(existing.items, +1);
       applyStockDelta(normalisedItems, -1);
+      // Reverse previous per-batch stock impact, apply new
+      applyBatchStockDelta(existing.items, +1);
+      applyBatchStockDelta(normalisedItems, -1);
 
       // Restore the IMEIs the previous version of this sale consumed, then
       // mark the newly selected ones as sold.
@@ -245,18 +305,18 @@ class SaleService {
         freight_charge: freight_charge_val,
         total_gst: Math.round(total_gst * 100) / 100,
         item_count: normalisedItems.length,
-        notes: data.notes || '',
-        customer_name: data.customer_name || '',
-        customer_mobile: data.customer_mobile || '',
-        customer_place: data.customer_place || '',
+        notes: data.notes || "",
+        customer_name: data.customer_name || "",
+        customer_mobile: data.customer_mobile || "",
+        customer_place: data.customer_place || "",
         customer_id,
         cash_amount,
         upi_amount,
         tendered_amount,
         waiter_id: data.waiter_id ? parseInt(data.waiter_id) : null,
-        waiter_name: data.waiter_name || '',
-        service_type: data.service_type || '',
-        dining_type: data.dining_type || 'dining',
+        waiter_name: data.waiter_name || "",
+        service_type: data.service_type || "",
+        dining_type: data.dining_type || "dining",
         items: normalisedItems,
       });
       consumeImeis(normalisedItems, id);
@@ -268,15 +328,23 @@ class SaleService {
   delete(id) {
     const db = getDb();
     const existing = saleRepository.getById(id);
-    if (!existing) throw new AppError('Sale not found', 404);
+    if (!existing) throw new AppError("Sale not found", 404);
     const ledger = ledgerRepository.findById(existing.ledger_id);
     const run = db.transaction(() => {
       if (ledger) {
-        const oldDelta = applyLedgerDelta(ledger.behaviour, existing.total_amount);
-        ledgerRepository.updateBalance(ledger.id, ledger.current_balance - oldDelta);
+        const oldDelta = applyLedgerDelta(
+          ledger.behaviour,
+          existing.total_amount,
+        );
+        ledgerRepository.updateBalance(
+          ledger.id,
+          ledger.current_balance - oldDelta,
+        );
       }
       // Restore stock back to inventory
       applyStockDelta(existing.items, +1);
+      // Restore per-batch stock back to inventory
+      applyBatchStockDelta(existing.items, +1);
       // Return any consumed IMEIs to in-stock.
       imeiRepository.restoreBySale(id);
       saleRepository.delete(id);
@@ -286,7 +354,7 @@ class SaleService {
 
   getById(id) {
     const sale = saleRepository.getById(id);
-    if (!sale) throw new AppError('Sale not found', 404);
+    if (!sale) throw new AppError("Sale not found", 404);
     return sale;
   }
 
@@ -316,7 +384,9 @@ class SaleService {
       const saleValue = round2((r.line_amount || 0) - (r.bill_discount || 0));
       const cost = round2(r.cost || 0);
       const profit = round2(saleValue - cost);
-      const margin = saleValue ? Math.round((profit / saleValue) * 1000) / 10 : 0;
+      const margin = saleValue
+        ? Math.round((profit / saleValue) * 1000) / 10
+        : 0;
       return {
         id: r.id,
         sale_number: r.sale_number,
@@ -338,13 +408,27 @@ class SaleService {
    * price, total sales value and total discount per item over a date range,
    * optionally filtered by category and/or a specific item.
    */
-  getFoodSalesReport({ fromDate, toDate, category, itemId, waiterName, diningType } = {}) {
+  getFoodSalesReport({
+    fromDate,
+    toDate,
+    category,
+    itemId,
+    waiterName,
+    diningType,
+  } = {}) {
     const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
-    const rows = saleRepository.getFoodSalesReport({ fromDate, toDate, category, itemId, waiterName, diningType });
+    const rows = saleRepository.getFoodSalesReport({
+      fromDate,
+      toDate,
+      category,
+      itemId,
+      waiterName,
+      diningType,
+    });
     return rows.map((r) => ({
       item_id: r.item_id,
       item_name: r.item_name,
-      category: r.category || '',
+      category: r.category || "",
       qty_sold: round2(r.qty_sold || 0),
       unit_price: round2(r.unit_price || 0),
       total_sales: round2(r.total_sales || 0),

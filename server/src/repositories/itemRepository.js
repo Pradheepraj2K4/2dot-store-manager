@@ -1,4 +1,4 @@
-const { getDb } = require('../db/database');
+const { getDb } = require("../db/database");
 
 class ItemRepository {
   getAll({ search } = {}) {
@@ -18,57 +18,129 @@ class ItemRepository {
         WHERE pi.item_id IS NOT NULL
       ) lp ON lp.item_id = i.id AND lp.rn = 1
     `;
+    // Subqueries: the most-recently created batch per item (for pricing display)
+    // and the number of batches carrying stock (to decide when to prompt for a
+    // batch selection during a sale).
+    const batchJoin = `
+      LEFT JOIN (
+        SELECT b.item_id,
+               b.id            AS latest_batch_id,
+               b.batch_no      AS latest_batch_no,
+               b.mrp           AS latest_batch_mrp,
+               b.rate          AS latest_batch_rate,
+               b.sales_rate    AS latest_batch_sales_rate,
+               b.current_stock AS latest_batch_stock,
+               ROW_NUMBER() OVER (
+                 PARTITION BY b.item_id ORDER BY b.id DESC
+               ) AS brn
+        FROM item_batches b
+      ) lb ON lb.item_id = i.id AND lb.brn = 1
+      LEFT JOIN (
+        SELECT item_id, COUNT(*) AS batch_count
+        FROM item_batches
+        GROUP BY item_id
+      ) bc ON bc.item_id = i.id
+    `;
+    const batchCols = `,
+        lb.latest_batch_id, lb.latest_batch_no, lb.latest_batch_mrp,
+        lb.latest_batch_rate, lb.latest_batch_sales_rate, lb.latest_batch_stock,
+        COALESCE(bc.batch_count, 0) AS batch_count`;
     if (search) {
       const q = `%${search.toLowerCase()}%`;
-      return db.prepare(`
-        SELECT i.*, lp.last_purchase_rate, lp.last_purchase_gst
+      return db
+        .prepare(
+          `
+        SELECT i.*, lp.last_purchase_rate, lp.last_purchase_gst${batchCols}
         FROM items i
         ${lpJoin}
+        ${batchJoin}
         WHERE i.status = 'active'
           AND (LOWER(i.name) LIKE ?
             OR LOWER(i.brand) LIKE ?
             OR LOWER(i.category) LIKE ?
             OR LOWER(i.item_code) LIKE ?)
         ORDER BY i.name ASC
-      `).all(q, q, q, q);
+      `,
+        )
+        .all(q, q, q, q);
     }
-    return db.prepare(`
-      SELECT i.*, lp.last_purchase_rate, lp.last_purchase_gst
+    return db
+      .prepare(
+        `
+      SELECT i.*, lp.last_purchase_rate, lp.last_purchase_gst${batchCols}
       FROM items i
       ${lpJoin}
+      ${batchJoin}
       ORDER BY i.name ASC
-    `).all();
+    `,
+      )
+      .all();
   }
 
   getById(id) {
     const db = getDb();
-    return db.prepare('SELECT * FROM items WHERE id = ?').get(id);
+    return db.prepare("SELECT * FROM items WHERE id = ?").get(id);
   }
 
-  create({ name, unit, mrp, sales_rate, brand, category, gst_percent, item_code, imei_enabled, ac_rate, non_ac_rate }) {
+  create({
+    name,
+    unit,
+    mrp,
+    sales_rate,
+    brand,
+    category,
+    gst_percent,
+    item_code,
+    imei_enabled,
+    ac_rate,
+    non_ac_rate,
+  }) {
     const db = getDb();
-    const info = db.prepare(`
+    const info = db
+      .prepare(
+        `
       INSERT INTO items (name, unit, mrp, sales_rate, brand, category, gst_percent, item_code, imei_enabled, ac_rate, non_ac_rate)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      name.trim(),
-      (unit || 'Nos').trim(),
-      parseFloat(mrp) || 0,
-      sales_rate != null && sales_rate !== '' ? parseFloat(sales_rate) : null,
-      (brand || '').trim(),
-      (category || '').trim(),
-      parseFloat(gst_percent) || 0,
-      (item_code || '').trim(),
-      imei_enabled ? 1 : 0,
-      ac_rate != null && ac_rate !== '' ? parseFloat(ac_rate) : null,
-      non_ac_rate != null && non_ac_rate !== '' ? parseFloat(non_ac_rate) : null
-    );
+    `,
+      )
+      .run(
+        name.trim(),
+        (unit || "Nos").trim(),
+        parseFloat(mrp) || 0,
+        sales_rate != null && sales_rate !== "" ? parseFloat(sales_rate) : null,
+        (brand || "").trim(),
+        (category || "").trim(),
+        parseFloat(gst_percent) || 0,
+        (item_code || "").trim(),
+        imei_enabled ? 1 : 0,
+        ac_rate != null && ac_rate !== "" ? parseFloat(ac_rate) : null,
+        non_ac_rate != null && non_ac_rate !== ""
+          ? parseFloat(non_ac_rate)
+          : null,
+      );
     return this.getById(info.lastInsertRowid);
   }
 
-  update(id, { name, unit, mrp, sales_rate, brand, category, gst_percent, item_code, status, imei_enabled, ac_rate, non_ac_rate }) {
+  update(
+    id,
+    {
+      name,
+      unit,
+      mrp,
+      sales_rate,
+      brand,
+      category,
+      gst_percent,
+      item_code,
+      status,
+      imei_enabled,
+      ac_rate,
+      non_ac_rate,
+    },
+  ) {
     const db = getDb();
-    db.prepare(`
+    db.prepare(
+      `
       UPDATE items
       SET name = ?, unit = ?, mrp = ?, sales_rate = ?, brand = ?, category = ?, gst_percent = ?,
           item_code = ?,
@@ -78,27 +150,30 @@ class ItemRepository {
           status = COALESCE(?, status),
           updated_at = datetime('now', 'localtime')
       WHERE id = ?
-    `).run(
+    `,
+    ).run(
       name.trim(),
-      (unit || 'Nos').trim(),
+      (unit || "Nos").trim(),
       parseFloat(mrp) || 0,
-      sales_rate != null && sales_rate !== '' ? parseFloat(sales_rate) : null,
-      (brand || '').trim(),
-      (category || '').trim(),
+      sales_rate != null && sales_rate !== "" ? parseFloat(sales_rate) : null,
+      (brand || "").trim(),
+      (category || "").trim(),
       parseFloat(gst_percent) || 0,
-      (item_code || '').trim(),
+      (item_code || "").trim(),
       imei_enabled ? 1 : 0,
-      ac_rate != null && ac_rate !== '' ? parseFloat(ac_rate) : null,
-      non_ac_rate != null && non_ac_rate !== '' ? parseFloat(non_ac_rate) : null,
+      ac_rate != null && ac_rate !== "" ? parseFloat(ac_rate) : null,
+      non_ac_rate != null && non_ac_rate !== ""
+        ? parseFloat(non_ac_rate)
+        : null,
       status || null,
-      id
+      id,
     );
     return this.getById(id);
   }
 
   delete(id) {
     const db = getDb();
-    return db.prepare('DELETE FROM items WHERE id = ?').run(id);
+    return db.prepare("DELETE FROM items WHERE id = ?").run(id);
   }
 
   /**
@@ -111,12 +186,14 @@ class ItemRepository {
     const qty = parseFloat(delta);
     if (!qty || isNaN(qty)) return;
     const db = getDb();
-    db.prepare(`
+    db.prepare(
+      `
       UPDATE items
       SET current_stock = current_stock + ?,
           updated_at    = datetime('now', 'localtime')
       WHERE id = ?
-    `).run(qty, itemId);
+    `,
+    ).run(qty, itemId);
   }
 
   /**
@@ -145,18 +222,28 @@ class ItemRepository {
   // Distinct brand/category lists for datalist suggestions
   getDistinctBrands() {
     const db = getDb();
-    return db.prepare(`
+    return db
+      .prepare(
+        `
       SELECT DISTINCT brand FROM items
       WHERE brand <> '' ORDER BY brand ASC
-    `).all().map((r) => r.brand);
+    `,
+      )
+      .all()
+      .map((r) => r.brand);
   }
 
   getDistinctCategories() {
     const db = getDb();
-    return db.prepare(`
+    return db
+      .prepare(
+        `
       SELECT DISTINCT category FROM items
       WHERE category <> '' ORDER BY category ASC
-    `).all().map((r) => r.category);
+    `,
+      )
+      .all()
+      .map((r) => r.category);
   }
 
   /**
@@ -176,13 +263,21 @@ class ItemRepository {
                 OR LOWER(i.item_code) LIKE ?)`);
       params.push(q, q, q, q);
     }
-    if (brand)    { conds.push('i.brand = ?');    params.push(brand); }
-    if (category) { conds.push('i.category = ?'); params.push(category); }
-    if (lowStockOnly) conds.push('i.current_stock <= 0');
+    if (brand) {
+      conds.push("i.brand = ?");
+      params.push(brand);
+    }
+    if (category) {
+      conds.push("i.category = ?");
+      params.push(category);
+    }
+    if (lowStockOnly) conds.push("i.current_stock <= 0");
 
-    const where = `WHERE ${conds.join(' AND ')}`;
+    const where = `WHERE ${conds.join(" AND ")}`;
 
-    return db.prepare(`
+    return db
+      .prepare(
+        `
       SELECT
         i.id,
         i.item_code,
@@ -226,7 +321,9 @@ class ItemRepository {
       ) ic ON ic.item_id = i.id
       ${where}
       ORDER BY i.name ASC
-    `).all(...params);
+    `,
+      )
+      .all(...params);
   }
 }
 

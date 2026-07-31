@@ -1,9 +1,11 @@
-const purchaseRepository = require('../repositories/purchaseRepository');
-const ledgerRepository = require('../repositories/ledgerRepository');
-const itemRepository = require('../repositories/itemRepository');
-const imeiRepository = require('../repositories/imeiRepository');
-const { AppError } = require('../middleware/errorHandler');
-const { getDb } = require('../db/database');
+const purchaseRepository = require("../repositories/purchaseRepository");
+const ledgerRepository = require("../repositories/ledgerRepository");
+const itemRepository = require("../repositories/itemRepository");
+const itemBatchRepository = require("../repositories/itemBatchRepository");
+const imeiRepository = require("../repositories/imeiRepository");
+const settingsRepository = require("../repositories/settingsRepository");
+const { AppError } = require("../middleware/errorHandler");
+const { getDb } = require("../db/database");
 
 /**
  * Purchase service.
@@ -16,14 +18,14 @@ const { getDb } = require('../db/database');
  */
 function computeLineAmounts(line) {
   const rate = parseFloat(line.rate) || 0;
-  const qty  = parseFloat(line.quantity) || 1;
+  const qty = parseFloat(line.quantity) || 1;
   const disc = parseFloat(line.discount_percent) || 0;
-  const gst  = parseFloat(line.gst_percent) || 0;
+  const gst = parseFloat(line.gst_percent) || 0;
   // GST inclusive: rate already contains tax. The line amount is the gross
   // (discounted) value and the GST portion is extracted from it.
-  const gross      = rate * qty * (1 - disc / 100);
+  const gross = rate * qty * (1 - disc / 100);
   const gst_amount = Math.round((gross - gross / (1 + gst / 100)) * 100) / 100;
-  const amount     = Math.round(gross * 100) / 100;
+  const amount = Math.round(gross * 100) / 100;
   return { gst_amount, amount };
 }
 
@@ -40,15 +42,75 @@ function applyStockDelta(items, sign) {
 function registerImeis(items, purchaseId) {
   for (const line of items || []) {
     if (!line.item_id || !Array.isArray(line.imeis)) continue;
-    const clean = line.imeis.map((s) => String(s || '').trim()).filter(Boolean);
+    const clean = line.imeis.map((s) => String(s || "").trim()).filter(Boolean);
     if (clean.length === 0) continue;
     imeiRepository.addForPurchase(line.item_id, purchaseId, clean);
   }
 }
 
+/** Whether per-batch inventory tracking is enabled for purchases. */
+function isBatchEnabled() {
+  const v = settingsRepository.get("purchase_batch_enabled");
+  return v === true || v === "true";
+}
+
+/**
+ * Resolve a batch for every linked purchase line, mutating each line with the
+ * final `batch_no`/`batch_id`, then stock that batch up by the line quantity.
+ *
+ * A line that already carries a batch number reuses it (find-or-create by
+ * item + batch_no); an empty batch number is auto-generated using the
+ * configured prefix. This makes the manual/auto UI modes converge on the same
+ * server logic and keeps edits idempotent (the saved batch_no round-trips).
+ * No-op when the batch feature is disabled.
+ */
+function resolveBatches(items) {
+  if (!isBatchEnabled()) return;
+  const prefix = settingsRepository.get("purchase_batch_prefix") || "";
+  for (const line of items || []) {
+    if (!line.item_id) continue;
+    const qty = parseFloat(line.quantity) || 0;
+    let batchNo = (line.batch_no || "").toString().trim();
+    if (!batchNo) batchNo = itemBatchRepository.getNextAutoNumber(prefix);
+    let batch = itemBatchRepository.findByItemAndNo(line.item_id, batchNo);
+    const meta = {
+      mrp: line.mrp,
+      rate: line.rate,
+      sales_rate:
+        line.sales_rate != null && line.sales_rate !== ""
+          ? line.sales_rate
+          : null,
+      gst_percent: line.gst_percent,
+    };
+    if (!batch) {
+      batch = itemBatchRepository.create({
+        item_id: line.item_id,
+        batch_no: batchNo,
+        ...meta,
+        current_stock: 0,
+      });
+    } else {
+      itemBatchRepository.updateMeta(batch.id, meta);
+    }
+    if (qty) itemBatchRepository.adjustStock(batch.id, +qty);
+    line.batch_no = batchNo;
+    line.batch_id = batch.id;
+  }
+}
+
+/** Reverse the batch stock movements introduced by previously-saved lines. */
+function reverseBatches(items) {
+  if (!isBatchEnabled()) return;
+  for (const line of items || []) {
+    if (!line.batch_id) continue;
+    const qty = parseFloat(line.quantity) || 0;
+    if (qty) itemBatchRepository.adjustStock(line.batch_id, -qty);
+  }
+}
+
 /** The CASH ledger never carries a running balance. */
 function isCashLedger(ledger) {
-  return ledger && ledger.name === 'CASH';
+  return ledger && ledger.name === "CASH";
 }
 
 /**
@@ -57,15 +119,15 @@ function isCashLedger(ledger) {
  *   customer ledger — purchase reduces what they owe us (-delta)
  */
 function applyLedgerDelta(behaviour, delta) {
-  return behaviour === 'customer' ? -delta : delta;
+  return behaviour === "customer" ? -delta : delta;
 }
 
 class PurchaseService {
   validate(data) {
-    if (!data) throw new AppError('Invalid payload', 400);
-    if (!data.ledger_id) throw new AppError('Ledger is required', 400);
+    if (!data) throw new AppError("Invalid payload", 400);
+    if (!data.ledger_id) throw new AppError("Ledger is required", 400);
     if (!Array.isArray(data.items) || data.items.length === 0) {
-      throw new AppError('At least one item line is required', 400);
+      throw new AppError("At least one item line is required", 400);
     }
     data.items.forEach((line, idx) => {
       if (!line.item_name || !String(line.item_name).trim()) {
@@ -73,11 +135,17 @@ class PurchaseService {
       }
       const rate = parseFloat(line.rate);
       if (isNaN(rate) || rate < 0) {
-        throw new AppError(`Row ${idx + 1}: rate must be a non-negative number`, 400);
+        throw new AppError(
+          `Row ${idx + 1}: rate must be a non-negative number`,
+          400,
+        );
       }
       const qty = parseFloat(line.quantity);
       if (isNaN(qty) || qty <= 0) {
-        throw new AppError(`Row ${idx + 1}: quantity must be greater than zero`, 400);
+        throw new AppError(
+          `Row ${idx + 1}: quantity must be greater than zero`,
+          400,
+        );
       }
     });
   }
@@ -90,6 +158,10 @@ class PurchaseService {
         quantity: parseFloat(line.quantity) || 1,
         rate: parseFloat(line.rate) || 0,
         mrp: parseFloat(line.mrp) || 0,
+        sales_rate:
+          line.sales_rate != null && line.sales_rate !== ""
+            ? parseFloat(line.sales_rate)
+            : null,
         discount_percent: parseFloat(line.discount_percent) || 0,
         gst_percent: parseFloat(line.gst_percent) || 0,
         gst_amount,
@@ -100,7 +172,7 @@ class PurchaseService {
 
   _totals(items) {
     const total_amount = items.reduce((s, l) => s + l.amount, 0);
-    const total_gst    = items.reduce((s, l) => s + l.gst_amount, 0);
+    const total_gst = items.reduce((s, l) => s + l.gst_amount, 0);
     const total_discount = items.reduce((s, l) => {
       const gross = (parseFloat(l.rate) || 0) * (parseFloat(l.quantity) || 1);
       const taxable = gross * (1 - (parseFloat(l.discount_percent) || 0) / 100);
@@ -117,36 +189,49 @@ class PurchaseService {
     this.validate(data);
     const db = getDb();
     const ledger = ledgerRepository.findById(data.ledger_id);
-    if (!ledger) throw new AppError('Ledger not found', 404);
-    if (ledger.status === 'closed') throw new AppError('Cannot record purchase on a closed ledger', 400);
+    if (!ledger) throw new AppError("Ledger not found", 404);
+    if (ledger.status === "closed")
+      throw new AppError("Cannot record purchase on a closed ledger", 400);
 
     const normalisedItems = this._normalise(data.items);
     const totals = this._totals(normalisedItems);
 
     const run = db.transaction(() => {
       const purchase_number = purchaseRepository.getNextPurchaseNumber();
-      const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
-      const freight_charge_val = Math.round((parseFloat(data.freight_charge) || 0) * 100) / 100;
+      const bill_discount_val =
+        Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
+      const freight_charge_val =
+        Math.round((parseFloat(data.freight_charge) || 0) * 100) / 100;
+      // Resolve/stock the per-line batches first so the linked batch_id is
+      // persisted onto the purchase_items rows.
+      resolveBatches(normalisedItems);
       const purchase = purchaseRepository.create({
         purchase_number,
         ledger_id: parseInt(data.ledger_id),
-        bill_number: data.bill_number || '',
-        po_number: data.po_number || '',
-        date: data.date || new Date().toISOString().split('T')[0],
-        time: data.time || '',
+        bill_number: data.bill_number || "",
+        po_number: data.po_number || "",
+        date: data.date || new Date().toISOString().split("T")[0],
+        time: data.time || "",
         ...totals,
-        total_amount: Math.round((totals.total_amount - bill_discount_val + freight_charge_val) * 100) / 100,
+        total_amount:
+          Math.round(
+            (totals.total_amount - bill_discount_val + freight_charge_val) *
+              100,
+          ) / 100,
         bill_discount: bill_discount_val,
         freight_charge: freight_charge_val,
         item_count: normalisedItems.length,
-        notes: data.notes || '',
+        notes: data.notes || "",
         items: normalisedItems,
       });
 
       // Credit the supplier ledger (skip CASH — settled immediately)
       if (!isCashLedger(ledger)) {
         const delta = applyLedgerDelta(ledger.behaviour, purchase.total_amount);
-        ledgerRepository.updateBalance(ledger.id, ledger.current_balance + delta);
+        ledgerRepository.updateBalance(
+          ledger.id,
+          ledger.current_balance + delta,
+        );
       }
 
       // Stock-in: every linked item's stock goes up
@@ -162,22 +247,33 @@ class PurchaseService {
     this.validate(data);
     const db = getDb();
     const existing = purchaseRepository.getById(id);
-    if (!existing) throw new AppError('Purchase not found', 404);
+    if (!existing) throw new AppError("Purchase not found", 404);
 
-    const ledger = ledgerRepository.findById(data.ledger_id || existing.ledger_id);
-    if (!ledger) throw new AppError('Ledger not found', 404);
+    const ledger = ledgerRepository.findById(
+      data.ledger_id || existing.ledger_id,
+    );
+    if (!ledger) throw new AppError("Ledger not found", 404);
 
     const normalisedItems = this._normalise(data.items);
     const totals = this._totals(normalisedItems);
 
-    const bill_discount_val = Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
-    const freight_charge_val = Math.round((parseFloat(data.freight_charge) || 0) * 100) / 100;
-    const net_total = Math.round((totals.total_amount - bill_discount_val + freight_charge_val) * 100) / 100;
+    const bill_discount_val =
+      Math.round((parseFloat(data.bill_discount) || 0) * 100) / 100;
+    const freight_charge_val =
+      Math.round((parseFloat(data.freight_charge) || 0) * 100) / 100;
+    const net_total =
+      Math.round(
+        (totals.total_amount - bill_discount_val + freight_charge_val) * 100,
+      ) / 100;
 
     const run = db.transaction(() => {
       // Reverse the prior stock-in, then apply the new one
       applyStockDelta(existing.items, -1);
       applyStockDelta(normalisedItems, +1);
+
+      // Reverse the prior per-batch stock, then resolve/stock the new batches.
+      reverseBatches(existing.items);
+      resolveBatches(normalisedItems);
 
       // Reverse the prior in-stock IMEIs from this purchase, then re-register
       // from the edited payload. Already-sold IMEIs are preserved.
@@ -187,19 +283,28 @@ class PurchaseService {
       // The old purchase may have used a different ledger, so reverse on that.
       const oldLedger = ledgerRepository.findById(existing.ledger_id);
       if (oldLedger && !isCashLedger(oldLedger)) {
-        const oldDelta = applyLedgerDelta(oldLedger.behaviour, existing.total_amount);
-        ledgerRepository.updateBalance(oldLedger.id, oldLedger.current_balance - oldDelta);
+        const oldDelta = applyLedgerDelta(
+          oldLedger.behaviour,
+          existing.total_amount,
+        );
+        ledgerRepository.updateBalance(
+          oldLedger.id,
+          oldLedger.current_balance - oldDelta,
+        );
       }
       if (!isCashLedger(ledger)) {
         const fresh = ledgerRepository.findById(ledger.id);
         const newDelta = applyLedgerDelta(fresh.behaviour, net_total);
-        ledgerRepository.updateBalance(fresh.id, fresh.current_balance + newDelta);
+        ledgerRepository.updateBalance(
+          fresh.id,
+          fresh.current_balance + newDelta,
+        );
       }
 
       const updated = purchaseRepository.update(id, {
         ledger_id: ledger.id,
-        bill_number: data.bill_number || '',
-        po_number: data.po_number || '',
+        bill_number: data.bill_number || "",
+        po_number: data.po_number || "",
         date: data.date || existing.date,
         time: data.time != null ? data.time : existing.time,
         ...totals,
@@ -207,7 +312,7 @@ class PurchaseService {
         bill_discount: bill_discount_val,
         freight_charge: freight_charge_val,
         item_count: normalisedItems.length,
-        notes: data.notes || '',
+        notes: data.notes || "",
         items: normalisedItems,
       });
       // Re-register IMEIs from the edited payload against this purchase.
@@ -220,16 +325,24 @@ class PurchaseService {
   delete(id) {
     const db = getDb();
     const existing = purchaseRepository.getById(id);
-    if (!existing) throw new AppError('Purchase not found', 404);
+    if (!existing) throw new AppError("Purchase not found", 404);
     const ledger = ledgerRepository.findById(existing.ledger_id);
     const run = db.transaction(() => {
       // Reverse the ledger movement introduced by this purchase (skip CASH)
       if (ledger && !isCashLedger(ledger)) {
-        const oldDelta = applyLedgerDelta(ledger.behaviour, existing.total_amount);
-        ledgerRepository.updateBalance(ledger.id, ledger.current_balance - oldDelta);
+        const oldDelta = applyLedgerDelta(
+          ledger.behaviour,
+          existing.total_amount,
+        );
+        ledgerRepository.updateBalance(
+          ledger.id,
+          ledger.current_balance - oldDelta,
+        );
       }
       // Reverse the stock-in introduced by this purchase
       applyStockDelta(existing.items, -1);
+      // Reverse the per-batch stock introduced by this purchase
+      reverseBatches(existing.items);
       // Drop the in-stock IMEIs this purchase introduced (sold ones remain).
       imeiRepository.removeInStockByPurchase(id);
       purchaseRepository.delete(id);
@@ -239,7 +352,7 @@ class PurchaseService {
 
   getById(id) {
     const purchase = purchaseRepository.getById(id);
-    if (!purchase) throw new AppError('Purchase not found', 404);
+    if (!purchase) throw new AppError("Purchase not found", 404);
     return purchase;
   }
 

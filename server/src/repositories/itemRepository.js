@@ -29,6 +29,7 @@ class ItemRepository {
                b.mrp           AS latest_batch_mrp,
                b.rate          AS latest_batch_rate,
                b.sales_rate    AS latest_batch_sales_rate,
+               b.freight_rate  AS latest_batch_freight_rate,
                b.current_stock AS latest_batch_stock,
                ROW_NUMBER() OVER (
                  PARTITION BY b.item_id ORDER BY b.id DESC
@@ -36,15 +37,17 @@ class ItemRepository {
         FROM item_batches b
       ) lb ON lb.item_id = i.id AND lb.brn = 1
       LEFT JOIN (
-        SELECT item_id, COUNT(*) AS batch_count
+        SELECT item_id, COUNT(*) AS batch_count,
+               GROUP_CONCAT(batch_no) AS batch_numbers
         FROM item_batches
         GROUP BY item_id
       ) bc ON bc.item_id = i.id
     `;
     const batchCols = `,
         lb.latest_batch_id, lb.latest_batch_no, lb.latest_batch_mrp,
-        lb.latest_batch_rate, lb.latest_batch_sales_rate, lb.latest_batch_stock,
-        COALESCE(bc.batch_count, 0) AS batch_count`;
+        lb.latest_batch_rate, lb.latest_batch_sales_rate,
+        lb.latest_batch_freight_rate, lb.latest_batch_stock,
+        COALESCE(bc.batch_count, 0) AS batch_count, bc.batch_numbers`;
     if (search) {
       const q = `%${search.toLowerCase()}%`;
       return db

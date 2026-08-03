@@ -9,7 +9,7 @@ import {
   TrashIcon,
 } from "@heroicons/react/24/outline";
 import { itemApi, saleApi, settingsApi, ledgerApi, waiterApi } from "../../api";
-import { ITEM_UNITS, DEFAULT_ITEM_UNIT } from "../../utils/itemConstants";
+import { DEFAULT_ITEM_UNIT } from "../../utils/itemConstants";
 import { formatCurrency, todayISO } from "../../utils/helpers";
 import { hasPermission } from "../../utils/auth";
 import { buildSaleReceiptHtml } from "../../utils/saleReceipt";
@@ -19,7 +19,7 @@ import CustomerAutocomplete from "../ui/CustomerAutocomplete";
 import LoadingSpinner from "../ui/LoadingSpinner";
 import Modal from "../ui/Modal";
 
-const FIELD_ORDER = ["itemName", "unit", "rate", "qty", "discount"];
+const FIELD_ORDER = ["itemName", "rate", "qty", "discount"];
 
 // localStorage key for the in-progress (new) sale entry, so partially filled
 // data survives navigating to another menu and back.
@@ -173,10 +173,27 @@ function ItemNameCell({
           it.name.toLowerCase().includes(q) ||
           (it.item_code || "").toLowerCase().includes(q) ||
           (it.brand || "").toLowerCase().includes(q) ||
-          (it.category || "").toLowerCase().includes(q),
+          (it.category || "").toLowerCase().includes(q) ||
+          (it.batch_numbers || "").toLowerCase().includes(q),
       )
       .slice(0, 20);
   }, [items, value]);
+
+  // When the query looks like a batch number, return the specific batch on this
+  // item that matches so selecting it can jump straight to that batch.
+  const matchedBatchNo = (it) => {
+    const q = (value || "").trim().toLowerCase();
+    if (!q || !it || !it.batch_numbers) return null;
+    const nums = String(it.batch_numbers)
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return (
+      nums.find((n) => n.toLowerCase() === q) ||
+      nums.find((n) => n.toLowerCase().includes(q)) ||
+      null
+    );
+  };
 
   useEffect(() => {
     setHighlight(-1);
@@ -192,23 +209,33 @@ function ItemNameCell({
       setHighlight((h) => (h <= 0 ? filtered.length - 1 : h - 1));
     } else if (e.key === "Enter") {
       e.preventDefault();
+      const typed = (value || "").trim();
       let chosen = null;
       if (open && highlight >= 0 && filtered[highlight]) {
         chosen = filtered[highlight];
-      } else {
+      } else if (typed) {
         // No row explicitly highlighted: resolve what the user typed. Prefer an
-        // exact item-code match, then an exact name match, else the top result
-        // so typing a code and hitting Enter selects the item and moves on.
-        const q = (value || "").trim().toLowerCase();
-        if (q) {
-          chosen =
-            filtered.find((it) => (it.item_code || "").toLowerCase() === q) ||
-            filtered.find((it) => it.name.toLowerCase() === q) ||
-            filtered[0] ||
-            null;
-        }
+        // exact item-code match, then an exact name match, then a batch-number
+        // match, else the top result so typing a code/batch and hitting Enter
+        // selects the item and moves on.
+        const q = typed.toLowerCase();
+        chosen =
+          filtered.find((it) => (it.item_code || "").toLowerCase() === q) ||
+          filtered.find((it) => it.name.toLowerCase() === q) ||
+          filtered.find((it) => matchedBatchNo(it)) ||
+          filtered[0] ||
+          null;
       }
-      if (chosen) onSelect(chosen);
+      if (typed && !chosen) {
+        // Typed text matches no existing item — keep focus here and force the
+        // operator to pick a real item or create one before advancing.
+        setOpen(true);
+        toast.error(
+          `"${typed}" is not a saved item. Select one from the list or create it.`,
+        );
+        return;
+      }
+      if (chosen) onSelect(chosen, matchedBatchNo(chosen));
       setOpen(false);
       onKeyEnter();
     } else if (e.key === "ArrowLeft" && !value) {
@@ -269,7 +296,7 @@ function ItemNameCell({
                 key={it.id}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => {
-                  onSelect(it);
+                  onSelect(it, matchedBatchNo(it));
                   setOpen(false);
                 }}
                 className={`w-full px-3 py-2 text-left text-sm border-b border-slate-100 last:border-0 hover:bg-trust-blue/20 ${
@@ -294,9 +321,11 @@ function ItemNameCell({
                           : it.mrp,
                       )}
                       <span className="ml-1 rounded bg-emerald-50 px-1 py-0.5 text-[10px] font-medium text-emerald-700">
-                        {Number(it.batch_count) > 1
-                          ? `${it.batch_count} batches`
-                          : `Batch ${it.latest_batch_no}`}
+                        {matchedBatchNo(it)
+                          ? `Batch ${matchedBatchNo(it)}`
+                          : Number(it.batch_count) > 1
+                            ? `${it.batch_count} batches`
+                            : `Batch ${it.latest_batch_no}`}
                       </span>
                     </span>
                   ) : (
@@ -1485,6 +1514,9 @@ export default function ItemSalesEntryPage() {
       non_ac_rate: item.non_ac_rate != null ? item.non_ac_rate : null,
       batch_id: batch ? batch.id : null,
       batch_no: batch ? batch.batch_no : "",
+      // Landed cost of the chosen batch: purchase rate + its freight share.
+      cost_rate: batch ? parseFloat(batch.rate) || 0 : null,
+      freight_rate: batch ? parseFloat(batch.freight_rate) || 0 : 0,
     };
   };
 
@@ -1498,14 +1530,15 @@ export default function ItemSalesEntryPage() {
     }
   };
 
-  const handleSelectItem = (idx, item) => {
+  const handleSelectItem = (idx, item, preferredBatchNo) => {
     const stock = Number(item.current_stock ?? 0);
     if (stockEnforced && stock <= 0) {
       toast.error(`"${item.name}" is out of stock`);
       return;
     }
     // Batch tracking: draw stock from a specific batch. A single batch is
-    // applied directly; multiple batches prompt the operator to choose one.
+    // applied directly; multiple batches prompt the operator to choose one,
+    // unless the search already resolved a specific batch number.
     if (batchEnabled && Number(item.batch_count || 0) > 0) {
       if (Number(item.batch_count) === 1) {
         applyLine(idx, item, {
@@ -1514,15 +1547,28 @@ export default function ItemSalesEntryPage() {
           mrp: item.latest_batch_mrp,
           rate: item.latest_batch_rate,
           sales_rate: item.latest_batch_sales_rate,
+          freight_rate: item.latest_batch_freight_rate,
           gst_percent: item.gst_percent,
           current_stock: item.latest_batch_stock,
         });
       } else {
         itemApi
           .getBatches(item.id)
-          .then((res) =>
-            setBatchModal({ rowIdx: idx, item, batches: res.data || [] }),
-          )
+          .then((res) => {
+            const batches = res.data || [];
+            const preset =
+              preferredBatchNo &&
+              batches.find(
+                (b) =>
+                  String(b.batch_no).toLowerCase() ===
+                  String(preferredBatchNo).toLowerCase(),
+              );
+            if (preset) {
+              applyLine(idx, item, preset);
+            } else {
+              setBatchModal({ rowIdx: idx, item, batches });
+            }
+          })
           .catch((err) => toast.error(err.message));
       }
       return;
@@ -1725,12 +1771,24 @@ export default function ItemSalesEntryPage() {
     if (!item) return null;
     const stock = Number(item.current_stock ?? line.current_stock ?? 0);
     let cost = null;
-    if (item.last_purchase_rate != null) {
+    if (line.batch_id && line.cost_rate != null) {
+      // Batch line: landed cost = (purchase rate + freight share) incl GST.
+      const gst = parseFloat(line.gst_percent) || 0;
+      const base = parseFloat(line.cost_rate) || 0;
+      const freight = parseFloat(line.freight_rate) || 0;
+      cost = {
+        costRate: (base + freight) * (1 + gst / 100),
+        gst,
+        baseRate: base,
+        freight,
+      };
+    } else if (item.last_purchase_rate != null) {
       const gst = item.last_purchase_gst || 0;
       cost = {
         costRate: item.last_purchase_rate * (1 + gst / 100),
         gst,
         baseRate: item.last_purchase_rate,
+        freight: 0,
       };
     }
     return {
@@ -1758,6 +1816,14 @@ export default function ItemSalesEntryPage() {
     const validLines = lines.filter((l) => l.item_name && l.item_name.trim());
     if (validLines.length === 0) {
       toast.error("Add at least one item line");
+      return;
+    }
+
+    const unresolved = validLines.find((l) => !l.item_id);
+    if (unresolved) {
+      toast.error(
+        `"${unresolved.item_name.trim()}" is not a saved item. Select it from the list or create it first.`,
+      );
       return;
     }
 
@@ -2210,6 +2276,11 @@ export default function ItemSalesEntryPage() {
                 <th className="px-3 py-2 text-left font-semibold text-white min-w-[18rem]">
                   Item Name
                 </th>
+                {batchEnabled && (
+                  <th className="px-3 py-2 text-left font-semibold text-white w-32 whitespace-nowrap">
+                    Batch No.
+                  </th>
+                )}
                 <th className="px-3 py-2 text-left font-semibold text-white w-28">
                   Unit
                 </th>
@@ -2263,7 +2334,9 @@ export default function ItemSalesEntryPage() {
                           imeis: [],
                         })
                       }
-                      onSelect={(it) => handleSelectItem(idx, it)}
+                      onSelect={(it, batchNo) =>
+                        handleSelectItem(idx, it, batchNo)
+                      }
                       registerRef={(ref) => setCellRef(idx, "itemName", ref)}
                       onKeyEnter={() => handleCellEnter(idx, "itemName")}
                       onKeyBack={() => handleCellBack(idx, "itemName")}
@@ -2271,27 +2344,19 @@ export default function ItemSalesEntryPage() {
                       hideStock={restaurantEnabled}
                     />
                   </td>
-                  <td className="px-3 py-2">
-                    <select
-                      ref={(el) => setCellRef(idx, "unit", { current: el })}
-                      value={line.unit}
-                      onChange={(e) =>
-                        updateLine(idx, { unit: e.target.value })
-                      }
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleCellEnter(idx, "unit");
-                        }
-                      }}
-                      className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
-                    >
-                      {ITEM_UNITS.map((u) => (
-                        <option key={u} value={u}>
-                          {u}
-                        </option>
-                      ))}
-                    </select>
+                  {batchEnabled && (
+                    <td className="px-3 py-2">
+                      {line.batch_no ? (
+                        <span className="inline-block rounded bg-slate-100 px-2 py-0.5 font-mono text-xs text-slate-700">
+                          {line.batch_no}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">—</span>
+                      )}
+                    </td>
+                  )}
+                  <td className="px-3 py-2 text-sm text-slate-700">
+                    {line.unit}
                   </td>
                   <td className="px-3 py-2 text-right text-slate-700">
                     {formatCurrency(line.mrp || 0)}
@@ -2751,10 +2816,20 @@ export default function ItemSalesEntryPage() {
                     <span className="font-bold text-slate-700">
                       {formatCurrency(focusedItemInfo.cost.costRate)}
                     </span>
-                    {focusedItemInfo.cost.gst > 0 && (
+                    {(focusedItemInfo.cost.gst > 0 ||
+                      focusedItemInfo.cost.freight > 0) && (
                       <span className="text-slate-400">
-                        ({formatCurrency(focusedItemInfo.cost.baseRate)} +{" "}
-                        {focusedItemInfo.cost.gst}% GST)
+                        ({formatCurrency(focusedItemInfo.cost.baseRate)}
+                        {focusedItemInfo.cost.freight > 0 && (
+                          <>
+                            {" + "}
+                            {formatCurrency(focusedItemInfo.cost.freight)} freight
+                          </>
+                        )}
+                        {focusedItemInfo.cost.gst > 0 && (
+                          <> + {focusedItemInfo.cost.gst}% GST</>
+                        )}
+                        )
                       </span>
                     )}
                   </span>

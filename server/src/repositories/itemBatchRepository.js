@@ -41,6 +41,7 @@ class ItemBatchRepository {
     rate,
     sales_rate,
     gst_percent,
+    freight_rate,
     current_stock,
     purchase_id,
   }) {
@@ -48,8 +49,8 @@ class ItemBatchRepository {
     const info = db
       .prepare(
         `
-      INSERT INTO item_batches (item_id, batch_no, mrp, rate, sales_rate, gst_percent, current_stock, purchase_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO item_batches (item_id, batch_no, mrp, rate, sales_rate, gst_percent, freight_rate, current_stock, purchase_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       )
       .run(
@@ -59,6 +60,7 @@ class ItemBatchRepository {
         parseFloat(rate) || 0,
         sales_rate != null && sales_rate !== "" ? parseFloat(sales_rate) : null,
         parseFloat(gst_percent) || 0,
+        parseFloat(freight_rate) || 0,
         parseFloat(current_stock) || 0,
         purchase_id || null,
       );
@@ -66,12 +68,12 @@ class ItemBatchRepository {
   }
 
   /** Refresh a batch's price metadata (used when a batch is re-purchased). */
-  updateMeta(id, { mrp, rate, sales_rate, gst_percent }) {
+  updateMeta(id, { mrp, rate, sales_rate, gst_percent, freight_rate }) {
     const db = getDb();
     db.prepare(
       `
       UPDATE item_batches
-      SET mrp = ?, rate = ?, sales_rate = ?, gst_percent = ?,
+      SET mrp = ?, rate = ?, sales_rate = ?, gst_percent = ?, freight_rate = ?,
           updated_at = datetime('now', 'localtime')
       WHERE id = ?
     `,
@@ -80,6 +82,7 @@ class ItemBatchRepository {
       parseFloat(rate) || 0,
       sales_rate != null && sales_rate !== "" ? parseFloat(sales_rate) : null,
       parseFloat(gst_percent) || 0,
+      parseFloat(freight_rate) || 0,
       id,
     );
     return this.getById(id);

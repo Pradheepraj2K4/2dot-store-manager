@@ -4,14 +4,16 @@ import toast from "react-hot-toast";
 import {
   ArrowLeftIcon,
   ArrowPathIcon,
+  Cog6ToothIcon,
   PlusIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
 import { itemApi, purchaseApi, ledgerApi, settingsApi } from "../../api";
-import { ITEM_UNITS, DEFAULT_ITEM_UNIT } from "../../utils/itemConstants";
+import { DEFAULT_ITEM_UNIT } from "../../utils/itemConstants";
 import { formatCurrency, todayISO } from "../../utils/helpers";
 import LedgerAutocomplete from "../ui/LedgerAutocomplete";
 import LoadingSpinner from "../ui/LoadingSpinner";
+import Modal from "../ui/Modal";
 
 const FIELD_ORDER = ["itemName", "unit", "rate", "qty", "discount"];
 
@@ -24,14 +26,19 @@ function nowHHMM() {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-function computeAmount({ rate, quantity, discount_percent }) {
+function computeAmount(
+  { rate, quantity, discount_percent, gst_percent },
+  taxMode = "inclusive",
+) {
   const r = parseFloat(rate) || 0;
   const q = parseFloat(quantity) || 1;
   const d = parseFloat(discount_percent) || 0;
-  // GST is inclusive: the rate already contains tax, so the line amount is
-  // simply the (discounted) rate × quantity. The tax portion is extracted
-  // separately for display in the GST total.
-  const amount = r * q * (1 - d / 100);
+  const g = parseFloat(gst_percent) || 0;
+  const gross = r * q * (1 - d / 100);
+  // 'taxable'  : the entered cost rate is pre-tax, so GST is added on top.
+  // 'inclusive': the cost rate already contains tax; the tax portion is
+  //              extracted separately for display in the GST total.
+  const amount = taxMode === "taxable" ? gross * (1 + g / 100) : gross;
   return Math.round(amount * 100) / 100;
 }
 
@@ -471,6 +478,17 @@ export default function ItemPurchaseEntryPage() {
   const autoBatchSeq = useRef(1);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
+  // Cost-rate tax treatment: 'inclusive' (rate includes GST) or 'taxable'
+  // (rate is pre-tax and GST is added on top). Toggled from the Ctrl+I dialog.
+  const [rateTaxMode, setRateTaxMode] = useState(() => {
+    const v = localStorage.getItem("purchase_rate_tax_mode");
+    return v === "taxable" ? "taxable" : "inclusive";
+  });
+  const setRateTaxModePersist = (val) => {
+    setRateTaxMode(val);
+    localStorage.setItem("purchase_rate_tax_mode", val);
+  };
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [imeiEnabled, setImeiEnabled] = useState(false);
   // When a save is attempted with missing IMEIs, highlight the offending rows
   // until the operator enters the required count. Cleared once valid.
@@ -724,9 +742,14 @@ export default function ItemPurchaseEntryPage() {
       .finally(() => setLoading(false));
   }, [isEdit, purchaseIdParam]);
 
-  // F10 → purchase report
+  // Ctrl+I toggles the settings dialog; F10 → purchase report. Scoped to this
+  // page, so the shortcut only acts while the purchase entry is mounted.
   useEffect(() => {
     const handler = (e) => {
+      if (e.ctrlKey && e.key === "i") {
+        e.preventDefault();
+        setSettingsOpen((o) => !o);
+      }
       if (e.key === "F10") {
         e.preventDefault();
         navigate("/purchase-report");
@@ -796,11 +819,18 @@ export default function ItemPurchaseEntryPage() {
     setLines((prev) => {
       const next = [...prev];
       const merged = { ...next[idx], ...patch };
-      merged.amount = computeAmount(merged);
+      merged.amount = computeAmount(merged, rateTaxMode);
       next[idx] = merged;
       return next;
     });
   };
+
+  // Re-price every line when the tax treatment toggles.
+  useEffect(() => {
+    setLines((prev) =>
+      prev.map((l) => ({ ...l, amount: computeAmount(l, rateTaxMode) })),
+    );
+  }, [rateTaxMode]);
 
   const removeLine = (idx) => {
     setLines((prev) => {
@@ -863,9 +893,10 @@ export default function ItemPurchaseEntryPage() {
   const fieldOrder = useMemo(() => {
     const order = ["itemName"];
     if (batchFieldEditable) order.push("batch");
-    order.push("unit");
-    if (batchEnabled) order.push("mrp", "salesRate");
-    order.push("rate", "qty", "discount");
+    if (batchEnabled) order.push("mrp");
+    order.push("rate");
+    if (batchEnabled) order.push("salesRate");
+    order.push("qty", "discount");
     return order;
   }, [batchFieldEditable, batchEnabled]);
 
@@ -916,9 +947,13 @@ export default function ItemPurchaseEntryPage() {
       const q = parseFloat(l.quantity) || 1;
       const d = parseFloat(l.discount_percent) || 0;
       const g = parseFloat(l.gst_percent) || 0;
-      // GST is inclusive — extract the embedded tax from the gross amount.
-      const inclusive = r * q * (1 - d / 100);
-      const gst = inclusive - inclusive / (1 + g / 100);
+      const gross = r * q * (1 - d / 100);
+      // 'taxable': GST is added on top of the gross; 'inclusive': it's embedded
+      // in the gross and extracted out.
+      const gst =
+        rateTaxMode === "taxable"
+          ? (gross * g) / 100
+          : gross - gross / (1 + g / 100);
       return s + Math.round(gst * 100) / 100;
     }, 0);
     const discountTotal = lines.reduce((s, l) => {
@@ -934,7 +969,7 @@ export default function ItemPurchaseEntryPage() {
       0,
     );
     return { total, discountTotal, gstTotal, lineCount, qtyTotal };
-  }, [lines]);
+  }, [lines, rateTaxMode]);
 
   const netTotal = Math.max(
     0,
@@ -951,6 +986,13 @@ export default function ItemPurchaseEntryPage() {
     const validLines = lines.filter((l) => l.item_name && l.item_name.trim());
     if (validLines.length === 0) {
       toast.error("Add at least one item line");
+      return;
+    }
+    const unresolved = validLines.find((l) => !l.item_id);
+    if (unresolved) {
+      toast.error(
+        `"${unresolved.item_name.trim()}" is not a saved item. Select it from the list or create it first.`,
+      );
       return;
     }
     for (let i = 0; i < validLines.length; i++) {
@@ -1017,6 +1059,7 @@ export default function ItemPurchaseEntryPage() {
           discount_percent: parseFloat(l.discount_percent) || 0,
           gst_percent: parseFloat(l.gst_percent) || 0,
           amount: parseFloat(l.amount) || 0,
+          rate_tax_mode: rateTaxMode,
           batch_no: batchEnabled ? (l.batch_no || "").trim() : "",
           sales_rate:
             batchEnabled && l.sales_rate !== "" && l.sales_rate != null
@@ -1118,6 +1161,14 @@ export default function ItemPurchaseEntryPage() {
               <ArrowPathIcon className="h-4 w-4" />
             </button>
           )}
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+            title="Purchase entry settings (Ctrl+I)"
+          >
+            <Cog6ToothIcon className="h-5 w-5" />
+          </button>
         </div>
 
         <div className="flex flex-wrap items-end gap-2">
@@ -1219,14 +1270,14 @@ export default function ItemPurchaseEntryPage() {
                 <th className="px-3 py-2 text-right font-semibold text-white w-24">
                   MRP
                 </th>
+                <th className="px-3 py-2 text-right font-semibold text-white w-28">
+                  {rateTaxMode === "taxable" ? "Cost Rate (Taxable)" : "Cost Rate"}
+                </th>
                 {batchEnabled && (
                   <th className="px-3 py-2 text-right font-semibold text-white w-28 whitespace-nowrap">
                     Sales Rate
                   </th>
                 )}
-                <th className="px-3 py-2 text-right font-semibold text-white w-28">
-                  Cost Rate
-                </th>
                 <th className="px-3 py-2 text-right font-semibold text-white w-24">
                   Qty
                 </th>
@@ -1308,27 +1359,8 @@ export default function ItemPurchaseEntryPage() {
                         )}
                       </td>
                     )}
-                    <td className="px-3 py-2">
-                      <select
-                        ref={(el) => setCellRef(idx, "unit", { current: el })}
-                        value={line.unit}
-                        onChange={(e) =>
-                          updateLine(idx, { unit: e.target.value })
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            handleCellEnter(idx, "unit");
-                          }
-                        }}
-                        className="w-full px-2 py-1.5 text-sm border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
-                      >
-                        {ITEM_UNITS.map((u) => (
-                          <option key={u} value={u}>
-                            {u}
-                          </option>
-                        ))}
-                      </select>
+                    <td className="px-3 py-2 text-sm text-slate-700">
+                      {line.unit}
                     </td>
                     <td className="px-3 py-2 text-right">
                       {stock == null ? (
@@ -1374,6 +1406,28 @@ export default function ItemPurchaseEntryPage() {
                         formatCurrency(line.mrp || 0)
                       )}
                     </td>
+                    <td className="px-3 py-2">
+                      <input
+                        ref={(el) => setCellRef(idx, "rate", { current: el })}
+                        type="number"
+                        step="0.01"
+                        value={line.rate}
+                        onChange={(e) =>
+                          updateLine(idx, { rate: e.target.value })
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            handleCellEnter(idx, "rate");
+                          } else if (e.key === "ArrowLeft" && !e.target.value) {
+                            e.preventDefault();
+                            handleCellBack(idx, "rate");
+                          }
+                        }}
+                        className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
+                        placeholder="0.00"
+                      />
+                    </td>
                     {batchEnabled && (
                       <td className="px-3 py-2">
                         <input
@@ -1403,28 +1457,6 @@ export default function ItemPurchaseEntryPage() {
                         />
                       </td>
                     )}
-                    <td className="px-3 py-2">
-                      <input
-                        ref={(el) => setCellRef(idx, "rate", { current: el })}
-                        type="number"
-                        step="0.01"
-                        value={line.rate}
-                        onChange={(e) =>
-                          updateLine(idx, { rate: e.target.value })
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            handleCellEnter(idx, "rate");
-                          } else if (e.key === "ArrowLeft" && !e.target.value) {
-                            e.preventDefault();
-                            handleCellBack(idx, "rate");
-                          }
-                        }}
-                        className="w-full px-2 py-1.5 text-sm text-right border border-slate-200 rounded focus:outline-none focus:border-trust-blue focus:ring-1 focus:ring-trust-blue"
-                        placeholder="0.00"
-                      />
-                    </td>
                     <td className="px-3 py-2">
                       <ImeiQtyCell
                         enabled={itemImeiTracked(line)}
@@ -1638,6 +1670,43 @@ export default function ItemPurchaseEntryPage() {
           </div>
         </div>
       </div>
+
+      {/* Item Purchase Settings dialog (Ctrl+I) */}
+      <Modal
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        title="Item Purchase Settings"
+        size="lg"
+      >
+        <div className="py-1">
+          <p className="text-sm font-medium text-slate-700">
+            Cost Rate Tax Treatment
+          </p>
+          <p className="text-xs text-slate-500 mt-0.5 mb-2">
+            Choose whether the entered cost rate already includes GST, or is the
+            pre-tax (taxable) value with GST added on top.
+          </p>
+          <div className="flex gap-2">
+            {[
+              { val: "inclusive", label: "Inclusive of tax" },
+              { val: "taxable", label: "Taxable rate" },
+            ].map((opt) => (
+              <button
+                key={opt.val}
+                type="button"
+                onClick={() => setRateTaxModePersist(opt.val)}
+                className={`flex-1 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                  rateTaxMode === opt.val
+                    ? "bg-trust-blue text-white border-trust-blue"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

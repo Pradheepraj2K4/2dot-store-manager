@@ -21,9 +21,14 @@ function computeLineAmounts(line) {
   const qty = parseFloat(line.quantity) || 1;
   const disc = parseFloat(line.discount_percent) || 0;
   const gst = parseFloat(line.gst_percent) || 0;
-  // GST inclusive: rate already contains tax. The line amount is the gross
-  // (discounted) value and the GST portion is extracted from it.
   const gross = rate * qty * (1 - disc / 100);
+  // 'taxable'   — rate is pre-tax; GST is added on top.
+  // 'inclusive' — rate already contains tax (default); GST is extracted.
+  if (line.rate_tax_mode === "taxable") {
+    const gst_amount = Math.round(((gross * gst) / 100) * 100) / 100;
+    const amount = Math.round((gross + gst_amount) * 100) / 100;
+    return { gst_amount, amount };
+  }
   const gst_amount = Math.round((gross - gross / (1 + gst / 100)) * 100) / 100;
   const amount = Math.round(gross * 100) / 100;
   return { gst_amount, amount };
@@ -64,9 +69,20 @@ function isBatchEnabled() {
  * server logic and keeps edits idempotent (the saved batch_no round-trips).
  * No-op when the batch feature is disabled.
  */
-function resolveBatches(items) {
+function resolveBatches(items, freightCharge = 0) {
   if (!isBatchEnabled()) return;
   const prefix = settingsRepository.get("purchase_batch_prefix") || "";
+  // Spread the bill freight evenly across every purchased unit so each unit
+  // carries an equal share of the landed cost (freight ÷ total units).
+  const freight = Math.round((parseFloat(freightCharge) || 0) * 100) / 100;
+  const totalUnits = (items || []).reduce((s, l) => {
+    if (!l.item_id) return s;
+    return s + (parseFloat(l.quantity) || 0);
+  }, 0);
+  const freightPerUnit =
+    freight > 0 && totalUnits > 0
+      ? Math.round((freight / totalUnits) * 100) / 100
+      : 0;
   for (const line of items || []) {
     if (!line.item_id) continue;
     const qty = parseFloat(line.quantity) || 0;
@@ -81,6 +97,7 @@ function resolveBatches(items) {
           ? line.sales_rate
           : null,
       gst_percent: line.gst_percent,
+      freight_rate: freightPerUnit,
     };
     if (!batch) {
       batch = itemBatchRepository.create({
@@ -204,7 +221,7 @@ class PurchaseService {
         Math.round((parseFloat(data.freight_charge) || 0) * 100) / 100;
       // Resolve/stock the per-line batches first so the linked batch_id is
       // persisted onto the purchase_items rows.
-      resolveBatches(normalisedItems);
+      resolveBatches(normalisedItems, freight_charge_val);
       const purchase = purchaseRepository.create({
         purchase_number,
         ledger_id: parseInt(data.ledger_id),
@@ -273,7 +290,7 @@ class PurchaseService {
 
       // Reverse the prior per-batch stock, then resolve/stock the new batches.
       reverseBatches(existing.items);
-      resolveBatches(normalisedItems);
+      resolveBatches(normalisedItems, freight_charge_val);
 
       // Reverse the prior in-stock IMEIs from this purchase, then re-register
       // from the edited payload. Already-sold IMEIs are preserved.

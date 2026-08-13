@@ -37,6 +37,8 @@ import StockAdjustmentPage from "./components/items/StockAdjustmentPage";
 import StaffListPage from "./components/staff/StaffListPage";
 import WaiterListPage from "./components/staff/WaiterListPage";
 import FoodSalesReportPage from "./components/reports/FoodSalesReportPage";
+import Gstr1ReportPage from "./components/reports/Gstr1ReportPage";
+import Gstr2ReportPage from "./components/reports/Gstr2ReportPage";
 import ServiceEntryPage from "./components/services/ServiceEntryPage";
 import ServiceListPage from "./components/services/ServiceListPage";
 import ServiceClosePage from "./components/services/ServiceClosePage";
@@ -131,6 +133,8 @@ export default function App() {
                 <Route path="/staffs" element={<StaffListPage />} />
                 <Route path="/waiters" element={<WaiterListPage />} />
                 <Route path="/food-sales-report" element={<FoodSalesReportPage />} />
+                <Route path="/gstr1-report" element={<Gstr1ReportPage />} />
+                <Route path="/gstr2-report" element={<Gstr2ReportPage />} />
                 <Route path="/services/new" element={<ServiceEntryPage />} />
                 <Route path="/services/pending" element={<ServiceListPage status="pending" />} />
                 <Route path="/services/closed" element={<ServiceListPage status="closed" />} />

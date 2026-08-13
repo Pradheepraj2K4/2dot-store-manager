@@ -318,6 +318,51 @@ class SaleRepository {
   }
 
   /**
+   * GSTR-1 (outward supplies) — one row per invoice + GST rate slab.
+   * Taxable value is derived as (line amount − GST portion) so it holds for
+   * both inclusive and taxable rate modes. CGST/SGST vs IGST split is left to
+   * the service layer based on the party's igst_status.
+   */
+  getGstr1Report({ fromDate, toDate } = {}) {
+    const db = getDb();
+    const conds = [];
+    const params = [];
+    if (fromDate) {
+      conds.push("s.date >= ?");
+      params.push(fromDate);
+    }
+    if (toDate) {
+      conds.push("s.date <= ?");
+      params.push(toDate);
+    }
+    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+    return db
+      .prepare(
+        `
+      SELECT
+        s.id                                                     AS sale_id,
+        s.sale_number                                            AS invoice_no,
+        s.date                                                   AS date,
+        COALESCE(NULLIF(TRIM(s.customer_name), ''), l.name)      AS party_name,
+        COALESCE(l.gst_no, '')                                   AS party_gstin,
+        COALESCE(l.state_code, '')                               AS state_code,
+        COALESCE(l.igst_status, 'NO')                            AS igst_status,
+        COALESCE(si.gst_percent, 0)                              AS gst_rate,
+        COALESCE(SUM(si.amount - si.gst_amount), 0)              AS taxable_value,
+        COALESCE(SUM(si.gst_amount), 0)                          AS gst_amount,
+        COALESCE(SUM(si.amount), 0)                              AS total_value
+      FROM sales s
+      JOIN ledgers l ON l.id = s.ledger_id
+      JOIN sale_items si ON si.sale_id = s.id
+      ${where}
+      GROUP BY s.id, si.gst_percent
+      ORDER BY s.date ASC, s.id ASC, si.gst_percent ASC
+    `,
+      )
+      .all(...params);
+  }
+
+  /**
    * Aggregate sales figures for the dashboard. `today` and `monthStart` are
    * local `YYYY-MM-DD` strings supplied by the caller so the totals line up
    * with the user's timezone.

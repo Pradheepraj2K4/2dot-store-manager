@@ -182,6 +182,10 @@ export const saleApi = {
     const qs = new URLSearchParams(params).toString();
     return api.get(`/sales/food-report${qs ? `?${qs}` : ""}`);
   },
+  getGstr1Report: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return api.get(`/sales/gstr1-report${qs ? `?${qs}` : ""}`);
+  },
   create: (data) => api.post("/sales", data),
   update: (id, data) => api.put(`/sales/${id}`, data),
   delete: (id) => api.delete(`/sales/${id}`),
@@ -195,6 +199,10 @@ export const purchaseApi = {
   getById: (id) => api.get(`/purchases/${id}`),
   getByLedger: (ledgerId) => api.get(`/purchases/ledger/${ledgerId}`),
   getNextNumber: () => api.get("/purchases/next-number"),
+  getGstr2Report: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return api.get(`/purchases/gstr2-report${qs ? `?${qs}` : ""}`);
+  },
   create: (data) => api.post("/purchases", data),
   update: (id, data) => api.put(`/purchases/${id}`, data),
   delete: (id) => api.delete(`/purchases/${id}`),

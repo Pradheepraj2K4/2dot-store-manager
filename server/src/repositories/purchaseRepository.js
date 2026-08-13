@@ -259,6 +259,50 @@ class PurchaseRepository {
     }
     return this.getById(id);
   }
+
+  /**
+   * GSTR-2 (inward supplies) — one row per supplier invoice + GST rate slab.
+   * Mirrors saleRepository.getGstr1Report. Taxable value is derived as
+   * (line amount − GST portion); tax split is applied in the service layer.
+   */
+  getGstr2Report({ fromDate, toDate } = {}) {
+    const db = getDb();
+    const conds = [];
+    const params = [];
+    if (fromDate) {
+      conds.push("p.date >= ?");
+      params.push(fromDate);
+    }
+    if (toDate) {
+      conds.push("p.date <= ?");
+      params.push(toDate);
+    }
+    const where = conds.length ? `WHERE ${conds.join(" AND ")}` : "";
+    return db
+      .prepare(
+        `
+      SELECT
+        p.id                                                     AS purchase_id,
+        COALESCE(NULLIF(TRIM(p.bill_number), ''), p.purchase_number) AS invoice_no,
+        p.date                                                   AS date,
+        l.name                                                   AS party_name,
+        COALESCE(l.gst_no, '')                                   AS party_gstin,
+        COALESCE(l.state_code, '')                               AS state_code,
+        COALESCE(l.igst_status, 'NO')                            AS igst_status,
+        COALESCE(pi.gst_percent, 0)                              AS gst_rate,
+        COALESCE(SUM(pi.amount - pi.gst_amount), 0)              AS taxable_value,
+        COALESCE(SUM(pi.gst_amount), 0)                          AS gst_amount,
+        COALESCE(SUM(pi.amount), 0)                              AS total_value
+      FROM purchases p
+      JOIN ledgers l ON l.id = p.ledger_id
+      JOIN purchase_items pi ON pi.purchase_id = p.id
+      ${where}
+      GROUP BY p.id, pi.gst_percent
+      ORDER BY p.date ASC, p.id ASC, pi.gst_percent ASC
+    `,
+      )
+      .all(...params);
+  }
 }
 
 module.exports = new PurchaseRepository();

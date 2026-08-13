@@ -384,6 +384,33 @@ class PurchaseService {
   getNextPurchaseNumber() {
     return purchaseRepository.getNextPurchaseNumber();
   }
+
+  /**
+   * GSTR-2 (inward supplies) — invoice + slab rows with CGST/SGST/IGST split.
+   * Mirrors saleService.getGstr1Report.
+   */
+  getGstr2Report({ fromDate, toDate } = {}) {
+    const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+    const rows = purchaseRepository.getGstr2Report({ fromDate, toDate });
+    return rows.map((r) => {
+      const gst = round2(r.gst_amount || 0);
+      const isIgst = String(r.igst_status).toUpperCase() === "YES";
+      return {
+        purchase_id: r.purchase_id,
+        invoice_no: r.invoice_no,
+        date: r.date,
+        party_name: r.party_name || "",
+        party_gstin: r.party_gstin || "",
+        gst_rate: round2(r.gst_rate || 0),
+        taxable_value: round2(r.taxable_value || 0),
+        cgst: isIgst ? 0 : round2(gst / 2),
+        sgst: isIgst ? 0 : round2(gst / 2),
+        igst: isIgst ? gst : 0,
+        gst_amount: gst,
+        total_value: round2(r.total_value || 0),
+      };
+    });
+  }
 }
 
 module.exports = new PurchaseService();

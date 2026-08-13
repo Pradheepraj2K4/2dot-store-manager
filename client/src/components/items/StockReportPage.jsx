@@ -1,13 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
-import { MagnifyingGlassIcon, ArrowDownTrayIcon, CubeIcon, AdjustmentsHorizontalIcon } from '@heroicons/react/24/outline';
-import { itemApi } from '../../api';
-import { formatCurrency } from '../../utils/helpers';
-import { exportToExcel } from '../../utils/exportUtils';
-import LoadingSpinner from '../ui/LoadingSpinner';
-import EmptyState from '../ui/EmptyState';
-import ImeiInfoButton from '../ui/ImeiInfoButton';
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
+import {
+  MagnifyingGlassIcon,
+  ArrowDownTrayIcon,
+  CubeIcon,
+  AdjustmentsHorizontalIcon,
+} from "@heroicons/react/24/outline";
+import { itemApi } from "../../api";
+import { formatCurrency } from "../../utils/helpers";
+import { exportToExcel } from "../../utils/exportUtils";
+import LoadingSpinner from "../ui/LoadingSpinner";
+import EmptyState from "../ui/EmptyState";
+import ImeiInfoButton from "../ui/ImeiInfoButton";
 
 export default function StockReportPage() {
   const navigate = useNavigate();
@@ -15,9 +20,9 @@ export default function StockReportPage() {
   const [brands, setBrands] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [brand, setBrand] = useState('');
-  const [category, setCategory] = useState('');
+  const [search, setSearch] = useState("");
+  const [brand, setBrand] = useState("");
+  const [category, setCategory] = useState("");
   const [lowStockOnly, setLowStockOnly] = useState(false);
 
   // Cache of in-flight / resolved IMEI breakdown promises, keyed by item id, so
@@ -39,7 +44,7 @@ export default function StockReportPage() {
       const params = {};
       if (brand) params.brand = brand;
       if (category) params.category = category;
-      if (lowStockOnly) params.lowStockOnly = 'true';
+      if (lowStockOnly) params.lowStockOnly = "true";
       const [report, b, c] = await Promise.all([
         itemApi.getStockReport(params),
         itemApi.getBrands(),
@@ -55,16 +60,19 @@ export default function StockReportPage() {
     }
   };
 
-  useEffect(() => { fetchData(); }, [brand, category, lowStockOnly]);
+  useEffect(() => {
+    fetchData();
+  }, [brand, category, lowStockOnly]);
 
   const filtered = useMemo(() => {
     if (!search) return rows;
     const q = search.toLowerCase();
-    return rows.filter((r) =>
-      (r.name || '').toLowerCase().includes(q) ||
-      (r.item_code || '').toLowerCase().includes(q) ||
-      (r.brand || '').toLowerCase().includes(q) ||
-      (r.category || '').toLowerCase().includes(q),
+    return rows.filter(
+      (r) =>
+        (r.name || "").toLowerCase().includes(q) ||
+        (r.item_code || "").toLowerCase().includes(q) ||
+        (r.brand || "").toLowerCase().includes(q) ||
+        (r.category || "").toLowerCase().includes(q),
     );
   }, [rows, search]);
 
@@ -79,7 +87,14 @@ export default function StockReportPage() {
         acc.value += r.stock_cost || 0;
         return acc;
       },
-      { purchased: 0, sold: 0, salesReturn: 0, purchaseReturn: 0, stock: 0, value: 0 },
+      {
+        purchased: 0,
+        sold: 0,
+        salesReturn: 0,
+        purchaseReturn: 0,
+        stock: 0,
+        value: 0,
+      },
     );
   }, [filtered]);
 
@@ -88,11 +103,11 @@ export default function StockReportPage() {
     try {
       await exportToExcel(
         filtered.map((r) => ({
-          code: r.item_code || '',
+          code: r.item_code || "",
           name: r.name,
-          brand: r.brand || '',
-          category: r.category || '',
-          unit: r.unit || '',
+          brand: r.brand || "",
+          category: r.category || "",
+          unit: r.unit || "",
           purchased: r.total_purchased || 0,
           purchaseReturn: r.total_purchase_return || 0,
           sold: r.total_sold || 0,
@@ -102,32 +117,40 @@ export default function StockReportPage() {
           value: r.stock_cost || 0,
         })),
         [
-          { header: 'Code', key: 'code', width: 12 },
-          { header: 'Item', key: 'name', width: 30 },
-          { header: 'Brand', key: 'brand', width: 18 },
-          { header: 'Category', key: 'category', width: 18 },
-          { header: 'Unit', key: 'unit', width: 8 },
-          { header: 'Purchased', key: 'purchased', width: 12 },
-          { header: 'Pur. Return', key: 'purchaseReturn', width: 12 },
-          { header: 'Sold', key: 'sold', width: 12 },
-          { header: 'Sales Return', key: 'salesReturn', width: 12 },
-          { header: 'Stock', key: 'stock', width: 10 },
-          { header: 'MRP', key: 'mrp', width: 12 },
-          { header: 'Stock Cost', key: 'value', width: 14 },
+          { header: "Code", key: "code", width: 12 },
+          { header: "Item", key: "name", width: 30 },
+          { header: "Brand", key: "brand", width: 18 },
+          { header: "Category", key: "category", width: 18 },
+          { header: "Unit", key: "unit", width: 8 },
+          { header: "Purchased", key: "purchased", width: 12 },
+          { header: "Pur. Return", key: "purchaseReturn", width: 12 },
+          { header: "Sold", key: "sold", width: 12 },
+          { header: "Sales Return", key: "salesReturn", width: 12 },
+          { header: "Stock", key: "stock", width: 10 },
+          { header: "MRP", key: "mrp", width: 12 },
+          { header: "Stock Cost", key: "value", width: 14 },
         ],
-        'stock-report',
+        "stock-report",
         {
           footer: [
-            '', 'Totals', '', '', '',
-            totals.purchased, totals.purchaseReturn,
-            totals.sold, totals.salesReturn,
-            totals.stock, '', totals.value,
+            "",
+            "Totals",
+            "",
+            "",
+            "",
+            totals.purchased,
+            totals.purchaseReturn,
+            totals.sold,
+            totals.salesReturn,
+            totals.stock,
+            "",
+            totals.value,
           ],
         },
       );
-      toast.success('Exported');
+      toast.success("Exported");
     } catch (err) {
-      toast.error('Export failed: ' + err.message);
+      toast.error("Export failed: " + err.message);
     }
   };
 
@@ -139,7 +162,7 @@ export default function StockReportPage() {
         <h1 className="page-title">Stock Report</h1>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => navigate('/stock-adjustment')}
+            onClick={() => navigate("/stock-adjustment")}
             className="btn-secondary flex items-center gap-2"
           >
             <AdjustmentsHorizontalIcon className="w-5 h-5" /> Adjust Stocks
@@ -165,13 +188,29 @@ export default function StockReportPage() {
             className="input-field pl-10"
           />
         </div>
-        <select value={brand} onChange={(e) => setBrand(e.target.value)} className="input-field max-w-[180px]">
+        <select
+          value={brand}
+          onChange={(e) => setBrand(e.target.value)}
+          className="input-field max-w-[180px]"
+        >
           <option value="">All brands</option>
-          {brands.map((b) => <option key={b} value={b}>{b}</option>)}
+          {brands.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
         </select>
-        <select value={category} onChange={(e) => setCategory(e.target.value)} className="input-field max-w-[180px]">
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value)}
+          className="input-field max-w-[180px]"
+        >
           <option value="">All categories</option>
-          {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          {categories.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
         </select>
         <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
           <input
@@ -194,7 +233,7 @@ export default function StockReportPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-600 uppercase text-xs">
+              <thead className="bg-amber-100 uppercase text-xs">
                 <tr>
                   <th className="px-3 py-2 text-left">Code</th>
                   <th className="px-3 py-2 text-left">Item</th>
@@ -212,13 +251,19 @@ export default function StockReportPage() {
               <tbody className="divide-y divide-gray-100">
                 {filtered.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50">
-                    <td className="px-3 py-2 text-gray-500">{r.item_code || '—'}</td>
-                    <td className="px-3 py-2 font-medium text-gray-800">{r.name}</td>
-                    <td className="px-3 py-2 text-gray-600">
-                      {r.brand || '—'}
-                      {r.category ? <span className="text-gray-400"> / {r.category}</span> : null}
+                    <td className="px-3 py-2 text-gray-500">
+                      {r.item_code || "—"}
                     </td>
-                    <td className="px-3 py-2 text-gray-600">{r.unit || '—'}</td>
+                    <td className="px-3 py-2 font-medium text-gray-800">
+                      {r.name}
+                    </td>
+                    <td className="px-3 py-2 text-gray-600">
+                      {r.brand || "—"}
+                      {r.category ? (
+                        <span className="text-gray-400"> / {r.category}</span>
+                      ) : null}
+                    </td>
+                    <td className="px-3 py-2 text-gray-600">{r.unit || "—"}</td>
                     <td className="px-3 py-2 text-right">
                       <span className="inline-flex items-center justify-end gap-1">
                         {r.imei_count > 0 && (
@@ -226,14 +271,18 @@ export default function StockReportPage() {
                             title="Purchased IMEIs"
                             loader={async () => {
                               const b = await getBreakdown(r.id);
-                              return [{ items: b.purchased || [], tone: 'blue' }];
+                              return [
+                                { items: b.purchased || [], tone: "blue" },
+                              ];
                             }}
                           />
                         )}
                         {r.total_purchased || 0}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-right text-debit-red">{r.total_purchase_return || 0}</td>
+                    <td className="px-3 py-2 text-right text-debit-red">
+                      {r.total_purchase_return || 0}
+                    </td>
                     <td className="px-3 py-2 text-right">
                       <span className="inline-flex items-center justify-end gap-1">
                         {r.imei_count > 0 && (
@@ -241,17 +290,21 @@ export default function StockReportPage() {
                             title="Sold IMEIs"
                             loader={async () => {
                               const b = await getBreakdown(r.id);
-                              return [{ items: b.sold || [], tone: 'green' }];
+                              return [{ items: b.sold || [], tone: "green" }];
                             }}
                           />
                         )}
                         {r.total_sold || 0}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-right text-credit-green">{r.total_sales_return || 0}</td>
+                    <td className="px-3 py-2 text-right text-credit-green">
+                      {r.total_sales_return || 0}
+                    </td>
                     <td
                       className={`px-3 py-2 text-right font-semibold ${
-                        (r.current_stock || 0) <= 0 ? 'text-debit-red' : 'text-gray-800'
+                        (r.current_stock || 0) <= 0
+                          ? "text-debit-red"
+                          : "text-gray-800"
                       }`}
                     >
                       <span className="inline-flex items-center justify-end gap-1">
@@ -260,28 +313,40 @@ export default function StockReportPage() {
                             title="Remaining IMEIs (in stock)"
                             loader={async () => {
                               const b = await getBreakdown(r.id);
-                              return [{ items: b.remaining || [], tone: 'slate' }];
+                              return [
+                                { items: b.remaining || [], tone: "slate" },
+                              ];
                             }}
                           />
                         )}
                         {r.current_stock || 0}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-right">{formatCurrency(r.mrp || 0)}</td>
-                    <td className="px-3 py-2 text-right font-medium">{formatCurrency(r.stock_cost || 0)}</td>
+                    <td className="px-3 py-2 text-right">
+                      {formatCurrency(r.mrp || 0)}
+                    </td>
+                    <td className="px-3 py-2 text-right font-medium">
+                      {formatCurrency(r.stock_cost || 0)}
+                    </td>
                   </tr>
                 ))}
               </tbody>
               <tfoot className="bg-gray-50 font-semibold">
                 <tr>
-                  <td className="px-3 py-2" colSpan={4}>Totals ({filtered.length} items)</td>
+                  <td className="px-3 py-2" colSpan={4}>
+                    Totals ({filtered.length} items)
+                  </td>
                   <td className="px-3 py-2 text-right">{totals.purchased}</td>
-                  <td className="px-3 py-2 text-right">{totals.purchaseReturn}</td>
+                  <td className="px-3 py-2 text-right">
+                    {totals.purchaseReturn}
+                  </td>
                   <td className="px-3 py-2 text-right">{totals.sold}</td>
                   <td className="px-3 py-2 text-right">{totals.salesReturn}</td>
                   <td className="px-3 py-2 text-right">{totals.stock}</td>
                   <td className="px-3 py-2"></td>
-                  <td className="px-3 py-2 text-right">{formatCurrency(totals.value)}</td>
+                  <td className="px-3 py-2 text-right">
+                    {formatCurrency(totals.value)}
+                  </td>
                 </tr>
               </tfoot>
             </table>

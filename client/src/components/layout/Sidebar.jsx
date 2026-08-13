@@ -108,6 +108,7 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
   const [expenseEnabled, setExpenseEnabled] = useState(false);
   const [serviceEnabled, setServiceEnabled] = useState(false);
   const [restaurantEnabled, setRestaurantEnabled] = useState(false);
+  const [gstReportsEnabled, setGstReportsEnabled] = useState(false);
   // Default-enabled modules: treat a missing setting as on.
   const [purchaseEnabled, setPurchaseEnabled] = useState(true);
   const [accountTxnEnabled, setAccountTxnEnabled] = useState(true);
@@ -174,6 +175,13 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
       .then((res) => {
         const val = res.data?.value;
         setAccountTxnEnabled(val !== false && val !== "false");
+      })
+      .catch(() => {});
+    settingsApi
+      .get("gst_reports_enabled")
+      .then((res) => {
+        const val = res.data?.value;
+        setGstReportsEnabled(val === true || val === "true");
       })
       .catch(() => {});
     settingsApi
@@ -285,6 +293,23 @@ export default function Sidebar({ open, onClose, collapsed = false, onToggleColl
         }
         return item;
       });
+    }
+    // GST Reports module: insert a dedicated group after Inventory Reports.
+    if (gstReportsEnabled) {
+      const invIdx = nav.findIndex((n) => n.name === "Inventory Reports");
+      const insertAt = invIdx >= 0 ? invIdx + 1 : nav.length;
+      nav = [
+        ...nav.slice(0, insertAt),
+        {
+          name: "GST Reports",
+          icon: DocumentChartBarIcon,
+          children: [
+            { name: "GSTR1", href: "/gstr1-report", icon: DocumentChartBarIcon },
+            { name: "GSTR2", href: "/gstr2-report", icon: DocumentChartBarIcon },
+          ],
+        },
+        ...nav.slice(insertAt),
+      ];
     }
     // Purchase module disabled: hide all purchase-related menus. Stock Report
     // also depends on purchase data, so hide it too.

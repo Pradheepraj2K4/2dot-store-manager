@@ -51,6 +51,14 @@ class SaleController {
     } catch (err) { next(err); }
   }
 
+  getGstr1Report(req, res, next) {
+    try {
+      const { fromDate, toDate } = req.query;
+      const rows = saleService.getGstr1Report({ fromDate, toDate });
+      res.json({ success: true, data: rows });
+    } catch (err) { next(err); }
+  }
+
   create(req, res, next) {
     try {
       const sale = saleService.create(req.body);

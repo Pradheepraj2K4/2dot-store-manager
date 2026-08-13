@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS = [
   ["purchase_module_enabled", "true"],
   ["account_transaction_enabled", "true"],
   ["gst_fields_enabled", "false"],
+  ["gst_reports_enabled", "false"],
   ["cash_tender_enabled", "true"],
   ["freight_charge_enabled", "false"],
   ["po_number_enabled", "false"],

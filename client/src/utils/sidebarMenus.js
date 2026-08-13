@@ -36,6 +36,10 @@ export const SIDEBAR_MENU_GROUPS = [
     items: ['Inventory Reports', 'Sales Report', 'Purchase Report', 'Stock Report'],
   },
   {
+    section: 'GST Reports',
+    items: ['GST Reports', 'GSTR1', 'GSTR2'],
+  },
+  {
     section: 'Account Transaction',
     items: ['Account Transaction', 'Payment Entry', 'Receipt Entry', 'Expense Entry'],
   },

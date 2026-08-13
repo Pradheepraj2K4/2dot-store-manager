@@ -35,6 +35,14 @@ class PurchaseController {
     } catch (err) { next(err); }
   }
 
+  getGstr2Report(req, res, next) {
+    try {
+      const { fromDate, toDate } = req.query;
+      const rows = purchaseService.getGstr2Report({ fromDate, toDate });
+      res.json({ success: true, data: rows });
+    } catch (err) { next(err); }
+  }
+
   create(req, res, next) {
     try {
       const purchase = purchaseService.create(req.body);

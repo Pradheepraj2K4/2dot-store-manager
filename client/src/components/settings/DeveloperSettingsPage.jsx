@@ -126,6 +126,8 @@ export default function DeveloperSettingsPage() {
     useState(true);
   // GST fields state
   const [gstFieldsEnabled, setGstFieldsEnabled] = useState(false);
+  // GST reports module state
+  const [gstReportsEnabled, setGstReportsEnabled] = useState(false);
   // Cash tender field state (default enabled)
   const [cashTenderEnabled, setCashTenderEnabled] = useState(true);
   // Freight charge field state
@@ -264,6 +266,11 @@ export default function DeveloperSettingsPage() {
       // Load GST fields setting
       setGstFieldsEnabled(
         data.gst_fields_enabled === true || data.gst_fields_enabled === "true",
+      );
+      // Load GST reports module setting
+      setGstReportsEnabled(
+        data.gst_reports_enabled === true ||
+          data.gst_reports_enabled === "true",
       );
       // Load cash tender setting (default enabled — missing key counts as on)
       setCashTenderEnabled(
@@ -1575,6 +1582,22 @@ export default function DeveloperSettingsPage() {
                     checked={restaurantModuleEnabled}
                     onChange={setRestaurantModuleEnabled}
                     toastLabel="Restaurant module"
+                  />
+                </div>
+              </div>
+
+              {/* Group: Reports */}
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                  Reports
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <ModuleToggle
+                    label="GST Reports (GSTR-1 & GSTR-2)"
+                    settingKey="gst_reports_enabled"
+                    checked={gstReportsEnabled}
+                    onChange={setGstReportsEnabled}
+                    toastLabel="GST reports"
                   />
                 </div>
               </div>

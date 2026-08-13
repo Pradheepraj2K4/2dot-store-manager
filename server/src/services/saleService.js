@@ -435,6 +435,34 @@ class SaleService {
       discount: round2(r.discount || 0),
     }));
   }
+
+  /**
+   * GSTR-1 (outward supplies) — invoice + slab rows with CGST/SGST/IGST split.
+   * Intra-state (igst_status !== 'YES') splits the tax evenly into CGST/SGST;
+   * inter-state puts the whole tax into IGST.
+   */
+  getGstr1Report({ fromDate, toDate } = {}) {
+    const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+    const rows = saleRepository.getGstr1Report({ fromDate, toDate });
+    return rows.map((r) => {
+      const gst = round2(r.gst_amount || 0);
+      const isIgst = String(r.igst_status).toUpperCase() === "YES";
+      return {
+        sale_id: r.sale_id,
+        invoice_no: r.invoice_no,
+        date: r.date,
+        party_name: r.party_name || "",
+        party_gstin: r.party_gstin || "",
+        gst_rate: round2(r.gst_rate || 0),
+        taxable_value: round2(r.taxable_value || 0),
+        cgst: isIgst ? 0 : round2(gst / 2),
+        sgst: isIgst ? 0 : round2(gst / 2),
+        igst: isIgst ? gst : 0,
+        gst_amount: gst,
+        total_value: round2(r.total_value || 0),
+      };
+    });
+  }
 }
 
 module.exports = new SaleService();

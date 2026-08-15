@@ -296,3 +296,14 @@ export const customerApi = {
   update: (id, data) => api.put(`/customers/${id}`, data),
   delete: (id) => api.delete(`/customers/${id}`),
 };
+
+export const unitApi = {
+  getAll: (params = {}) => {
+    const qs = new URLSearchParams(params).toString();
+    return api.get(`/units${qs ? `?${qs}` : ""}`);
+  },
+  getById: (id) => api.get(`/units/${id}`),
+  create: (data) => api.post("/units", data),
+  update: (id, data) => api.put(`/units/${id}`, data),
+  delete: (id) => api.delete(`/units/${id}`),
+};

@@ -43,6 +43,7 @@ import ServiceEntryPage from "./components/services/ServiceEntryPage";
 import ServiceListPage from "./components/services/ServiceListPage";
 import ServiceClosePage from "./components/services/ServiceClosePage";
 import CustomerListPage from "./components/customers/CustomerListPage";
+import UnitListPage from "./components/units/UnitListPage";
 
 export default function App() {
   return (
@@ -62,6 +63,7 @@ export default function App() {
                 <Route path="/ledgers" element={<LedgerListPage />} />
                 <Route path="/ledger/:id" element={<LedgerPage />} />
                 <Route path="/customers" element={<CustomerListPage />} />
+                <Route path="/units" element={<UnitListPage />} />
                 <Route
                   path="/pending-interest"
                   element={<PendingInterestPage />}

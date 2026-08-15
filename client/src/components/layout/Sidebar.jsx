@@ -30,6 +30,7 @@ import {
   PresentationChartLineIcon,
   ArrowsPointingOutIcon,
   ArrowsPointingInIcon,
+  ScaleIcon,
 } from "@heroicons/react/24/outline";
 import { logout, hasPermission, getCurrentUser } from "../../utils/auth";
 import { interestApi, expenseApi, serviceApi, waiterApi, settingsApi } from "../../api";
@@ -45,6 +46,7 @@ const baseNavigation = [
       { name: "Ledgers", href: "/ledgers", icon: BookOpenIcon },
       { name: "Customers", href: "/customers", icon: UserGroupIcon },
       { name: "Items", href: "/items", icon: CubeIcon },
+      { name: "Unit", href: "/units", icon: ScaleIcon },
     ],
   },
   {

@@ -14,7 +14,7 @@ export const SIDEBAR_MENU_GROUPS = [
   },
   {
     section: 'Master',
-    items: ['Master', 'Ledgers', 'Customers', 'Items', 'Staffs', 'Waiters'],
+    items: ['Master', 'Ledgers', 'Customers', 'Items', 'Unit', 'Staffs', 'Waiters'],
   },
   {
     section: 'Service',

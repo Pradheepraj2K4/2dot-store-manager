@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
-import { itemApi, waiterApi } from '../../api';
+import { itemApi, waiterApi, unitApi } from '../../api';
 import { ITEM_UNITS, DEFAULT_ITEM_UNIT } from '../../utils/itemConstants';
 import LoadingSpinner from '../ui/LoadingSpinner';
 import GstSelect from '../ui/GstSelect';
@@ -44,6 +44,7 @@ export default function ItemCreationPage() {
   const [errors, setErrors] = useState({});
   const [brands, setBrands] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [units, setUnits] = useState(ITEM_UNITS);
   const [restaurantEnabled, setRestaurantEnabled] = useState(false);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
@@ -51,6 +52,12 @@ export default function ItemCreationPage() {
   useEffect(() => {
     itemApi.getBrands().then((r) => setBrands(r.data || [])).catch(() => {});
     itemApi.getCategories().then((r) => setCategories(r.data || [])).catch(() => {});
+    unitApi.getAll()
+      .then((r) => {
+        const names = (r.data || []).map((u) => u.name);
+        if (names.length) setUnits(names);
+      })
+      .catch(() => {});
     waiterApi.isEnabled()
       .then((r) => {
         const v = r.data?.value;
@@ -220,7 +227,7 @@ export default function ItemCreationPage() {
               onKeyDown={handleFieldKeyDown('unit')}
               className="input-field"
             >
-              {ITEM_UNITS.map((u) => (
+              {(units.includes(form.unit) || !form.unit ? units : [form.unit, ...units]).map((u) => (
                 <option key={u} value={u}>{u}</option>
               ))}
             </select>

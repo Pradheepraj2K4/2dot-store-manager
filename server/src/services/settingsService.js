@@ -31,6 +31,8 @@ class SettingsService {
       email: settingsRepository.get('email'),
       // UPI id used to render a payment QR code on the thermal bill.
       upi_id: settingsRepository.get('upi_id'),
+      // Terms & conditions printed in the invoice footer.
+      terms_conditions: settingsRepository.get('terms_conditions'),
       // Derive the logo path from the actual file on disk so a stale/empty
       // `logo_path` setting never hides an uploaded logo.
       logo_path: this.resolveLogoPath(),

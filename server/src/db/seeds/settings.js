@@ -15,6 +15,10 @@ const DEFAULT_SETTINGS = [
   ["phone", ""],
   ["email", ""],
   ["upi_id", ""],
+  [
+    "terms_conditions",
+    "Goods once sold cannot be taken back.\nSubject to local jurisdiction.\nOur responsibility ceases on delivery of goods.",
+  ],
   ["interest_module_enabled", "false"],
   ["expense_module_enabled", "false"],
   ["service_module_enabled", "false"],

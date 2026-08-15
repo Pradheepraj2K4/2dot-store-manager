@@ -83,6 +83,7 @@ export default function DeveloperSettingsPage() {
     phone: "",
     email: "",
     upi_id: "",
+    terms_conditions: "",
     logo_path: "",
   });
 
@@ -220,6 +221,7 @@ export default function DeveloperSettingsPage() {
         phone: data.phone || "",
         email: data.email || "",
         upi_id: data.upi_id || "",
+        terms_conditions: data.terms_conditions || "",
         logo_path: data.logo_path || "",
       });
       if (data.logo_path) {
@@ -1154,6 +1156,24 @@ export default function DeveloperSettingsPage() {
                   When set, a UPI payment QR code is printed at the bottom of
                   the thermal bill. Adjust its size in the{" "}
                   <span className="font-medium">Receipt</span> tab.
+                </p>
+              </div>
+              <div>
+                <label className="label">Terms &amp; Conditions</label>
+                <textarea
+                  rows={4}
+                  value={profile.terms_conditions}
+                  onChange={(e) =>
+                    setProfile((p) => ({
+                      ...p,
+                      terms_conditions: e.target.value,
+                    }))
+                  }
+                  className="input-field"
+                  placeholder={"One term per line, e.g.\nGoods once sold cannot be taken back.\nSubject to local jurisdiction."}
+                />
+                <p className="text-xs text-slate-500 mt-1">
+                  Printed in the invoice footer. Enter one condition per line.
                 </p>
               </div>
               <div className="flex justify-end pt-2">

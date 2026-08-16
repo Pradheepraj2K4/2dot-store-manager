@@ -151,7 +151,7 @@ export default function OutstandingBalanceReportPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm table-zebra">
               <thead>
-                <tr className="border-b border-slate-200 bg-slate-50">
+                <tr className="border-b border-slate-200 bg-amber-100">
                   <th className="px-4 py-3 text-left font-semibold text-slate-600">Name</th>
                   <th className="px-4 py-3 text-left font-semibold text-slate-600">Type</th>
                   <th className="px-4 py-3 text-left font-semibold text-slate-600">Phone</th>

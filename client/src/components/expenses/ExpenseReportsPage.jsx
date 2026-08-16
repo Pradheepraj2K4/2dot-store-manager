@@ -235,7 +235,7 @@ export default function ExpenseReportsPage() {
             <div className="card p-0 overflow-hidden">
               <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 330px)' }}>
                 <table className="w-full text-sm border-collapse">
-                  <thead className="sticky top-0 z-10 bg-slate-100">
+                  <thead className="sticky top-0 z-10 bg-amber-100">
                     <tr className="text-slate-600 text-xs">
                       <th className="px-3 py-2 text-center font-semibold border-b border-slate-200 w-10">S.No</th>
                       <th className="px-3 py-2 text-left font-semibold border-b border-slate-200 whitespace-nowrap">Date</th>

@@ -7,6 +7,7 @@ import {
   cacheReceiptConfig,
   THERMAL_SECTION_LABELS,
   PAPER_COLUMN_LABELS,
+  INVOICE_LABEL_FIELDS,
 } from "../../utils/receiptConfig";
 import {
   SIDEBAR_MENU_GROUPS,
@@ -103,14 +104,17 @@ export default function DeveloperSettingsPage() {
   );
   const [paperPreviewFormat, setPaperPreviewFormat] = useState("a4");
   const [savingReceiptDesign, setSavingReceiptDesign] = useState(false);
-  const [activeBlock, setActiveBlock] = useState("logo");
+  // Invoice labels editor state (A4 / A5 labels for sale + purchase)
+  const [invoiceLabelsCfg, setInvoiceLabelsCfg] = useState(
+    () => mergeReceiptConfig(null).invoiceLabels,
+  );
+  const [labelDocKind, setLabelDocKind] = useState("sale");
+  const [savingInvoiceLabels, setSavingInvoiceLabels] = useState(false);
   const [fullscreenPreview, setFullscreenPreview] = useState(false);
-  const paperCanvasRef = useRef(null);
 
   // Active section tab
   const [activeTab, setActiveTab] = useState("profile");
   const [receiptSubTab, setReceiptSubTab] = useState("print");
-
   // Interest module state
   const [interestModuleEnabled, setInterestModuleEnabled] = useState(false);
   // Expense module state
@@ -335,6 +339,7 @@ export default function DeveloperSettingsPage() {
       const mergedCfg = mergeReceiptConfig(cfg);
       setThermalCfg(mergedCfg.thermal);
       setPaperCfg(mergedCfg.paper);
+      setInvoiceLabelsCfg(mergedCfg.invoiceLabels);
       cacheReceiptConfig(mergedCfg);
       setDefaultPrintFormat(
         ["thermal", "a5", "a4"].includes(cfg.format) ? cfg.format : "thermal",
@@ -702,6 +707,42 @@ export default function DeveloperSettingsPage() {
     persistReceiptDesign(thermalCfg, d);
   };
 
+  // Invoice labels: persist / reset / edit a single field.
+  const persistInvoiceLabels = async (nextLabels) => {
+    setSavingInvoiceLabels(true);
+    try {
+      const next = { ...receiptConfig, invoiceLabels: nextLabels };
+      await settingsApi.update("receipt_config", next);
+      setReceiptConfig(next);
+      cacheReceiptConfig(mergeReceiptConfig(next));
+      toast.success("Invoice labels saved");
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSavingInvoiceLabels(false);
+    }
+  };
+
+  const saveInvoiceLabels = () => persistInvoiceLabels(invoiceLabelsCfg);
+
+  const resetInvoiceLabels = () => {
+    const d = mergeReceiptConfig(null).invoiceLabels;
+    setInvoiceLabelsCfg(d);
+    persistInvoiceLabels(d);
+  };
+
+  const updateInvoiceLabel = (kind, key, value) => {
+    setInvoiceLabelsCfg((prev) => ({
+      ...prev,
+      [kind]: { ...prev[kind], [key]: value },
+    }));
+  };
+
+  const toggleSeparatePurchaseLabels = (checked) => {
+    setInvoiceLabelsCfg((prev) => ({ ...prev, separatePurchase: checked }));
+    if (!checked && labelDocKind === "purchase") setLabelDocKind("sale");
+  };
+
   // Thermal: toggle / reorder sections + style knobs
   const toggleThermalSection = (id) => {
     setThermalCfg((prev) => ({
@@ -731,52 +772,6 @@ export default function DeveloperSettingsPage() {
       ...prev,
       columns: { ...prev.columns, [id]: !(prev.columns?.[id] !== false) },
     }));
-  const setBlockField = (block, key, value) =>
-    setPaperCfg((prev) => ({
-      ...prev,
-      blocks: {
-        ...prev.blocks,
-        [block]: { ...prev.blocks[block], [key]: value },
-      },
-    }));
-
-  // Drag a header block around the free-hand A4 canvas. Coordinates are stored
-  // in millimetres on a 210mm-wide (A4) canvas.
-  const onBlockPointerDown = (e, blockId) => {
-    e.preventDefault();
-    setActiveBlock(blockId);
-    const canvas = paperCanvasRef.current;
-    if (!canvas) return;
-    const pxPerMm = canvas.getBoundingClientRect().width / 210;
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const origX = paperCfg.blocks[blockId].x;
-    const origY = paperCfg.blocks[blockId].y;
-    const maxY = Math.max(2, (paperCfg.headerHeight || 40) - 2);
-    const move = (ev) => {
-      const nx = Math.max(
-        0,
-        Math.min(200, Math.round(origX + (ev.clientX - startX) / pxPerMm)),
-      );
-      const ny = Math.max(
-        0,
-        Math.min(maxY, Math.round(origY + (ev.clientY - startY) / pxPerMm)),
-      );
-      setPaperCfg((prev) => ({
-        ...prev,
-        blocks: {
-          ...prev.blocks,
-          [blockId]: { ...prev.blocks[blockId], x: nx, y: ny },
-        },
-      }));
-    };
-    const up = () => {
-      window.removeEventListener("pointermove", move);
-      window.removeEventListener("pointerup", up);
-    };
-    window.addEventListener("pointermove", move);
-    window.addEventListener("pointerup", up);
-  };
 
   // Live design preview — a sample sale rendered through the current config.
   const buildDesignPreviewHtml = (format) =>
@@ -1846,6 +1841,7 @@ export default function DeveloperSettingsPage() {
               { id: "print", label: "Print Settings" },
               { id: "thermal", label: "Thermal Design" },
               { id: "paper", label: "A4 / A5 Design" },
+              { id: "labels", label: "Invoice Labels" },
             ].map((st) => (
               <button
                 key={st.id}
@@ -2384,8 +2380,8 @@ export default function DeveloperSettingsPage() {
                     A4 / A5 Invoice Design
                   </h2>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Drag the header blocks anywhere, then style the invoice
-                    body.
+                    Style the invoice body, choose visible columns and toggle
+                    sections.
                   </p>
                 </div>
                 <div className="flex gap-2">
@@ -2404,170 +2400,6 @@ export default function DeveloperSettingsPage() {
                   >
                     {savingReceiptDesign ? "Saving…" : "Save Design"}
                   </button>
-                </div>
-              </div>
-
-              {/* Free-hand header canvas */}
-              <div className="mt-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-semibold text-slate-800">
-                    Header Layout (free-hand)
-                  </h3>
-                  <span className="text-xs text-slate-400">
-                    A4 · 210mm wide
-                  </span>
-                </div>
-                <div
-                  ref={paperCanvasRef}
-                  className="relative w-full bg-white border border-slate-300 rounded-lg overflow-hidden select-none"
-                  style={{
-                    aspectRatio: `210 / ${paperCfg.headerHeight || 40}`,
-                  }}
-                >
-                  {["logo", "store", "meta"].map((id) => {
-                    const b = paperCfg.blocks[id];
-                    if (!b || b.enabled === false) return null;
-                    return (
-                      <div
-                        key={id}
-                        onPointerDown={(e) => onBlockPointerDown(e, id)}
-                        className={`absolute cursor-move rounded border px-1.5 py-1 text-[10px] font-semibold truncate ${
-                          activeBlock === id
-                            ? "border-trust-blue bg-blue-50 text-trust-blue z-10"
-                            : "border-slate-300 bg-slate-50 text-slate-500"
-                        }`}
-                        style={{
-                          left: `${(b.x / 210) * 100}%`,
-                          top: `${(b.y / (paperCfg.headerHeight || 40)) * 100}%`,
-                          width: `${(b.w / 210) * 100}%`,
-                        }}
-                      >
-                        {id === "logo"
-                          ? "Logo"
-                          : id === "store"
-                            ? "Store Info"
-                            : "Invoice Meta"}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="flex items-center gap-2 mt-2">
-                  {["logo", "store", "meta"].map((id) => (
-                    <button
-                      key={id}
-                      onClick={() => setActiveBlock(id)}
-                      className={`px-2.5 py-1 rounded-md text-xs font-medium border ${
-                        activeBlock === id
-                          ? "bg-trust-blue text-white border-trust-blue"
-                          : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                      }`}
-                    >
-                      {id === "logo"
-                        ? "Logo"
-                        : id === "store"
-                          ? "Store Info"
-                          : "Invoice Meta"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Active block controls */}
-              <div className="mt-3 p-3 rounded-lg border border-slate-200 bg-slate-50">
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 items-end">
-                  <div>
-                    <label className="label">
-                      X ({paperCfg.blocks[activeBlock].x}mm)
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="200"
-                      value={paperCfg.blocks[activeBlock].x}
-                      onChange={(e) =>
-                        setBlockField(activeBlock, "x", Number(e.target.value))
-                      }
-                      className="w-full accent-trust-blue"
-                    />
-                  </div>
-                  <div>
-                    <label className="label">
-                      Y ({paperCfg.blocks[activeBlock].y}mm)
-                    </label>
-                    <input
-                      type="range"
-                      min="0"
-                      max={(paperCfg.headerHeight || 40) - 2}
-                      value={paperCfg.blocks[activeBlock].y}
-                      onChange={(e) =>
-                        setBlockField(activeBlock, "y", Number(e.target.value))
-                      }
-                      className="w-full accent-trust-blue"
-                    />
-                  </div>
-                  <div>
-                    <label className="label">
-                      Width ({paperCfg.blocks[activeBlock].w}mm)
-                    </label>
-                    <input
-                      type="range"
-                      min="10"
-                      max="200"
-                      value={paperCfg.blocks[activeBlock].w}
-                      onChange={(e) =>
-                        setBlockField(activeBlock, "w", Number(e.target.value))
-                      }
-                      className="w-full accent-trust-blue"
-                    />
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-1.5 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={paperCfg.blocks[activeBlock].enabled !== false}
-                        onChange={(e) =>
-                          setBlockField(
-                            activeBlock,
-                            "enabled",
-                            e.target.checked,
-                          )
-                        }
-                        className="h-4 w-4 rounded text-trust-blue focus:ring-trust-blue"
-                      />
-                      <span className="text-xs text-slate-700">Show</span>
-                    </label>
-                    {activeBlock !== "logo" && (
-                      <select
-                        value={
-                          paperCfg.blocks[activeBlock].align ||
-                          (activeBlock === "meta" ? "right" : "left")
-                        }
-                        onChange={(e) =>
-                          setBlockField(activeBlock, "align", e.target.value)
-                        }
-                        className="input-field text-xs py-1"
-                      >
-                        <option value="left">Left</option>
-                        <option value="center">Center</option>
-                        <option value="right">Right</option>
-                      </select>
-                    )}
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <label className="label">
-                    Header Band Height ({paperCfg.headerHeight}mm)
-                  </label>
-                  <input
-                    type="range"
-                    min="18"
-                    max="70"
-                    value={paperCfg.headerHeight}
-                    onChange={(e) =>
-                      setPaperStyle("headerHeight", Number(e.target.value))
-                    }
-                    className="w-full accent-trust-blue"
-                  />
                 </div>
               </div>
 
@@ -2803,6 +2635,113 @@ export default function DeveloperSettingsPage() {
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Invoice Labels */}
+          {receiptSubTab === "labels" && (
+            <div className="card space-y-4">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <h3 className="text-base font-semibold text-slate-800">
+                    Custom Invoice Labels
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Rename the headings, columns and totals printed on A4 / A5
+                    invoices.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={resetInvoiceLabels}
+                    disabled={savingInvoiceLabels}
+                    className="btn-secondary text-sm disabled:opacity-50"
+                  >
+                    Reset
+                  </button>
+                  <button
+                    onClick={saveInvoiceLabels}
+                    disabled={savingInvoiceLabels}
+                    className="btn-primary text-sm disabled:opacity-50"
+                  >
+                    {savingInvoiceLabels ? "Saving…" : "Save Labels"}
+                  </button>
+                </div>
+              </div>
+
+              <label className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg border border-slate-200 bg-slate-50">
+                <span className="text-sm font-medium text-slate-700">
+                  Use different labels for Purchase invoices
+                </span>
+                <span className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={invoiceLabelsCfg.separatePurchase !== false}
+                    onChange={(e) =>
+                      toggleSeparatePurchaseLabels(e.target.checked)
+                    }
+                    className="sr-only peer"
+                  />
+                  <span className="w-11 h-6 bg-slate-200 peer-focus:ring-2 peer-focus:ring-blue-300 rounded-full peer peer-checked:bg-trust-blue transition-colors after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></span>
+                </span>
+              </label>
+
+              {invoiceLabelsCfg.separatePurchase !== false && (
+                <div className="flex gap-1 bg-slate-100 rounded-lg p-1 max-w-xs">
+                  {[
+                    { id: "sale", label: "Sales Invoice" },
+                    { id: "purchase", label: "Purchase Invoice" },
+                  ].map((k) => (
+                    <button
+                      key={k.id}
+                      onClick={() => setLabelDocKind(k.id)}
+                      className={`flex-1 py-1.5 px-3 rounded-md text-sm font-medium transition-all ${
+                        labelDocKind === k.id
+                          ? "bg-white text-slate-900 shadow-sm"
+                          : "text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
+                      {k.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {(() => {
+                const kind =
+                  invoiceLabelsCfg.separatePurchase === false
+                    ? "sale"
+                    : labelDocKind;
+                const set = invoiceLabelsCfg[kind] || {};
+                return (
+                  <div className="space-y-5">
+                    {INVOICE_LABEL_FIELDS.map((group) => (
+                      <div key={group.group}>
+                        <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                          {group.group}
+                        </h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {Object.entries(group.fields).map(([key, label]) => (
+                            <div key={key}>
+                              <label className="block text-xs font-medium text-slate-600 mb-1">
+                                {label}
+                              </label>
+                              <input
+                                type="text"
+                                value={set[key] ?? ""}
+                                onChange={(e) =>
+                                  updateInvoiceLabel(kind, key, e.target.value)
+                                }
+                                className="input-field text-sm"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>

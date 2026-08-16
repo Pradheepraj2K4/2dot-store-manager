@@ -334,15 +334,15 @@ export default function PurchaseReportPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm table-zebra">
               <thead>
-                <tr className="border-b border-slate-200">
+                <tr className="border-b border-slate-200 bg-amber-100">
                   <th className="px-4 py-2.5 w-10"></th>
-                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600 w-24">Purchase #</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600 w-24 whitespace-nowrap">Purchase #</th>
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Supplier</th>
                   {poEnabled && (
-                    <th className="px-4 py-2.5 text-left font-semibold text-slate-600 w-32">PO #</th>
+                    <th className="px-4 py-2.5 text-left font-semibold text-slate-600 w-32 whitespace-nowrap">PO #</th>
                   )}
-                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600 w-32">Bill #</th>
-                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Date / Time</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600 w-32 whitespace-nowrap">Bill #</th>
+                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600 whitespace-nowrap">Date / Time</th>
                   <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Items</th>
                   <th className="px-4 py-2.5 text-right font-semibold text-slate-600">GST</th>
                   <th className="px-4 py-2.5 text-right font-semibold text-slate-600">Discount</th>

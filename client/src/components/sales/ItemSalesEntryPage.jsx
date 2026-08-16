@@ -2006,6 +2006,63 @@ export default function ItemSalesEntryPage() {
     setPreviewModal({ open: true, html, sale });
   };
 
+  // Preview the invoice for the in-progress (unsaved) sale using the current
+  // form state, without persisting anything.
+  const handlePreviewInvoice = () => {
+    const validLines = lines.filter((l) => l.item_name && l.item_name.trim());
+    if (validLines.length === 0) {
+      toast.error("Add at least one item line to preview");
+      return;
+    }
+    const previewSale = {
+      sale_number: saleNumber || "PREVIEW",
+      ledger_name: ledger?.name,
+      date,
+      time,
+      customer_name: isCashLedger ? customerName.trim() : "",
+      customer_mobile: isCashLedger ? customerMobile.trim() : "",
+      customer_place: isCashLedger ? customerPlace.trim() : "",
+      total_amount: netTotal,
+      total_discount: totals.discountTotal,
+      bill_discount: parseFloat(billDiscount) || 0,
+      freight_charge: freightEnabled ? parseFloat(freightCharge) || 0 : 0,
+      total_gst: totals.gstTotal,
+      cash_amount: parseFloat(cashAmount) || 0,
+      upi_amount: parseFloat(upiAmount) || 0,
+      tendered_amount: parseFloat(tenderedAmount) || 0,
+      service_type: restaurantEnabled ? serviceType : "",
+      waiter_name:
+        restaurantEnabled && waiterId
+          ? waiters.find((w) => String(w.id) === String(waiterId))?.name || ""
+          : "",
+      item_count: validLines.length,
+      items: validLines.map((l) => {
+        const r = parseFloat(l.rate) || 0;
+        const q = parseFloat(l.quantity) || 1;
+        const d = parseFloat(l.discount_percent) || 0;
+        const g = parseFloat(l.gst_percent) || 0;
+        const gross = r * q * (1 - d / 100);
+        const gstAmt =
+          rateTaxMode === "taxable"
+            ? (gross * g) / 100
+            : gross - gross / (1 + g / 100);
+        return {
+          item_name: l.item_name.trim(),
+          hsn: l.hsn || items.find((x) => x.id === l.item_id)?.hsn_code || "",
+          unit: l.unit || DEFAULT_ITEM_UNIT,
+          mrp: parseFloat(l.mrp) || 0,
+          rate: r,
+          quantity: q,
+          discount_percent: d,
+          gst_percent: g,
+          gst_amount: Math.round(gstAmt * 100) / 100,
+          amount: parseFloat(l.amount) || 0,
+        };
+      }),
+    };
+    openSalePreview(previewSale, ledger?.name, false);
+  };
+
   const closePreview = () => {
     const shouldNavigate = navigateAfterPreviewRef.current;
     navigateAfterPreviewRef.current = false;
@@ -2853,6 +2910,14 @@ export default function ItemSalesEntryPage() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handlePreviewInvoice}
+              className="btn-secondary inline-flex items-center gap-1.5"
+            >
+              <PrinterIcon className="h-4 w-4" />
+              Preview
+            </button>
             <button
               type="button"
               onClick={() => navigate("/item-sales")}

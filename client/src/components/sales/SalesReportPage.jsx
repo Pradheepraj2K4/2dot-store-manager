@@ -351,15 +351,15 @@ export default function SalesReportPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm table-zebra">
               <thead>
-                <tr className="border-b border-slate-200">
+                <tr className="border-b border-slate-200 bg-amber-100">
                   <th className="px-4 py-2.5 w-10"></th>
-                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600 w-24">
+                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600 w-24 whitespace-nowrap">
                     Sale #
                   </th>
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">
                     Customer
                   </th>
-                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600">
+                  <th className="px-4 py-2.5 text-left font-semibold text-slate-600 whitespace-nowrap">
                     Date / Time
                   </th>
                   <th className="px-4 py-2.5 text-right font-semibold text-slate-600">

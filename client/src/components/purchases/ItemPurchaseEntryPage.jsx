@@ -6,11 +6,14 @@ import {
   ArrowPathIcon,
   Cog6ToothIcon,
   PlusIcon,
+  PrinterIcon,
   TrashIcon,
 } from "@heroicons/react/24/outline";
 import { itemApi, purchaseApi, ledgerApi, settingsApi } from "../../api";
 import { DEFAULT_ITEM_UNIT } from "../../utils/itemConstants";
 import { formatCurrency, todayISO } from "../../utils/helpers";
+import { buildPurchaseReceiptHtml } from "../../utils/purchaseReceipt";
+import { fetchLogoDataUrl } from "../../utils/interestReceipt";
 import LedgerAutocomplete from "../ui/LedgerAutocomplete";
 import LoadingSpinner from "../ui/LoadingSpinner";
 import Modal from "../ui/Modal";
@@ -478,6 +481,13 @@ export default function ItemPurchaseEntryPage() {
   const autoBatchSeq = useRef(1);
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
+  // Invoice preview (print) state — store profile, logo and receipt config are
+  // loaded once so the operator can preview the voucher before saving.
+  const [store, setStore] = useState({});
+  const [logoDataUrl, setLogoDataUrl] = useState(null);
+  const [receiptFormat, setReceiptFormat] = useState("a5");
+  const [receiptConfig, setReceiptConfig] = useState(null);
+  const [previewModal, setPreviewModal] = useState({ open: false, html: "", purchase: null });
   // Cost-rate tax treatment: 'inclusive' (rate includes GST) or 'taxable'
   // (rate is pre-tax and GST is added on top). Toggled from the Ctrl+I dialog.
   const [rateTaxMode, setRateTaxMode] = useState(() => {
@@ -977,6 +987,91 @@ export default function ItemPurchaseEntryPage() {
       (parseFloat(billDiscount) || 0) +
       (freightEnabled ? parseFloat(freightCharge) || 0 : 0),
   );
+
+  // Load store profile / receipt config / logo once for invoice previewing.
+  useEffect(() => {
+    (async () => {
+      const [profileRes, configRes] = await Promise.all([
+        settingsApi.getStoreProfile().catch(() => ({ data: {} })),
+        settingsApi.getReceiptConfig().catch(() => ({ data: {} })),
+      ]);
+      const profile = profileRes.data || {};
+      setStore(profile);
+      const cfg =
+        configRes.data && typeof configRes.data === "object" ? configRes.data : {};
+      setReceiptConfig(cfg);
+      const fmt = cfg.format || "a5";
+      setReceiptFormat(["a4", "a5", "thermal"].includes(fmt) ? fmt : "a5");
+      if (profile.logo_path) {
+        const dl = await fetchLogoDataUrl(profile.logo_path);
+        setLogoDataUrl(dl);
+      }
+    })();
+  }, []);
+
+  // Assemble a purchase-shaped object from the current form state so the
+  // in-progress voucher can be previewed without saving.
+  const buildPreviewPurchase = () => {
+    const validLines = lines.filter((l) => l.item_name && l.item_name.trim());
+    return {
+      purchase_number: purchaseNumber || "PREVIEW",
+      ledger_name: ledger?.name,
+      bill_number: billNumber,
+      po_number: poEnabled ? poNumber : "",
+      date,
+      time,
+      total_amount: netTotal,
+      total_discount: totals.discountTotal,
+      bill_discount: parseFloat(billDiscount) || 0,
+      freight_charge: freightEnabled ? parseFloat(freightCharge) || 0 : 0,
+      total_gst: totals.gstTotal,
+      item_count: validLines.length,
+      items: validLines.map((l) => {
+        const r = parseFloat(l.rate) || 0;
+        const q = parseFloat(l.quantity) || 1;
+        const d = parseFloat(l.discount_percent) || 0;
+        const g = parseFloat(l.gst_percent) || 0;
+        const gross = r * q * (1 - d / 100);
+        const gstAmt =
+          rateTaxMode === "taxable"
+            ? (gross * g) / 100
+            : gross - gross / (1 + g / 100);
+        return {
+          item_name: l.item_name.trim(),
+          hsn: l.hsn || items.find((x) => x.id === l.item_id)?.hsn_code || "",
+          unit: l.unit || DEFAULT_ITEM_UNIT,
+          mrp: parseFloat(l.mrp) || 0,
+          rate: r,
+          quantity: q,
+          discount_percent: d,
+          gst_percent: g,
+          gst_amount: Math.round(gstAmt * 100) / 100,
+          amount: parseFloat(l.amount) || 0,
+        };
+      }),
+    };
+  };
+
+  const handlePreviewInvoice = () => {
+    if (!ledger) {
+      toast.error("Select a supplier ledger to preview");
+      return;
+    }
+    const validLines = lines.filter((l) => l.item_name && l.item_name.trim());
+    if (validLines.length === 0) {
+      toast.error("Add at least one item line to preview");
+      return;
+    }
+    const purchase = buildPreviewPurchase();
+    const html = buildPurchaseReceiptHtml({
+      purchase,
+      store,
+      logoDataUrl,
+      format: receiptFormat,
+      config: receiptConfig,
+    });
+    setPreviewModal({ open: true, html, purchase });
+  };
 
   const handleSave = async () => {
     if (!ledger) {
@@ -1650,6 +1745,14 @@ export default function ItemPurchaseEntryPage() {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={handlePreviewInvoice}
+              className="btn-secondary inline-flex items-center gap-1.5"
+            >
+              <PrinterIcon className="h-4 w-4" />
+              Preview
+            </button>
+            <button
+              type="button"
               onClick={() => navigate("/item-purchases")}
               className="btn-secondary"
             >
@@ -1707,6 +1810,84 @@ export default function ItemPurchaseEntryPage() {
           </div>
         </div>
       </Modal>
+
+      {/* Invoice Preview Modal */}
+      <Modal
+        open={previewModal.open}
+        onClose={() => setPreviewModal({ open: false, html: "", purchase: null })}
+        title={`Purchase Voucher Preview${previewModal.purchase ? " " + previewModal.purchase.purchase_number : ""}`}
+        size="lg"
+      >
+        <PurchaseReceiptPreview
+          html={previewModal.html}
+          format={receiptFormat}
+          onFormatChange={(f) => {
+            setReceiptFormat(f);
+            if (previewModal.purchase) {
+              const html = buildPurchaseReceiptHtml({
+                purchase: previewModal.purchase,
+                store,
+                logoDataUrl,
+                format: f,
+                config: receiptConfig,
+              });
+              setPreviewModal((prev) => ({ ...prev, html }));
+            }
+          }}
+          onClose={() => setPreviewModal({ open: false, html: "", purchase: null })}
+        />
+      </Modal>
+    </div>
+  );
+}
+
+function PurchaseReceiptPreview({ html, format, onFormatChange, onClose }) {
+  const iframeRef = useRef(null);
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-slate-500">Format:</span>
+        {["thermal", "a5", "a4"].map((f) => (
+          <button
+            key={f}
+            type="button"
+            onClick={() => onFormatChange(f)}
+            className={`rounded-md px-2.5 py-1 text-xs font-medium border ${
+              format === f
+                ? "bg-blue-600 text-white border-blue-600"
+                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            {f === "thermal" ? "Thermal 80mm" : f.toUpperCase()}
+          </button>
+        ))}
+      </div>
+      <iframe
+        ref={iframeRef}
+        srcDoc={html}
+        title="Purchase Voucher Preview"
+        className="w-full border border-slate-200 rounded bg-white"
+        style={{ minHeight: 380, maxHeight: 600, overflowX: "hidden" }}
+        onLoad={(e) => {
+          const doc = e.target.contentDocument;
+          if (doc)
+            e.target.style.height =
+              Math.min(doc.body.scrollHeight + 8, 600) + "px";
+        }}
+      />
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onClose} className="btn-secondary">
+          Close
+        </button>
+        <button
+          type="button"
+          onClick={() => iframeRef.current?.contentWindow?.print()}
+          className="btn-primary inline-flex items-center gap-1.5"
+        >
+          <PrinterIcon className="h-4 w-4" />
+          Print
+        </button>
+      </div>
     </div>
   );
 }

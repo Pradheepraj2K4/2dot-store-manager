@@ -495,7 +495,7 @@ export default function ReportsPage() {
           </div>
           <div className="overflow-y-auto overflow-x-auto flex-1">
             <table className="w-full text-sm table-zebra">
-              <thead className="sticky top-0 z-10 bg-white">
+              <thead className="sticky top-0 z-10 bg-amber-100">
                 <tr className="border-b border-slate-200">
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Date</th>
                   <th className="px-4 py-2.5 text-left font-semibold text-slate-600">Ref #</th>

@@ -9,7 +9,8 @@
  *              Supplier block, ruled items table and totals panel
  */
 
-import { mergeReceiptConfig } from './receiptConfig';
+import { mergeReceiptConfig, getInvoiceLabels } from './receiptConfig';
+import { buildUpiQrDataUrl } from './saleReceipt';
 
 function fmt(date) {
   if (!date) return '—';
@@ -84,7 +85,7 @@ export function buildPurchaseReceiptHtml({
   const ps = PAGE_SIZES[format] || PAGE_SIZES.thermal;
   const fontFamily = mergeReceiptConfig(config).paper.fontFamily || "'Helvetica Neue', Helvetica, Arial, sans-serif";
   if (format === 'thermal') return buildThermal({ purchase, store, logoDataUrl, ps });
-  return buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily });
+  return buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily, config });
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -326,8 +327,10 @@ function buildThermal({ purchase, store, logoDataUrl, ps }) {
 // ───────────────────────────────────────────────────────────────────────────
 // A4 / A5 — standard monochrome purchase voucher
 // ───────────────────────────────────────────────────────────────────────────
-function buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily }) {
+function buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily, config = null }) {
   const isA5 = format === 'a5';
+  const cfgP = mergeReceiptConfig(config).paper;
+  const il = getInvoiceLabels(config, 'purchase');
   const items = Array.isArray(purchase.items) ? purchase.items : [];
 
   const totalItemDiscount = parseFloat(purchase.total_discount) || 0;
@@ -374,60 +377,87 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily }) {
     ? `<img class="logo" src="${logoDataUrl}" alt="Logo"/>`
     : '';
 
-  const itemsRows = items.map((l, i) => {
-    const rate = parseFloat(l.rate) || 0;
-    const qty  = parseFloat(l.quantity) || 0;
-    const disc = parseFloat(l.discount_percent) || 0;
-    const gst  = parseFloat(l.gst_percent) || 0;
-    const mrp  = parseFloat(l.mrp) || 0;
-    return `
-      <tr>
-        <td class="c">${i + 1}</td>
-        <td class="nm">${escapeHtml(l.item_name || '')}</td>
-        <td class="c">${escapeHtml(l.hsn_code || l.hsn || '')}</td>
-        <td class="c">${escapeHtml(l.unit || '')}</td>
-        <td class="r">${mrp ? num(mrp) : '—'}</td>
-        <td class="r">${num(qty, qty % 1 === 0 ? 0 : 2)}</td>
-        <td class="r">${num(rate)}</td>
-        <td class="c">${gst ? num(gst, 0) : '0'}</td>
-        <td class="c">${disc ? num(disc, 0) : '0'}</td>
-        <td class="r">${num(l.amount)}</td>
-      </tr>
-    `;
-  }).join('');
+  // Optional-column visibility (paper.columns). Item, Qty and Amount are always
+  // shown; every other column is toggled from the A4/A5 design settings.
+  const cols = cfgP.columns || {};
+  const colOn = (k) => cols[k] !== false;
+  const columnDefs = [
+    { key: 'sno', cls: 'col-no', th: il.colSno, cell: (l, i) => `<td class="c">${i + 1}</td>` },
+    { key: 'item', cls: 'col-name', th: il.colItem, always: true, cell: (l) => `<td class="nm">${escapeHtml(l.item_name || '')}</td>` },
+    { key: 'hsn', cls: 'col-hsn', th: il.colHsn, cell: (l) => `<td class="c">${escapeHtml(l.hsn_code || l.hsn || '')}</td>` },
+    { key: 'unit', cls: 'col-unit', th: il.colUnit, cell: (l) => `<td class="c">${escapeHtml(l.unit || '')}</td>` },
+    { key: 'mrp', cls: 'col-mrp', th: il.colMrp, cell: (l) => { const mrp = parseFloat(l.mrp) || 0; return `<td class="r">${mrp ? num(mrp, mrp % 1 === 0 ? 0 : 2) : '—'}</td>`; } },
+    { key: 'qty', cls: 'col-qty', th: il.colQty, always: true, cell: (l) => { const q = parseFloat(l.quantity) || 0; return `<td class="r">${num(q, q % 1 === 0 ? 0 : 2)}</td>`; } },
+    { key: 'rate', cls: 'col-rate', th: il.colRate, cell: (l) => { const rate = parseFloat(l.rate) || 0; return `<td class="r">${num(rate, rate % 1 === 0 ? 0 : 2)}</td>`; } },
+    { key: 'gst', cls: 'col-gst', th: il.colGst, cell: (l) => { const gst = parseFloat(l.gst_percent) || 0; return `<td class="c">${gst ? num(gst, 0) : '0'}</td>`; } },
+    { key: 'discount', cls: 'col-dis', th: il.colDiscount, cell: (l) => { const disc = parseFloat(l.discount_percent) || 0; return `<td class="c">${disc ? num(disc, 0) : '0'}</td>`; } },
+    { key: 'amount', cls: 'col-amt', th: il.colAmount, always: true, cell: (l) => `<td class="r">${num(l.amount)}</td>` },
+  ];
+  const activeCols = columnDefs.filter((c) => c.always || colOn(c.key));
+  const colgroupHtml = activeCols.map((c) => `<col class="${c.cls}"/>`).join('');
+  const theadHtml = activeCols.map((c) => `<th>${escapeHtml(c.th)}</th>`).join('');
+  const itemsRows = items
+    .map((l, i) => `<tr>${activeCols.map((c) => c.cell(l, i)).join('')}</tr>`)
+    .join('');
 
   // Blank filler row keeps the items table at a fixed height regardless of the
   // number of lines, so short invoices keep the same tall ruled body as long ones.
-  const fillerRow = `
-      <tr class="filler">
-        <td class="c"></td>
-        <td class="nm remarks">Remarks:</td>
-        <td class="c"></td>
-        <td class="c"></td>
-        <td class="r"></td>
-        <td class="r"></td>
-        <td class="r"></td>
-        <td class="c"></td>
-        <td class="c"></td>
-        <td class="r"></td>
-      </tr>`;
+  const fillerRow = `<tr class="filler">${activeCols
+    .map((c) => (c.key === 'item' ? '<td class="nm remarks">Remarks:</td>' : '<td></td>'))
+    .join('')}</tr>`;
 
   const contactBits = [
     store.phone ? `Cell: ${escapeHtml(store.phone)}` : '',
     store.email ? `email: ${escapeHtml(store.email)}` : '',
   ].filter(Boolean).join('<br>');
 
-  const termsLines = (store.terms_conditions && String(store.terms_conditions).trim())
-    ? String(store.terms_conditions).split('\n').map((t) => t.trim()).filter(Boolean)
+  // UPI payment QR for the invoice footer (encodes store VPA + bill total).
+  const upiQrDataUrl = buildUpiQrDataUrl(store?.upi_id, {
+    payeeName: store.store_name || '',
+    amount: totalAmount,
+  });
+
+  const termsSource = (cfgP.termsText && String(cfgP.termsText).trim())
+    ? String(cfgP.termsText)
+    : (store.terms_conditions && String(store.terms_conditions).trim() ? String(store.terms_conditions) : '');
+  const termsLines = termsSource.trim()
+    ? termsSource.split('\n').map((t) => t.trim()).filter(Boolean)
     : ['Goods once sold cannot be taken back.', 'Subject to local jurisdiction.', 'Our responsibility ceases on delivery of goods.'];
   const termsHtml = termsLines.map((t) => `<li>${escapeHtml(t)}</li>`).join('');
 
   const itemsTableHeight = isA5 ? '58mm' : '120mm';
 
-  const baseFs   = isA5 ? '9pt'  : '10.5pt';
-  const titleFs  = isA5 ? '15pt' : '20pt';
-  const headFs   = isA5 ? '8.5pt' : '9.5pt';
-  const grandFs  = isA5 ? '12pt' : '14pt';
+  // ── Style tokens ──
+  const accent = /^#[0-9a-fA-F]{3,8}$/.test(cfgP.accentColor || '') ? cfgP.accentColor : '#000000';
+  const F = Math.min(1.3, Math.max(0.8, parseFloat(cfgP.fontScale) || 1));
+  const pt = (v) => `${+(v * F).toFixed(2)}pt`;
+
+  const baseFs   = isA5 ? pt(9)   : pt(10.5);
+  const titleFs  = isA5 ? pt(15)  : pt(20);
+  const headFs   = isA5 ? pt(8.5) : pt(9.5);
+  const grandFs  = isA5 ? pt(12)  : pt(14);
+
+  const signatureLabel = cfgP.signatureLabel && cfgP.signatureLabel.trim() ? cfgP.signatureLabel.trim() : 'Authorised Signatory';
+
+  // Section-level A4/A5 design toggles.
+  const showBorder = cfgP.showBorder !== false;
+  const showWords = cfgP.showWords !== false;
+  const showTerms = cfgP.showTerms !== false;
+  const showSignature = cfgP.showSignature !== false;
+  const thanksText = (cfgP.thanksText && String(cfgP.thanksText).trim()) ? String(cfgP.thanksText).trim() : '';
+
+  const footCols = [];
+  if (showTerms) {
+    footCols.push(`<div class="col terms"><span class="lbl">Terms &amp; Condition</span><ol>${termsHtml}</ol></div>`);
+  }
+  if (showSignature) {
+    footCols.push(`<div class="col sig"><span class="lbl">Receiver Signature</span><div class="sig-space"></div></div>`);
+    footCols.push(`<div class="col sig"><span class="lbl">For ${escapeHtml(store.store_name || 'Store')}</span><div class="sig-space">${escapeHtml(signatureLabel)}</div></div>`);
+  }
+  const footGrid = (showTerms && showSignature) ? '1.4fr 1fr 1fr' : (showTerms ? '1fr' : '1fr 1fr');
+  const footHtml = footCols.length
+    ? `<div class="foot" style="grid-template-columns: ${footGrid};">${footCols.join('')}</div>`
+    : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -435,70 +465,75 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily }) {
   <meta charset="UTF-8" />
   <title>Purchase ${purchase.purchase_number || ''}</title>
   <style>
+    :root { --accent: ${accent}; }
     @page { size: ${ps.cssSize}; margin: ${isA5 ? '8mm' : '14mm'}; }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { background: #fff; }
-    body, body * { color: #000 !important; background: transparent !important; border-color: #000 !important; }
     body {
       font-family: ${fontFamily};
       font-size: ${baseFs};
+      color: #000;
       line-height: 1.4;
       width: ${ps.width};
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     @media screen { html { background: #eef0f2; } body { margin: 0 auto; box-shadow: 0 0 6px rgba(0,0,0,0.15); } }
     .page { width: 100%; }
 
-    .doc { border: 1.4px solid #000; }
+    .doc { border: ${showBorder ? '1.4px solid var(--accent)' : 'none'}; }
 
     .head {
       display: grid;
-      grid-template-columns: 1.6fr 1fr;
-      border-bottom: 1.4px solid #000;
+      grid-template-columns: 2.2fr 1fr;
+      border-bottom: 1.4px solid var(--accent);
     }
     .head .left { padding: ${isA5 ? '3mm 4mm' : '4mm 6mm'}; display: flex; align-items: center; gap: 4mm; }
+    .head .left > div { flex: 1; min-width: 0; }
     .head .right {
-      border-left: 1.4px solid #000;
+      border-left: 1.4px solid var(--accent);
       display: flex;
       flex-direction: column;
     }
-    .logo { max-height: ${isA5 ? '14mm' : '18mm'}; max-width: ${isA5 ? '24mm' : '32mm'}; object-fit: contain; filter: grayscale(100%); }
-    .store-name { font-size: ${titleFs}; font-weight: 800; letter-spacing: 0.4px; line-height: 1.1; }
-    .store-meta { font-size: ${isA5 ? '8pt' : '9pt'}; margin-top: 1mm; line-height: 1.4; }
+    .logo { max-height: ${isA5 ? '14mm' : '18mm'}; max-width: ${isA5 ? '24mm' : '32mm'}; object-fit: contain; }
+    .store-name { font-size: ${titleFs}; font-weight: 800; letter-spacing: 0.4px; line-height: 1.1; color: var(--accent); }
+    .store-meta { font-size: ${isA5 ? pt(8) : pt(9)}; margin-top: 1mm; line-height: 1.4; }
 
     .doc-title {
-      font-size: ${isA5 ? '13pt' : '17pt'};
+      font-size: ${isA5 ? pt(11) : pt(13)};
       font-weight: 800;
       letter-spacing: 1px;
       text-transform: uppercase;
       text-align: center;
       padding: ${isA5 ? '2mm' : '3mm'};
-      border-bottom: 1.4px solid #000;
+      border-bottom: 1.4px solid var(--accent);
+      color: var(--accent);
     }
-    .doc-meta { font-size: ${isA5 ? '8.5pt' : '9.5pt'}; line-height: 1.5; padding: ${isA5 ? '2mm 3mm' : '3mm 4mm'}; flex: 1; }
+    .doc-meta { font-size: ${isA5 ? pt(8.5) : pt(9.5)}; line-height: 1.5; padding: ${isA5 ? '2mm 3mm' : '3mm 4mm'}; flex: 1; }
     .doc-meta div { display: flex; justify-content: space-between; gap: 3mm; padding: 0.4mm 0; }
     .doc-meta .lbl { font-weight: 700; }
     .doc-meta .val { font-weight: 700; text-align: right; }
 
     .gst-row {
-      border-bottom: 1.4px solid #000;
+      border-bottom: 1.4px solid var(--accent);
       font-size: ${headFs};
       font-weight: 700;
     }
     .gst-row > div { padding: ${isA5 ? '1.5mm 4mm' : '2mm 6mm'}; }
 
-    .parties { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1.4px solid #000; }
+    .parties { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1.4px solid var(--accent); }
     .party { padding: ${isA5 ? '2.5mm 4mm' : '3mm 6mm'}; }
-    .party + .party { border-left: 1.4px solid #000; }
+    .party + .party { border-left: 1.4px solid var(--accent); }
     .party-title { font-size: ${headFs}; font-weight: 700; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 1mm; text-align: center; }
-    .party-name { font-size: ${isA5 ? '10pt' : '11.5pt'}; font-weight: 700; }
-    .party-meta { font-size: ${isA5 ? '8pt' : '9pt'}; line-height: 1.4; margin-top: 0.5mm; }
+    .party-name { font-size: ${isA5 ? pt(10) : pt(11.5)}; font-weight: 700; }
+    .party-meta { font-size: ${isA5 ? pt(8) : pt(9)}; line-height: 1.4; margin-top: 0.5mm; }
 
     .items { width: 100%; border-collapse: collapse; table-layout: fixed; height: ${itemsTableHeight}; }
     .items th, .items td {
       padding: ${isA5 ? '1.2mm 1.6mm' : '1.6mm 2mm'};
-      border-right: 1px solid #000;
+      border-right: 1px solid var(--accent);
       vertical-align: top;
-      font-size: ${isA5 ? '8pt' : '9pt'};
+      font-size: ${isA5 ? pt(8) : pt(9)};
       word-break: break-word;
     }
     .items th:last-child, .items td:last-child { border-right: none; }
@@ -507,15 +542,16 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily }) {
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.4px;
-      border-bottom: 1.4px solid #000;
+      border-bottom: 1.4px solid var(--accent);
       text-align: center;
       background: #f2f2f2;
+      color: #000;
       -webkit-print-color-adjust: exact;
       print-color-adjust: exact;
     }
     .items tbody td { border-bottom: none; }
-    .items .c { text-align: center; }
-    .items .r { text-align: right; }
+    .items .c { text-align: center; white-space: nowrap; }
+    .items .r { text-align: right; white-space: nowrap; }
     .items td.nm { font-weight: 600; text-align: left; }
     .items .filler td { height: 100%; }
     .items .filler .remarks { vertical-align: bottom; font-weight: 700; }
@@ -531,13 +567,13 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily }) {
     .items col.col-dis  { width: ${isA5 ? '10mm' : '12mm'}; }
     .items col.col-amt  { width: ${isA5 ? '16mm' : '22mm'}; }
 
-    .summary { display: grid; grid-template-columns: 1fr ${isA5 ? '58mm' : '76mm'}; border-top: 1.4px solid #000; }
-    .summary .sum-left { border-right: 1.4px solid #000; display: flex; flex-direction: column; }
+    .summary { display: grid; grid-template-columns: 1fr ${isA5 ? '58mm' : '76mm'}; border-top: 1.4px solid var(--accent); }
+    .summary .sum-left { border-right: 1.4px solid var(--accent); display: flex; flex-direction: column; }
 
     .tax-summary { width: 100%; border-collapse: collapse; }
     .tax-summary th, .tax-summary td {
-      border: 1px solid #000; padding: ${isA5 ? '1mm 1.5mm' : '1.4mm 2mm'};
-      font-size: ${isA5 ? '7.5pt' : '8.5pt'};
+      border: 1px solid var(--accent); padding: ${isA5 ? '1mm 1.5mm' : '1.4mm 2mm'};
+      font-size: ${isA5 ? pt(7.5) : pt(8.5)};
     }
     .tax-summary th { font-weight: 700; text-transform: uppercase; text-align: center; }
     .tax-summary .c { text-align: center; }
@@ -546,20 +582,25 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily }) {
     .tax-summary td:last-child, .tax-summary th:last-child { border-right: none; }
     .tax-summary tr:first-child th { border-top: none; }
 
-    .pay { padding: ${isA5 ? '2.5mm 4mm' : '3mm 6mm'}; font-size: ${isA5 ? '8pt' : '9pt'}; line-height: 1.5; flex: 1; }
+    .pay { padding: ${isA5 ? '2.5mm 4mm' : '3mm 6mm'}; font-size: ${isA5 ? pt(8) : pt(9)}; line-height: 1.5; flex: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 3mm; }
+    .pay .pay-info { flex: 1; min-width: 0; }
+    .pay .pay-qr { flex-shrink: 0; text-align: center; }
+    .pay .pay-qr img { width: ${isA5 ? '18mm' : '22mm'}; height: ${isA5 ? '18mm' : '22mm'}; display: block; }
+    .pay .pay-qr span { display: block; margin-top: 0.5mm; font-size: ${isA5 ? pt(6.5) : pt(7)}; font-weight: 600; }
     .pay .lbl { font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; text-decoration: underline; margin-bottom: 1mm; display: block; }
 
     .totals-table { width: 100%; border-collapse: collapse; height: 100%; }
     .totals-table td {
-      padding: ${isA5 ? '1.4mm 3mm' : '1.8mm 4mm'};
-      font-size: ${isA5 ? '9pt' : '10pt'};
+      padding: ${isA5 ? '0.6mm 3mm' : '0.8mm 4mm'};
+      font-size: ${isA5 ? pt(9) : pt(10)};
     }
     .totals-table td.r { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
     .totals-table td.k { text-align: left; }
     .totals-table tr.grand td {
       font-weight: 800;
       font-size: ${grandFs};
-      border-top: 1.4px solid #000;
+      color: var(--accent);
+      border-top: 1.4px solid var(--accent);
       padding-top: ${isA5 ? '2mm' : '2.6mm'};
       padding-bottom: ${isA5 ? '2mm' : '2.6mm'};
       text-transform: uppercase;
@@ -567,19 +608,19 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily }) {
 
     .words {
       padding: ${isA5 ? '2mm 4mm' : '2.5mm 6mm'};
-      border-top: 1.4px solid #000;
-      font-size: ${isA5 ? '8.5pt' : '9.5pt'};
+      border-top: 1.4px solid var(--accent);
+      font-size: ${isA5 ? pt(8.5) : pt(9.5)};
     }
     .words .lbl { font-weight: 700; }
 
     .foot {
       display: grid;
       grid-template-columns: 1.4fr 1fr 1fr;
-      border-top: 1.4px solid #000;
-      font-size: ${isA5 ? '8pt' : '9pt'};
+      border-top: 1.4px solid var(--accent);
+      font-size: ${isA5 ? pt(8) : pt(9)};
     }
     .foot .col { padding: ${isA5 ? '3mm' : '4mm'}; }
-    .foot .col + .col { border-left: 1.4px solid #000; }
+    .foot .col + .col { border-left: 1.4px solid var(--accent); }
     .foot .sig { text-align: center; display: flex; flex-direction: column; justify-content: space-between; }
     .foot .lbl { text-transform: uppercase; letter-spacing: 0.6px; font-weight: 700; margin-bottom: 1mm; display: block; }
     .foot .sig-space { margin-top: ${isA5 ? '10mm' : '14mm'}; }
@@ -589,11 +630,16 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily }) {
     .system-tag {
       text-align: center;
       padding: ${isA5 ? '1.5mm' : '2mm'};
-      font-size: ${isA5 ? '7pt' : '8pt'};
+      font-size: ${isA5 ? pt(7) : pt(8)};
       letter-spacing: 1px;
       text-transform: uppercase;
-      border-top: 1.4px solid #000;
+      border-top: 1.4px solid var(--accent);
       font-weight: 700;
+    }
+    .thanks {
+      text-align: center; padding: ${isA5 ? '2mm' : '2.5mm'};
+      font-size: ${isA5 ? pt(9) : pt(10)}; font-weight: 700; letter-spacing: 0.4px;
+      border-top: 1.4px solid var(--accent); color: var(--accent);
     }
   </style>
 </head>
@@ -614,10 +660,10 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily }) {
         </div>
       </div>
       <div class="right">
-        <div class="doc-title">Purchase Invoice</div>
+        <div class="doc-title">${escapeHtml(il.title)}</div>
         <div class="doc-meta">
-          <div><span class="lbl">Invoice No.</span><span class="val">${escapeHtml(purchase.purchase_number || '—')}</span></div>
-          <div><span class="lbl">Date</span><span class="val">${fmt(purchase.date)}${purchase.time ? '  ' + escapeHtml(purchase.time) : ''}</span></div>
+          <div><span class="lbl">${escapeHtml(il.numberLabel)}</span><span class="val">${escapeHtml(purchase.purchase_number || '—')}</span></div>
+          <div><span class="lbl">${escapeHtml(il.dateLabel)}</span><span class="val">${fmt(purchase.date)}</span></div>
           ${purchase.po_number ? `<div><span class="lbl">PO No.</span><span class="val">${escapeHtml(purchase.po_number)}</span></div>` : ''}
           ${purchase.bill_number ? `<div><span class="lbl">Supplier Bill No.</span><span class="val">${escapeHtml(purchase.bill_number)}</span></div>` : ''}
         </div>
@@ -630,7 +676,7 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily }) {
 
     <div class="parties">
       <div class="party">
-        <div class="party-title">Supplier Name &amp; Address</div>
+        <div class="party-title">${escapeHtml(il.partyTitle)}</div>
         <div class="party-name">${escapeHtml(purchase.ledger_name || '—')}</div>
       </div>
       <div class="party">
@@ -644,31 +690,9 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily }) {
     </div>
 
     <table class="items">
-      <colgroup>
-        <col class="col-no"/>
-        <col class="col-name"/>
-        <col class="col-hsn"/>
-        <col class="col-unit"/>
-        <col class="col-mrp"/>
-        <col class="col-qty"/>
-        <col class="col-rate"/>
-        <col class="col-gst"/>
-        <col class="col-dis"/>
-        <col class="col-amt"/>
-      </colgroup>
+      <colgroup>${colgroupHtml}</colgroup>
       <thead>
-        <tr>
-          <th>S.N</th>
-          <th>Item Description</th>
-          <th>HSN</th>
-          <th>Unit</th>
-          <th>MRP</th>
-          <th>Qty</th>
-          <th>Base Rate</th>
-          <th>GST%</th>
-          <th>DIS%</th>
-          <th>Amount</th>
-        </tr>
+        <tr>${theadHtml}</tr>
       </thead>
       <tbody>
         ${itemsRows}
@@ -689,48 +713,37 @@ function buildPaper({ purchase, store, logoDataUrl, ps, format, fontFamily }) {
           </tbody>
         </table>
         <div class="pay">
-          <span class="lbl">For Making Payment</span>
-          ${store.upi_id ? `Gpay / UPI: ${escapeHtml(store.upi_id)}<br>` : ''}
-          ${contactBits}
+          <div class="pay-info">
+            <span class="lbl">For Making Payment</span>
+            ${store.upi_id ? `Gpay / UPI: ${escapeHtml(store.upi_id)}<br>` : ''}
+            ${contactBits}
+          </div>
+          ${upiQrDataUrl ? `<div class="pay-qr"><img src="${upiQrDataUrl}" alt="UPI QR"/><span>Scan to Pay</span></div>` : ''}
         </div>
       </div>
       <div class="totals">
         <table class="totals-table">
           <tbody>
-            <tr><td class="k">Total Amount</td><td class="r">${num(taxableTotal)}</td></tr>
-            <tr><td class="k">Less : Discount</td><td class="r">${num(totalDiscount)}</td></tr>
+            <tr><td class="k">${escapeHtml(il.totalAmount)}</td><td class="r">${num(taxableTotal)}</td></tr>
+            <tr><td class="k">${escapeHtml(il.discountLabel)}</td><td class="r">${num(totalDiscount)}</td></tr>
             <tr><td class="k">Add : CGST</td><td class="r">${num(cgstTotal)}</td></tr>
             <tr><td class="k">Add : SGST</td><td class="r">${num(sgstTotal)}</td></tr>
             <tr><td class="k">Add : IGST</td><td class="r">${num(0)}</td></tr>
-            <tr><td class="k">Add : Freight</td><td class="r">${num(totalFreight)}</td></tr>
-            <tr><td class="k">Net Nos</td><td class="r">${num(totalQty, totalQty % 1 === 0 ? 0 : 2)}</td></tr>
-            <tr class="grand"><td class="k">Net Value</td><td class="r">${num(totalAmount)}</td></tr>
+            <tr><td class="k">${escapeHtml(il.freightLabel)}</td><td class="r">${num(totalFreight)}</td></tr>
+            <tr><td class="k">${escapeHtml(il.netQtyLabel)}</td><td class="r">${num(totalQty, totalQty % 1 === 0 ? 0 : 2)}</td></tr>
+            <tr class="grand"><td class="k">${escapeHtml(il.grandTotalLabel)}</td><td class="r">${num(totalAmount)}</td></tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <div class="words">
-      <span class="lbl">Rupees in Words :</span> ${escapeHtml(amountInWords(totalAmount))}
-    </div>
+    ${showWords ? `<div class="words">
+      <span class="lbl">${escapeHtml(il.wordsLabel)}</span> ${escapeHtml(amountInWords(totalAmount))}
+    </div>` : ''}
 
-    <div class="foot">
-      <div class="col terms">
-        <span class="lbl">Terms &amp; Condition</span>
-        <ol>
-          ${termsHtml}
-        </ol>
-      </div>
-      <div class="col sig">
-        <span class="lbl">Receiver Signature</span>
-        <div class="sig-space"></div>
-      </div>
-      <div class="col sig">
-        <span class="lbl">For ${escapeHtml(store.store_name || 'Store')}</span>
-        <div class="sig-space"></div>
-      </div>
-    </div>
+    ${footHtml}
 
+    ${thanksText ? `<div class="thanks">${escapeHtml(thanksText)}</div>` : ''}
     <div class="system-tag">**** This is a system generated invoice ***</div>
 
   </div>

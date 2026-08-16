@@ -256,7 +256,7 @@ export default function GstReturnReportPage({ title, partyLabel, fetchReport, fi
             <div className="overflow-x-auto">
               <table className="w-full text-sm table-zebra">
                 <thead>
-                  <tr className="border-b border-indigo-200 bg-indigo-100 text-indigo-800">
+                  <tr className="border-b border-amber-200 bg-amber-100">
                     <th className="px-3 py-3 text-left font-semibold">Date</th>
                     <th className="px-3 py-3 text-left font-semibold">Invoice No</th>
                     <th className="px-3 py-3 text-left font-semibold">{partyLabel}</th>
@@ -309,7 +309,7 @@ export default function GstReturnReportPage({ title, partyLabel, fetchReport, fi
             <div className="overflow-x-auto">
               <table className="w-full text-sm table-zebra">
                 <thead>
-                  <tr className="border-b border-indigo-200 bg-indigo-100 text-indigo-800">
+                  <tr className="border-b border-amber-200 bg-amber-100">
                     <th className="px-3 py-2.5 text-right font-semibold">Rate %</th>
                     <th className="px-3 py-2.5 text-right font-semibold">Taxable</th>
                     <th className="px-3 py-2.5 text-right font-semibold">CGST</th>

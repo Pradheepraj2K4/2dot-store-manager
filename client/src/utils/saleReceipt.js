@@ -17,12 +17,12 @@
  */
 
 import qrcode from 'qrcode-generator';
-import { mergeReceiptConfig } from './receiptConfig';
+import { mergeReceiptConfig, getInvoiceLabels } from './receiptConfig';
 
 // Builds a UPI payment QR code as a data URL for the given VPA (UPI id).
 // Returns null when no valid UPI id is supplied. Fully synchronous so it can
 // be embedded directly in the receipt HTML string.
-function buildUpiQrDataUrl(upiId, { payeeName = '', amount = 0 } = {}) {
+export function buildUpiQrDataUrl(upiId, { payeeName = '', amount = 0 } = {}) {
   const vpa = String(upiId || '').trim();
   if (!vpa) return null;
   try {
@@ -169,7 +169,7 @@ export function buildSaleReceiptHtml({
   const cfg = mergeReceiptConfig(config);
 
   if (isThermal) return buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docType, cfg, logoHeightMm, upiQrSizeMm, widthMm });
-  return buildPaper({ sale, store, logoDataUrl, ps, format, labels, cfg });
+  return buildPaper({ sale, store, logoDataUrl, ps, format, labels, docType, cfg });
 }
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -481,9 +481,11 @@ function buildThermal({ sale, ledgerName, store, logoDataUrl, ps, labels, docTyp
 // ───────────────────────────────────────────────────────────────────────────
 // A4 / A5 — FREE-HAND branding header + structured tax invoice
 // ───────────────────────────────────────────────────────────────────────────
-function buildPaper({ sale, store, logoDataUrl, ps, format, labels, cfg }) {
+function buildPaper({ sale, store, logoDataUrl, ps, format, labels, docType = 'sale', cfg }) {
   const isA5 = format === 'a5';
   const cfgP = cfg.paper;
+  const il = getInvoiceLabels(cfg, 'sale');
+  const isEstimate = docType === 'estimation';
   const items = Array.isArray(sale.items) ? sale.items : [];
 
   const totalItemDiscount = parseFloat(sale.total_discount) || 0;
@@ -541,7 +543,11 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels, cfg }) {
   const headFs   = isA5 ? pt(8.5) : pt(9.5);
   const grandFs  = isA5 ? pt(12)  : pt(14);
 
-  const paperTitle = cfgP.titleText && cfgP.titleText.trim() ? cfgP.titleText.trim() : (labels.title || 'Tax Invoice');
+  const paperTitle = cfgP.titleText && cfgP.titleText.trim()
+    ? cfgP.titleText.trim()
+    : (isEstimate ? (labels.title || 'Estimate') : (il.title || labels.title || 'Tax Invoice'));
+  const numberLabel = isEstimate ? (labels.numberLabelPaper || 'Estimate No.') : (il.numberLabel || 'Invoice No.');
+  const dateLabel = isEstimate ? (labels.dateLabelPaper || 'Date') : (il.dateLabel || 'Date');
   const signatureLabel = cfgP.signatureLabel && cfgP.signatureLabel.trim() ? cfgP.signatureLabel.trim() : 'Authorised Signatory';
 
   const logoHtml = logoDataUrl
@@ -553,48 +559,42 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels, cfg }) {
     store.email ? `email: ${escapeHtml(store.email)}` : '',
   ].filter(Boolean).join('<br>');
 
-  const termsLines = (store.terms_conditions && String(store.terms_conditions).trim())
-    ? String(store.terms_conditions).split('\n').map((t) => t.trim()).filter(Boolean)
+  const termsSource = (cfgP.termsText && String(cfgP.termsText).trim())
+    ? String(cfgP.termsText)
+    : (store.terms_conditions && String(store.terms_conditions).trim() ? String(store.terms_conditions) : '');
+  const termsLines = termsSource.trim()
+    ? termsSource.split('\n').map((t) => t.trim()).filter(Boolean)
     : ['Goods once sold cannot be taken back.', 'Subject to local jurisdiction.', 'Our responsibility ceases on delivery of goods.'];
   const termsHtml = termsLines.map((t) => `<li>${escapeHtml(t)}</li>`).join('');
 
-  const itemsRows = items.map((l, i) => {
-    const rate = parseFloat(l.rate) || 0;
-    const qty  = parseFloat(l.quantity) || 0;
-    const disc = parseFloat(l.discount_percent) || 0;
-    const gst  = parseFloat(l.gst_percent) || 0;
-    const mrp  = parseFloat(l.mrp) || 0;
-    return `
-      <tr>
-        <td class="c">${i + 1}</td>
-        <td class="nm">${escapeHtml(l.item_name || '')}</td>
-        <td class="c">${escapeHtml(l.hsn_code || l.hsn || '')}</td>
-        <td class="c">${escapeHtml(l.unit || '')}</td>
-        <td class="r">${mrp ? num(mrp) : '—'}</td>
-        <td class="r">${num(qty, qty % 1 === 0 ? 0 : 2)}</td>
-        <td class="r">${num(rate)}</td>
-        <td class="c">${gst ? num(gst, 0) : '0'}</td>
-        <td class="c">${disc ? num(disc, 0) : '0'}</td>
-        <td class="r">${num(l.amount)}</td>
-      </tr>
-    `;
-  }).join('');
+  // Optional-column visibility (paper.columns). Item, Qty and Amount are always
+  // shown; every other column is toggled from the A4/A5 design settings.
+  const cols = cfgP.columns || {};
+  const colOn = (k) => cols[k] !== false;
+  const columnDefs = [
+    { key: 'sno', cls: 'col-no', th: il.colSno, cell: (l, i) => `<td class="c">${i + 1}</td>` },
+    { key: 'item', cls: 'col-name', th: il.colItem, always: true, cell: (l) => `<td class="nm">${escapeHtml(l.item_name || '')}</td>` },
+    { key: 'hsn', cls: 'col-hsn', th: il.colHsn, cell: (l) => `<td class="c">${escapeHtml(l.hsn_code || l.hsn || '')}</td>` },
+    { key: 'unit', cls: 'col-unit', th: il.colUnit, cell: (l) => `<td class="c">${escapeHtml(l.unit || '')}</td>` },
+    { key: 'mrp', cls: 'col-mrp', th: il.colMrp, cell: (l) => { const mrp = parseFloat(l.mrp) || 0; return `<td class="r">${mrp ? num(mrp, mrp % 1 === 0 ? 0 : 2) : '—'}</td>`; } },
+    { key: 'qty', cls: 'col-qty', th: il.colQty, always: true, cell: (l) => { const q = parseFloat(l.quantity) || 0; return `<td class="r">${num(q, q % 1 === 0 ? 0 : 2)}</td>`; } },
+    { key: 'rate', cls: 'col-rate', th: il.colRate, cell: (l) => { const rate = parseFloat(l.rate) || 0; return `<td class="r">${num(rate, rate % 1 === 0 ? 0 : 2)}</td>`; } },
+    { key: 'gst', cls: 'col-gst', th: il.colGst, cell: (l) => { const gst = parseFloat(l.gst_percent) || 0; return `<td class="c">${gst ? num(gst, 0) : '0'}</td>`; } },
+    { key: 'discount', cls: 'col-dis', th: il.colDiscount, cell: (l) => { const disc = parseFloat(l.discount_percent) || 0; return `<td class="c">${disc ? num(disc, 0) : '0'}</td>`; } },
+    { key: 'amount', cls: 'col-amt', th: il.colAmount, always: true, cell: (l) => `<td class="r">${num(l.amount)}</td>` },
+  ];
+  const activeCols = columnDefs.filter((c) => c.always || colOn(c.key));
+  const colgroupHtml = activeCols.map((c) => `<col class="${c.cls}"/>`).join('');
+  const theadHtml = activeCols.map((c) => `<th>${escapeHtml(c.th)}</th>`).join('');
+  const itemsRows = items
+    .map((l, i) => `<tr>${activeCols.map((c) => c.cell(l, i)).join('')}</tr>`)
+    .join('');
 
   // Blank filler row keeps the items table at a fixed height regardless of the
   // number of lines, so short invoices keep the same tall ruled body as long ones.
-  const fillerRow = `
-      <tr class="filler">
-        <td class="c"></td>
-        <td class="nm remarks">Remarks:</td>
-        <td class="c"></td>
-        <td class="c"></td>
-        <td class="r"></td>
-        <td class="r"></td>
-        <td class="r"></td>
-        <td class="c"></td>
-        <td class="c"></td>
-        <td class="r"></td>
-      </tr>`;
+  const fillerRow = `<tr class="filler">${activeCols
+    .map((c) => (c.key === 'item' ? '<td class="nm remarks">Remarks:</td>' : '<td></td>'))
+    .join('')}</tr>`;
 
   const itemsTableHeight = isA5 ? '58mm' : '120mm';
 
@@ -606,6 +606,32 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels, cfg }) {
     upiAmt > 0 ? `UPI: ${num(upiAmt)}` : '',
     changeAmt > 0 ? `Change: ${num(changeAmt)}` : '',
   ].filter(Boolean).join('<br>');
+
+  // UPI payment QR for the invoice footer (encodes store VPA + bill total).
+  const upiQrDataUrl = buildUpiQrDataUrl(store?.upi_id, {
+    payeeName: store.store_name || '',
+    amount: totalAmount,
+  });
+
+  // Section-level A4/A5 design toggles.
+  const showBorder = cfgP.showBorder !== false;
+  const showWords = cfgP.showWords !== false;
+  const showTerms = cfgP.showTerms !== false;
+  const showSignature = cfgP.showSignature !== false;
+  const thanksText = (cfgP.thanksText && String(cfgP.thanksText).trim()) ? String(cfgP.thanksText).trim() : '';
+
+  const footCols = [];
+  if (showTerms) {
+    footCols.push(`<div class="col terms"><span class="lbl">Terms &amp; Condition</span><ol>${termsHtml}</ol></div>`);
+  }
+  if (showSignature) {
+    footCols.push(`<div class="col sig"><span class="lbl">Receiver Signature</span><div class="sig-space"></div></div>`);
+    footCols.push(`<div class="col sig"><span class="lbl">For ${escapeHtml(store.store_name || 'Store')}</span><div class="sig-space">${escapeHtml(signatureLabel)}</div></div>`);
+  }
+  const footGrid = (showTerms && showSignature) ? '1.4fr 1fr 1fr' : (showTerms ? '1fr' : '1fr 1fr');
+  const footHtml = footCols.length
+    ? `<div class="foot" style="grid-template-columns: ${footGrid};">${footCols.join('')}</div>`
+    : '';
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -629,21 +655,22 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels, cfg }) {
     @media screen { html { background: #eef0f2; } body { margin: 0 auto; box-shadow: 0 0 6px rgba(0,0,0,0.15); } }
     .page { width: 100%; }
 
-    .doc { border: 1.4px solid var(--accent); }
+    .doc { border: ${showBorder ? '1.4px solid var(--accent)' : 'none'}; }
 
     .head {
       display: grid;
-      grid-template-columns: 1.6fr 1fr;
+      grid-template-columns: 2.2fr 1fr;
       border-bottom: 1.4px solid var(--accent);
     }
     .head .left { padding: ${isA5 ? '3mm 4mm' : '4mm 6mm'}; display: flex; align-items: center; gap: 4mm; }
+    .head .left > div { flex: 1; min-width: 0; }
     .head .right { border-left: 1.4px solid var(--accent); display: flex; flex-direction: column; }
     .logo { max-height: ${isA5 ? '14mm' : '18mm'}; max-width: ${isA5 ? '24mm' : '32mm'}; object-fit: contain; }
     .store-name { font-size: ${titleFs}; font-weight: 800; letter-spacing: 0.4px; line-height: 1.1; color: var(--accent); }
     .store-meta { font-size: ${isA5 ? pt(8) : pt(9)}; margin-top: 1mm; line-height: 1.4; }
 
     .doc-title {
-      font-size: ${isA5 ? pt(13) : pt(17)};
+      font-size: ${isA5 ? pt(11) : pt(13)};
       font-weight: 800; letter-spacing: 1px; text-transform: uppercase; text-align: center;
       padding: ${isA5 ? '2mm' : '3mm'};
       border-bottom: 1.4px solid var(--accent);
@@ -681,8 +708,8 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels, cfg }) {
       -webkit-print-color-adjust: exact; print-color-adjust: exact;
     }
     .items tbody td { border-bottom: none; }
-    .items .c { text-align: center; }
-    .items .r { text-align: right; }
+    .items .c { text-align: center; white-space: nowrap; }
+    .items .r { text-align: right; white-space: nowrap; }
     .items td.nm { font-weight: 600; text-align: left; }
     .items .filler td { height: 100%; }
     .items .filler .remarks { vertical-align: bottom; font-weight: 700; }
@@ -691,7 +718,7 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels, cfg }) {
     .items col.col-name { width: auto; }
     .items col.col-hsn  { width: ${isA5 ? '14mm' : '18mm'}; }
     .items col.col-unit { width: ${isA5 ? '12mm' : '15mm'}; }
-    .items col.col-mrp  { width: ${isA5 ? '13mm' : '16mm'}; }
+    .items col.col-mrp  { width: ${isA5 ? '15mm' : '19mm'}; }
     .items col.col-qty  { width: ${isA5 ? '11mm' : '13mm'}; }
     .items col.col-rate { width: ${isA5 ? '14mm' : '18mm'}; }
     .items col.col-gst  { width: ${isA5 ? '10mm' : '12mm'}; }
@@ -713,11 +740,15 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels, cfg }) {
     .tax-summary td:last-child, .tax-summary th:last-child { border-right: none; }
     .tax-summary tr:first-child th { border-top: none; }
 
-    .pay { padding: ${isA5 ? '2.5mm 4mm' : '3mm 6mm'}; font-size: ${isA5 ? pt(8) : pt(9)}; line-height: 1.5; flex: 1; }
+    .pay { padding: ${isA5 ? '2.5mm 4mm' : '3mm 6mm'}; font-size: ${isA5 ? pt(8) : pt(9)}; line-height: 1.5; flex: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 3mm; }
+    .pay .pay-info { flex: 1; min-width: 0; }
+    .pay .pay-qr { flex-shrink: 0; text-align: center; }
+    .pay .pay-qr img { width: ${isA5 ? '18mm' : '22mm'}; height: ${isA5 ? '18mm' : '22mm'}; display: block; }
+    .pay .pay-qr span { display: block; margin-top: 0.5mm; font-size: ${isA5 ? pt(6.5) : pt(7)}; font-weight: 600; }
     .pay .lbl { font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; text-decoration: underline; margin-bottom: 1mm; display: block; }
 
     .totals-table { width: 100%; border-collapse: collapse; height: 100%; }
-    .totals-table td { padding: ${isA5 ? '1.4mm 3mm' : '1.8mm 4mm'}; font-size: ${isA5 ? pt(9) : pt(10)}; }
+    .totals-table td { padding: ${isA5 ? '0.6mm 3mm' : '0.8mm 4mm'}; font-size: ${isA5 ? pt(9) : pt(10)}; }
     .totals-table td.r { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
     .totals-table td.k { text-align: left; }
     .totals-table tr.grand td {
@@ -752,6 +783,11 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels, cfg }) {
       font-size: ${isA5 ? pt(7) : pt(8)}; letter-spacing: 1px; text-transform: uppercase;
       border-top: 1.4px solid var(--accent); font-weight: 700;
     }
+    .thanks {
+      text-align: center; padding: ${isA5 ? '2mm' : '2.5mm'};
+      font-size: ${isA5 ? pt(9) : pt(10)}; font-weight: 700; letter-spacing: 0.4px;
+      border-top: 1.4px solid var(--accent); color: var(--accent);
+    }
   </style>
 </head>
 <body>
@@ -773,8 +809,8 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels, cfg }) {
       <div class="right">
         <div class="doc-title">${escapeHtml(paperTitle)}</div>
         <div class="doc-meta">
-          <div><span class="lbl">${escapeHtml(labels.numberLabelPaper || 'Invoice No.')}</span><span class="val">${escapeHtml(sale.sale_number || '—')}</span></div>
-          <div><span class="lbl">${escapeHtml(labels.dateLabelPaper || 'Date')}</span><span class="val">${fmt(sale.date)}${sale.time ? '  ' + escapeHtml(sale.time) : ''}</span></div>
+          <div><span class="lbl">${escapeHtml(numberLabel)}</span><span class="val">${escapeHtml(sale.sale_number || '—')}</span></div>
+          <div><span class="lbl">${escapeHtml(dateLabel)}</span><span class="val">${fmt(sale.date)}</span></div>
           ${sale.service_type ? `<div><span class="lbl">Dining</span><span class="val">${sale.service_type === 'ac' ? 'A/C' : 'Non-A/C'}</span></div>` : ''}
           ${sale.waiter_name && sale.waiter_name.trim() ? `<div><span class="lbl">Waiter</span><span class="val">${escapeHtml(sale.waiter_name.trim())}</span></div>` : ''}
         </div>
@@ -787,7 +823,7 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels, cfg }) {
 
     <div class="parties">
       <div class="party">
-        <div class="party-title">Buyer's Name &amp; Address</div>
+        <div class="party-title">${escapeHtml(il.partyTitle)}</div>
         <div class="party-name">${escapeHtml(buyerName)}</div>
         ${buyerMobile ? `<div class="party-meta">Mobile: ${escapeHtml(buyerMobile)}</div>` : ''}
       </div>
@@ -799,31 +835,9 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels, cfg }) {
     </div>
 
     <table class="items">
-      <colgroup>
-        <col class="col-no"/>
-        <col class="col-name"/>
-        <col class="col-hsn"/>
-        <col class="col-unit"/>
-        <col class="col-mrp"/>
-        <col class="col-qty"/>
-        <col class="col-rate"/>
-        <col class="col-gst"/>
-        <col class="col-dis"/>
-        <col class="col-amt"/>
-      </colgroup>
+      <colgroup>${colgroupHtml}</colgroup>
       <thead>
-        <tr>
-          <th>S.N</th>
-          <th>Item Description</th>
-          <th>HSN</th>
-          <th>Unit</th>
-          <th>MRP</th>
-          <th>Qty</th>
-          <th>Base Rate</th>
-          <th>GST%</th>
-          <th>DIS%</th>
-          <th>Amount</th>
-        </tr>
+        <tr>${theadHtml}</tr>
       </thead>
       <tbody>
         ${itemsRows}
@@ -844,49 +858,38 @@ function buildPaper({ sale, store, logoDataUrl, ps, format, labels, cfg }) {
           </tbody>
         </table>
         <div class="pay">
-          <span class="lbl">For Making Payment</span>
-          ${store.upi_id ? `Gpay / UPI: ${escapeHtml(store.upi_id)}<br>` : ''}
-          ${paySplit ? `${paySplit}<br>` : ''}
-          ${contactBits}
+          <div class="pay-info">
+            <span class="lbl">For Making Payment</span>
+            ${store.upi_id ? `Gpay / UPI: ${escapeHtml(store.upi_id)}<br>` : ''}
+            ${paySplit ? `${paySplit}<br>` : ''}
+            ${contactBits}
+          </div>
+          ${upiQrDataUrl ? `<div class="pay-qr"><img src="${upiQrDataUrl}" alt="UPI QR"/><span>Scan to Pay</span></div>` : ''}
         </div>
       </div>
       <div class="totals">
         <table class="totals-table">
           <tbody>
-            <tr><td class="k">Total Amount</td><td class="r">${num(taxableTotal)}</td></tr>
-            <tr><td class="k">Less : Discount</td><td class="r">${num(totalDiscount)}</td></tr>
+            <tr><td class="k">${escapeHtml(il.totalAmount)}</td><td class="r">${num(taxableTotal)}</td></tr>
+            <tr><td class="k">${escapeHtml(il.discountLabel)}</td><td class="r">${num(totalDiscount)}</td></tr>
             <tr><td class="k">Add : CGST</td><td class="r">${num(cgstTotal)}</td></tr>
             <tr><td class="k">Add : SGST</td><td class="r">${num(sgstTotal)}</td></tr>
             <tr><td class="k">Add : IGST</td><td class="r">${num(0)}</td></tr>
-            <tr><td class="k">Add : Freight</td><td class="r">${num(totalFreight)}</td></tr>
-            <tr><td class="k">Net Nos</td><td class="r">${num(totalQty, totalQty % 1 === 0 ? 0 : 2)}</td></tr>
-            <tr class="grand"><td class="k">Net Value</td><td class="r">${num(totalAmount)}</td></tr>
+            <tr><td class="k">${escapeHtml(il.freightLabel)}</td><td class="r">${num(totalFreight)}</td></tr>
+            <tr><td class="k">${escapeHtml(il.netQtyLabel)}</td><td class="r">${num(totalQty, totalQty % 1 === 0 ? 0 : 2)}</td></tr>
+            <tr class="grand"><td class="k">${escapeHtml(il.grandTotalLabel)}</td><td class="r">${num(totalAmount)}</td></tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <div class="words">
-      <span class="lbl">Rupees in Words :</span> ${escapeHtml(amountInWords(totalAmount))}
-    </div>
+    ${showWords ? `<div class="words">
+      <span class="lbl">${escapeHtml(il.wordsLabel)}</span> ${escapeHtml(amountInWords(totalAmount))}
+    </div>` : ''}
 
-    <div class="foot">
-      <div class="col terms">
-        <span class="lbl">Terms &amp; Condition</span>
-        <ol>
-          ${termsHtml}
-        </ol>
-      </div>
-      <div class="col sig">
-        <span class="lbl">Receiver Signature</span>
-        <div class="sig-space"></div>
-      </div>
-      <div class="col sig">
-        <span class="lbl">For ${escapeHtml(store.store_name || 'Store')}</span>
-        <div class="sig-space">${escapeHtml(signatureLabel)}</div>
-      </div>
-    </div>
+    ${footHtml}
 
+    ${thanksText ? `<div class="thanks">${escapeHtml(thanksText)}</div>` : ''}
     <div class="system-tag">**** This is a system generated invoice ***</div>
 
   </div>

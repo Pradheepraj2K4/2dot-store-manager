@@ -35,14 +35,92 @@ export const THERMAL_SECTION_LABELS = {
   footer: 'Footer / Thank-you',
 };
 
-// Paper (A4/A5) invoice-table column catalogue — id → human label.
+// Paper (A4/A5) invoice-table column catalogue — id → human label. These map
+// to the optional columns of the structured invoice; Item, Qty and Amount are
+// always shown and therefore not listed here.
 export const PAPER_COLUMN_LABELS = {
   sno: 'S.No',
+  hsn: 'HSN',
   unit: 'Unit',
+  mrp: 'MRP',
   rate: 'Rate',
-  discount: 'Discount %',
   gst: 'GST %',
-  taxable: 'Taxable Value',
+  discount: 'Discount %',
+};
+
+// Customisable invoice-label catalogue — field id → human label shown in the
+// settings editor. Applies to the A4 / A5 invoice for both sale (items) and
+// purchase documents. Grouped for a cleaner editor layout.
+export const INVOICE_LABEL_FIELDS = [
+  { group: 'Header', fields: {
+    title: 'Document Title',
+    numberLabel: 'Number Label',
+    dateLabel: 'Date Label',
+    partyTitle: 'Party Title',
+  } },
+  { group: 'Table Columns', fields: {
+    colSno: 'S.No Column',
+    colItem: 'Item Column',
+    colHsn: 'HSN Column',
+    colUnit: 'Unit Column',
+    colMrp: 'MRP Column',
+    colQty: 'Qty Column',
+    colRate: 'Rate Column',
+    colGst: 'GST % Column',
+    colDiscount: 'Discount % Column',
+    colAmount: 'Amount Column',
+  } },
+  { group: 'Totals', fields: {
+    totalAmount: 'Total Amount',
+    discountLabel: 'Discount',
+    freightLabel: 'Freight',
+    netQtyLabel: 'Net Qty',
+    grandTotalLabel: 'Grand Total',
+    wordsLabel: 'Amount in Words',
+  } },
+];
+
+// Flat list of every customisable invoice-label field id.
+export const INVOICE_LABEL_KEYS = INVOICE_LABEL_FIELDS
+  .flatMap((g) => Object.keys(g.fields));
+
+// Column / totals / words labels are shared defaults for both document kinds.
+const INVOICE_LABELS_COMMON = {
+  colSno: 'S.N',
+  colItem: 'Item Description',
+  colHsn: 'HSN',
+  colUnit: 'Unit',
+  colMrp: 'MRP',
+  colQty: 'Qty',
+  colRate: 'Base Rate',
+  colGst: 'GST%',
+  colDiscount: 'DIS%',
+  colAmount: 'Amount',
+  totalAmount: 'Total Amount',
+  discountLabel: 'Less : Discount',
+  freightLabel: 'Add : Freight',
+  netQtyLabel: 'Net Nos',
+  grandTotalLabel: 'Net Value',
+  wordsLabel: 'Rupees in Words :',
+};
+
+export const DEFAULT_INVOICE_LABELS = {
+  // When false, purchase invoices reuse the sale (items) labels.
+  separatePurchase: true,
+  sale: {
+    title: 'Tax Invoice',
+    numberLabel: 'Invoice No.',
+    dateLabel: 'Invoice Date',
+    partyTitle: "Buyer's Name & Address",
+    ...INVOICE_LABELS_COMMON,
+  },
+  purchase: {
+    title: 'Purchase Invoice',
+    numberLabel: 'Invoice No.',
+    dateLabel: 'Date',
+    partyTitle: 'Supplier Name & Address',
+    ...INVOICE_LABELS_COMMON,
+  },
 };
 
 export const DEFAULT_RECEIPT_CONFIG = {
@@ -89,7 +167,7 @@ export const DEFAULT_RECEIPT_CONFIG = {
     showSignature: true,
     showWords: true,
     showTerms: true,
-    columns: { sno: true, unit: true, rate: true, discount: true, gst: true, taxable: true },
+    columns: { sno: true, hsn: true, unit: true, mrp: true, rate: true, gst: true, discount: true },
     // Free-hand branding header. Coordinates are millimetres on an A4 canvas
     // (210mm wide); for A5 they are scaled proportionally (×148/210).
     headerHeight: 40,     // mm — height of the draggable header band
@@ -99,6 +177,9 @@ export const DEFAULT_RECEIPT_CONFIG = {
       meta: { x: 150, y: 7, w: 52, align: 'right', enabled: true },
     },
   },
+
+  // ── Customisable invoice labels (A4 / A5) ──
+  invoiceLabels: JSON.parse(JSON.stringify(DEFAULT_INVOICE_LABELS)),
 };
 
 function isObj(v) {
@@ -157,7 +238,35 @@ export function mergeReceiptConfig(saved) {
     };
   }
 
+  // Invoice labels — merge only known string fields over the defaults.
+  if (isObj(saved.invoiceLabels)) {
+    const il = saved.invoiceLabels;
+    if (typeof il.separatePurchase === 'boolean') {
+      out.invoiceLabels.separatePurchase = il.separatePurchase;
+    }
+    ['sale', 'purchase'].forEach((kind) => {
+      if (!isObj(il[kind])) return;
+      INVOICE_LABEL_KEYS.forEach((key) => {
+        const v = il[kind][key];
+        if (typeof v === 'string' && v.trim()) out.invoiceLabels[kind][key] = v;
+      });
+    });
+  }
+
   return out;
+}
+
+// Resolve the effective invoice labels for a document kind ('sale' | 'purchase').
+// Purchase falls back to the sale (items) labels when separate labels are off.
+export function getInvoiceLabels(config, kind = 'sale') {
+  const cfg = isObj(config) && isObj(config.invoiceLabels)
+    ? config
+    : mergeReceiptConfig(config);
+  const il = cfg.invoiceLabels || DEFAULT_INVOICE_LABELS;
+  if (kind === 'purchase') {
+    return il.separatePurchase ? il.purchase : il.sale;
+  }
+  return il.sale;
 }
 
 // Read the mirrored config synchronously (used by the print path & preview).
